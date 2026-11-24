@@ -1,0 +1,46 @@
+services:
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      AUTH_DB_PASSWORD: ${AUTH_DB_PASSWORD:-auth}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:-app}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - postgres_data:/var/lib/postgresql
+      - ./db/init.sh:/docker-entrypoint-initdb.d/init.sh:ro
+  auth:
+    build: ./auth
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://auth:${AUTH_DB_PASSWORD:-auth}@postgres:5432/auth
+    volumes:
+      - jwt_private:/keys/private
+      - jwt_public:/keys/public
+  app:
+    build: ./app
+    depends_on:
+      - auth
+    environment:
+      TICK_RATE: ${TICK_RATE:-20}
+    volumes:
+      - jwt_public:/keys/public:ro
+  nginx:
+    image: nginx:stable
+    depends_on:
+      - auth
+      - app
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+volumes:
+  postgres_data:
+  jwt_private:
+  jwt_public:
