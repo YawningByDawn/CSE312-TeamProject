@@ -1,6 +1,7 @@
 services:
   postgres:
     image: postgres:18
+    restart: unless-stopped
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       AUTH_DB_PASSWORD: ${AUTH_DB_PASSWORD:-auth}
@@ -15,6 +16,7 @@ services:
       - ./db/init.sh:/docker-entrypoint-initdb.d/init.sh:ro
   auth:
     build: ./auth
+    restart: unless-stopped
     depends_on:
       postgres:
         condition: service_healthy
@@ -25,6 +27,7 @@ services:
       - jwt_public:/keys/public
   app:
     build: ./app
+    restart: unless-stopped
     depends_on:
       - auth
     environment:
@@ -33,6 +36,7 @@ services:
       - jwt_public:/keys/public:ro
   nginx:
     image: nginx:stable
+    restart: unless-stopped
     depends_on:
       - auth
       - app

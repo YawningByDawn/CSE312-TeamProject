@@ -1,6 +1,9 @@
 package websocket
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"html"
+)
 
 // All message encoding lives here, so a binary format can replace JSON in one place.
 
@@ -30,6 +33,9 @@ func decode(data []byte) (inMessage, bool) {
 }
 
 func encodeState(players []playerState) []byte {
+	for i := range players {
+		players[i].Name = html.EscapeString(players[i].Name)
+	}
 	data, _ := json.Marshal(stateMessage{Type: "state", Players: players})
 	return data
 }

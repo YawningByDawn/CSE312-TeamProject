@@ -4,7 +4,7 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/DoritoMayhem/WebProject/app/token"
+	"github.com/YawningByDawn/CSE312-TeamProject/app/token"
 	fiberws "github.com/gofiber/contrib/v3/websocket"
 	"github.com/gofiber/fiber/v3"
 )

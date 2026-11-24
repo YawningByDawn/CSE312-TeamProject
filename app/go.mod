@@ -1,4 +1,4 @@
-module github.com/DoritoMayhem/WebProject/app
+module github.com/YawningByDawn/CSE312-TeamProject/app
 
 go 1.26
 

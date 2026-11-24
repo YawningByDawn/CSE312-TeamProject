@@ -1,12 +1,14 @@
 package router
 
 import (
+	"html"
 	"net/url"
 	"regexp"
+	"strings"
 	"time"
 
-	"github.com/DoritoMayhem/WebProject/auth/database"
-	"github.com/DoritoMayhem/WebProject/auth/token"
+	"github.com/YawningByDawn/CSE312-TeamProject/auth/database"
+	"github.com/YawningByDawn/CSE312-TeamProject/auth/token"
 	"github.com/gofiber/fiber/v3"
 )
 
@@ -15,7 +17,7 @@ type credentials struct {
 	Password string `json:"password"`
 }
 
-var validUsername = regexp.MustCompile(`^[A-Za-z0-9_]{3,20}$`)
+var validUsername = regexp.MustCompile(`^[a-z0-9_]{3,20}$`)
 
 func Setup(app *fiber.App) {
 	app.Use(checkOrigin)
@@ -34,11 +36,18 @@ func checkOrigin(c fiber.Ctx) error {
 	return c.Next()
 }
 
-func register(c fiber.Ctx) error {
+// readCredentials lowercases the username so "Bob" and "bob" are the same account.
+func readCredentials(c fiber.Ctx) (credentials, error) {
 	var body credentials
 	err := c.Bind().Body(&body)
+	body.Username = strings.ToLower(body.Username)
+	return body, err
+}
+
+func register(c fiber.Ctx) error {
+	body, err := readCredentials(c)
 	if err != nil || !validUsername.MatchString(body.Username) || len(body.Password) < 8 || len(body.Password) > 72 {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "username: 3-20 letters, digits or _; password: 8-72 characters"})
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "username: 3-20 letters, digits or _ (not case-sensitive); password: 8-72 characters"})
 	}
 	created, err := database.RegisterUser(body.Username, body.Password)
 	if err != nil {
@@ -47,12 +56,12 @@ func register(c fiber.Ctx) error {
 	if !created {
 		return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": "username taken"})
 	}
-	return c.JSON(fiber.Map{"username": body.Username})
+	return c.JSON(fiber.Map{"username": html.EscapeString(body.Username)})
 }
 
 func login(c fiber.Ctx) error {
-	var body credentials
-	if err := c.Bind().Body(&body); err != nil || !database.CheckUser(body.Username, body.Password) {
+	body, err := readCredentials(c)
+	if err != nil || !database.CheckUser(body.Username, body.Password) {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "wrong username or password"})
 	}
 	jwtString, err := token.Sign(body.Username)
@@ -60,7 +69,7 @@ func login(c fiber.Ctx) error {
 		return c.SendStatus(fiber.StatusInternalServerError)
 	}
 	setCookie(c, jwtString, time.Now().Add(token.Lifetime))
-	return c.JSON(fiber.Map{"username": body.Username})
+	return c.JSON(fiber.Map{"username": html.EscapeString(body.Username)})
 }
 
 func logout(c fiber.Ctx) error {

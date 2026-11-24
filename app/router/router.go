@@ -1,7 +1,9 @@
 package router
 
 import (
-	"github.com/DoritoMayhem/WebProject/app/token"
+	"html"
+
+	"github.com/YawningByDawn/CSE312-TeamProject/app/token"
 	"github.com/gofiber/fiber/v3"
 )
 
@@ -15,5 +17,5 @@ func me(c fiber.Ctx) error {
 	if err != nil {
 		return c.SendStatus(fiber.StatusUnauthorized)
 	}
-	return c.JSON(fiber.Map{"username": username})
+	return c.JSON(fiber.Map{"username": html.EscapeString(username)})
 }

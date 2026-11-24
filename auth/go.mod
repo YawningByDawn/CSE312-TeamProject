@@ -1,4 +1,4 @@
-module github.com/DoritoMayhem/WebProject/auth
+module github.com/YawningByDawn/CSE312-TeamProject/auth
 
 go 1.26
 
