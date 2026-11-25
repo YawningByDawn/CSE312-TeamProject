@@ -10,6 +10,16 @@ docker compose up
 
 Then open http://localhost:8080. No `.env` is needed; `compose.yaml` has defaults.
 
+## Game
+
+Hungry God Inc. lives in `app/game` (TypeScript, Vite, PixiJS). The app image builds it in a Node stage and serves the build at `/game/`; the home page links to it once you log in. To work on it alone:
+
+```
+cd app/game
+npm ci
+npm run dev
+```
+
 ## Deploy (Ubuntu server)
 
 Host nginx terminates HTTPS and forwards to the compose stack on `127.0.0.1:8080`. Its config is `deploy/host-nginx.conf`.
