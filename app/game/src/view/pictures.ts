@@ -22,8 +22,7 @@ export function upload(renderer: Renderer, bm: ImageBitmap, data = false): Textu
 }
 
 /**
- * A picture the GPU keeps compressed, from its .bc1 or .bc3 files (gen/bake/dds.cjs: a level's file, then those after
- * it; BC3 premultiplied, BC1 opaque), each fetched and inflated off the main thread, their mips one chain, uploaded now.
+ * A picture the GPU keeps compressed, from its .bc1 or .bc3 files (a level's file, then those after it; BC3 premultiplied, BC1 opaque), each fetched and inflated off the main thread, their mips one chain, uploaded now.
  * A GPU without the format throws here.
  */
 export async function compressed(renderer: Renderer, urls: readonly string[]): Promise<Texture> {

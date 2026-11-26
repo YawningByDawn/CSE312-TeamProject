@@ -3,6 +3,7 @@ import { GIFTS } from '../../content/gifts';
 import { FACILITY_ITEM } from '../../content/items';
 import { ANSWER_ITEM, THREAT_SLOTS, THREATS } from '../../content/threats';
 import { uiText } from '../../content/text';
+import { bound } from '../../content/keys';
 import { AREAS, PLACES } from '../../content/world';
 import ROOMS from '../../content/rooms.json';
 import { BLOOD, DIM, PALE, TILE_H, TILE_W, VIOLET, Words, attr, div, itemText, line, portrait, room, slab, stoneTile, surface, thingText, verb } from './art';
@@ -255,8 +256,8 @@ export class Building implements Panel {
     verb(el, RX + 560, y, 270, 84, uiText('btn.openVault'), why1(this.c.q.check(s, a)), () => this.c.act(a), say, uiText('building.oneAction'));
   }
 
-  press(e: KeyboardEvent): boolean {
-    if (e.key !== 'Escape') return false;
+  press(e: KeyboardEvent, vm: ViewModel): boolean {
+    if (!bound(vm.settings, 'back', e)) return false;
     this.c.focus(null);
     return true;
   }

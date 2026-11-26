@@ -66,7 +66,7 @@ export const PANEL_WORDS: Readonly<Record<string, string>> = {
 
   'bonus.pickHead': 'Three things survived the fall. Keep one.',
   'blessing.choose': 'Choose a blessing',
-  'pick.keys': 'Press 1 to {n}, or click',
+  'pick.keys': 'Press {a} to {b}, or click',
   'pick.click': 'Click to take it',
   'facet.choose': 'Choose its cut. You keep one.',
   'facet.cut.0': 'The spire cut',
@@ -104,7 +104,7 @@ export const PANEL_WORDS: Readonly<Record<string, string>> = {
   'group.crew': 'crew',
   'group.flock': 'chapel flock',
   'group.watch': 'watch',
-  'person.moveWhere': 'Pick the place to send them. Escape keeps them where they are.',
+  'person.moveWhere': 'Pick the place to send them. {back} keeps them where they are.',
   'tie.kind.kin': 'kin',
   'tie.kind.owes': 'owes them',
   'tie.kind.owed': 'is owed by them',
@@ -261,8 +261,6 @@ export const PANEL_WORDS: Readonly<Record<string, string>> = {
   'ledger.lost': 'Lost',
   'ledger.heat': '{power} heat',
 
-  'odd.echo.name': 'Echo',
-  'odd.echo.line': 'A follower may get a double. Doubles draw twice the heat.',
   'odd.secondSight.name': 'Second Sight',
   'odd.secondSight.line': 'One more blessing to choose from, every time.',
   'odd.loaded.name': 'Loaded',

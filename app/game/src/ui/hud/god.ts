@@ -2,7 +2,7 @@ import type { GameState, Intent, Query, Reason, ViewModel } from '../../types';
 import { BALANCE } from '../../content/balance';
 import { uiText } from '../../content/text';
 import { maxIchor } from '../../sim/core';
-import { DIM, INK, PALE, Pic, VIOLET, Words, attr, row, surface } from '../kit';
+import { DIM, INK, PALE, Pic, VIOLET, Words, row, surface } from '../kit';
 
 // The god's corner, top left (inventory #95, docs/style.md §7): the grave crystal filling as Hunger falls, rank as its
 // lit facets; Hunger's word on a hide tab with its value and groove; Malice's word, value and groove; Ichor and Nether
@@ -52,7 +52,6 @@ export class God {
   constructor(anchor: HTMLElement, send: (i: Intent) => void, private readonly q: Query) {
     this.box = surface(anchor, 'slab', 0, 0, GOD_W, GOD_H, 'hg-hit');
     this.box.addEventListener('click', () => send({ kind: 'menu', menu: 'stats' }));
-    attr(this.box, 'title', uiText('hud.god'));
     const b = this.box;
     this.grave = new Pic(b, 62, 66, 'grave.0');
     for (let i = 0; i < FACETS; i++) this.facets.push(new Pic(b, 62, 66, `grave.facet.${i}`));

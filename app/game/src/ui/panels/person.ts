@@ -1,5 +1,6 @@
 import type { Action, Person as P, PlaceId, Routine, ViewModel } from '../../types';
 import { hasText, uiText } from '../../content/text';
+import { bound, keyName } from '../../content/keys';
 import { PLACES } from '../../content/world';
 import { BLOOD, DIM, INK, PALE, VIOLET, Words, attr, backed, cell, itemText, line, portrait, slab, surface, verb } from './art';
 import { why1 } from './grave';
@@ -58,7 +59,7 @@ export class Person implements Panel {
     const s = vm.state, q = this.c.q;
     if (this.moving) {
       const { el } = slab(root, 260, 250, 520, 110, s.people[this.moving.unit]!.name);
-      line(el, 24, 70, 472, 19, VIOLET, uiText('person.moveWhere'));
+      line(el, 24, 70, 472, 19, VIOLET, uiText('person.moveWhere', { back: keyName(vm.settings.keys.back[0] ?? '') }));
       return;
     }
     const p = s.people[(vm.focus as { unit: string }).unit]!;
@@ -174,8 +175,8 @@ export class Person implements Panel {
     fit(y + 30);
   }
 
-  press(e: KeyboardEvent): boolean {
-    if (e.key !== 'Escape') return false;
+  press(e: KeyboardEvent, vm: ViewModel): boolean {
+    if (!bound(vm.settings, 'back', e)) return false;
     if (this.moving) {
       this.moving = null;
       this.c.redraw();

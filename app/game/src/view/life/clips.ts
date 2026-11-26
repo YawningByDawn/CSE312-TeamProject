@@ -1,8 +1,7 @@
 import type { CardId, GameEvent, ViewModel } from '../../types';
 import { GRADES } from '../../content/crystals';
 
-// The effects' recipes (#77, #81-89), one clip per event kind, card and grade: the old game's recipes (src/render/fx/kinds)
-// as parts of baked life-atlas cells. Sizes are figure heights, times seconds. fx.ts places them.
+// The effects' recipes (#77, #81-89), one clip per event kind, card and grade, as parts of baked life-atlas cells. Sizes are figure heights, times seconds. fx.ts places them.
 
 /** Where a part sits: the event's feet, their wick, the grave, riding from the grave to the feet (back: to the grave). */
 export const FEET = 0, CROWN = 1, GRAVE = 2, RIDE = 3, BACK = 4;

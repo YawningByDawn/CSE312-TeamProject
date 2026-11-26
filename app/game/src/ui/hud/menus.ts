@@ -1,4 +1,5 @@
-import type { FactionId, GameState, Intent, Menu, Person, Query, Settings, ViewModel } from '../../types';
+import type { Bind, FactionId, GameState, Intent, Menu, Person, Query, Settings, ViewModel } from '../../types';
+import { BINDS, keyName } from '../../content/keys';
 import { hasText, uiText } from '../../content/text';
 import { area, maxIchor, whereNow } from '../../sim/core';
 import { portrait, verb, slab } from '../panels/art';
@@ -10,15 +11,20 @@ import { POWERS_W } from './powers';
 // The menus (inventory #107, 109, 110): what app's `vm.menu` holds open, one at a time over the rest layout. The stats
 // menu (I, or the god's corner) hangs under the god's corner: each night's urges and stores, your people, your rank,
 // the powers, a label and a number a row, its line on hover. The characters menu (P): yours, then those walking against
-// you, a face, a name, a trade, where they are and what they do; a click looks at them. Settings (Esc, or the cog):
-// the volumes, the interface's size, the hints. Each is built again only when what it shows may have moved.
+// you, a face, a name, a trade, where they are and what they do; a click looks at them. Settings (back, or the cog), in
+// two tabs: General, the volumes, the interface's size, the hints and, in a run, Main menu (the save kept); Keys, each
+// bind's two keys, a click on one and the next key pressed binds it. Each is built again only when what it shows may
+// have moved.
 
 const POWERS: readonly FactionId[] = ['temple', 'council', 'public'];
 const STATS_W = 440;
 const PEOPLE_W = 620, ROW_H = 70, NONE_H = 36, PEOPLE_H = 640;
-const SET_W = 520;
+const SET_W = 560, SET_H = 580, TAB_Y = 76, TOP = 136, KEY_H = 46;
 const VOLUMES: readonly (keyof Settings & ('master' | 'music' | 'sfx' | 'ambience'))[] = ['master', 'music', 'sfx', 'ambience'];
 const SIZES: readonly Settings['uiSize'][] = ['small', 'medium', 'large'];
+const TABS = ['general', 'keys'] as const;
+/** A plate not chosen: dimmed. */
+const dim = (b: HTMLElement): void => { b.style.filter = 'saturate(0.3) brightness(0.8)'; };
 
 type Row = [label: string, value: string, tone: string, tip: string];
 
@@ -28,13 +34,27 @@ export class Menus {
   private set: Readonly<Settings> | null = null;
   private hour = -1;
   private root: HTMLDivElement | null = null;
+  private tab: (typeof TABS)[number] = 'general';
+  /** The key plate waiting for a key: its bind and which of its two keys. */
+  private listen: [Bind, number] | null = null;
 
   constructor(private readonly at: Anchors, cogAt: HTMLElement, private readonly send: (i: Intent) => void, private readonly q: Query) {
     this.cog = surface(cogAt, 'slab', -POWERS_W - 56, 0, 44, 44, 'hg-hit');
     new Pic(this.cog, 22, 22, 'icon.cog');
-    attr(this.cog, 'title', uiText('menu.settings'));
     // the cog stands left of the powers, where nothing else is
     this.cog.addEventListener('click', () => this.send({ kind: 'menu', menu: 'settings' }));
+    // a plate waiting for a key takes the next one before anything else reads it
+    window.addEventListener('keydown', (e) => {
+      const set = this.set;
+      if (!this.listen || this.menu !== 'settings' || !set) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      const [b, i] = this.listen;
+      this.listen = null;
+      const keys = [...set.keys[b]];
+      keys[i] = e.key.toLowerCase();
+      this.send({ kind: 'settings', patch: { keys: { ...set.keys, [b]: keys.filter((k, j) => keys.indexOf(k) === j) } } });
+    }, { capture: true });
   }
 
   frame(vm: ViewModel): void {
@@ -46,11 +66,15 @@ export class Menus {
     this.hour = hour;
     this.root?.remove();
     this.root = null;
+    if (m !== 'settings') this.listen = null;
     if (!m) return;
     if (m === 'stats') this.stats(s);
     else if (m === 'people') this.people(s);
-    else this.settings(vm.settings);
+    else this.settings(vm.settings, vm.title);
   }
+
+  /** Settings built again on the next frame (a tab, a plate waiting). */
+  private redo = (): void => { this.set = null; };
 
   private close = (): void => this.send({ kind: 'menu', menu: null });
 
@@ -150,10 +174,43 @@ export class Menus {
     return uiText('people.line', { role: uiText(`role.${p.role}.name`), place, doing, order });
   }
 
-  private settings(set: Readonly<Settings>): void {
-    const el = this.pane(this.at.c, -SET_W / 2, -230, SET_W, 460, uiText('menu.settings'));
+  private settings(set: Readonly<Settings>, title: boolean): void {
+    const el = this.pane(this.at.c, -SET_W / 2, -SET_H / 2, SET_W, SET_H, uiText('menu.settings'));
+    TABS.forEach((t, i) => {
+      const b = verb(el, 36 + i * 140, TAB_Y, 130, 40, uiText(`settings.tab.${t}`), '', () => {
+        this.tab = t;
+        this.listen = null;
+        this.redo();
+      }, () => {});
+      if (t !== this.tab) dim(b);
+    });
+    if (this.tab === 'keys') this.keys(el, set);
+    else this.general(el, set, title);
+  }
+
+  private keys(el: HTMLElement, set: Readonly<Settings>): void {
+    new Words(el, 36, TOP - 6, 17, DIM).set(uiText('settings.keysLine'));
+    const list = div(el, 'hg-b hg-scroll', 20, TOP + 26, SET_W - 40, SET_H - TOP - 50);
+    BINDS.forEach((b, r) => {
+      const y = r * KEY_H;
+      new Words(list, 16, y + 10, 19, PALE).set(uiText(`bind.${b}`));
+      for (let i = 0; i < 2; i++) {
+        const waiting = this.listen?.[0] === b && this.listen[1] === i;
+        const k = set.keys[b][i];
+        const word = waiting ? uiText('settings.press') : k === undefined ? uiText('settings.none') : keyName(k);
+        const plate = verb(list, 290 + i * 116, y + 2, 106, 38, word, '', () => {
+          this.listen = waiting ? null : [b, Math.min(i, set.keys[b].length)];
+          this.redo();
+        }, () => {});
+        if (waiting) plate.style.filter = 'brightness(1.5)';
+      }
+    });
+    div(list, 'hg-b', 0, BINDS.length * KEY_H, 1, 1);
+  }
+
+  private general(el: HTMLElement, set: Readonly<Settings>, title: boolean): void {
     VOLUMES.forEach((v, i) => {
-      const y = 92 + i * 52;
+      const y = TOP + i * 52;
       new Words(el, 36, y, 20, PALE).set(uiText(`settings.${v}`));
       const r = el.appendChild(document.createElement('input'));
       r.type = 'range';
@@ -164,14 +221,17 @@ export class Menus {
       Object.assign(r.style, { left: '200px', top: `${y}px` });
       r.addEventListener('change', () => this.send({ kind: 'settings', patch: { [v]: Number(r.value) / 100 } }));
     });
-    new Words(el, 36, 310, 20, PALE).set(uiText('settings.uiSize'));
+    const y = TOP + VOLUMES.length * 52;
+    new Words(el, 36, y + 12, 20, PALE).set(uiText('settings.uiSize'));
     SIZES.forEach((z, i) => {
-      const b = verb(el, 200 + i * 98, 298, 90, 42, uiText(`settings.size.${z}`), '', () => this.send({ kind: 'settings', patch: { uiSize: z } }), () => {});
-      if (z !== set.uiSize) b.style.filter = 'saturate(0.3) brightness(0.8)';
+      const b = verb(el, 200 + i * 98, y, 90, 42, uiText(`settings.size.${z}`), '', () => this.send({ kind: 'settings', patch: { uiSize: z } }), () => {});
+      if (z !== set.uiSize) dim(b);
     });
-    new Words(el, 36, 374, 20, PALE).set(uiText('settings.hints'));
+    new Words(el, 36, y + 76, 20, PALE).set(uiText('settings.hints'));
     // turned on again, every hint teaches once more
-    const hints = verb(el, 200, 362, 150, 42, uiText(set.hints ? 'settings.on' : 'settings.off'), '', () => this.send({ kind: 'settings', patch: set.hints ? { hints: false } : { hints: true, seenHints: [] } }), () => {});
+    const hints = verb(el, 200, y + 64, 150, 42, uiText(set.hints ? 'settings.on' : 'settings.off'), '', () => this.send({ kind: 'settings', patch: set.hints ? { hints: false } : { hints: true, seenHints: [] } }), () => {});
     attr(hints, 'title', uiText('settings.hintsTip'));
+    // the run is left for the title; its save stays, so Continue resumes it
+    if (!title) verb(el, 36, y + 138, 220, 48, uiText('settings.mainMenu'), '', () => this.send({ kind: 'title' }), () => {});
   }
 }

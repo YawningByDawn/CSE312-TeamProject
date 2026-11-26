@@ -17,8 +17,6 @@ export const BALANCE = {
   carryRate: 0.5,
   /** Carry-over is capped at this many turns of income. */
   carryCapTurns: 1,
-  /** A vein holds this many crystals per point of richness before it is worked out. */
-  veinReservePerRichness: 6,
 
   // --- god ---
   /** Ichor the fallen god wakes with (max is 10 + 2(L−1); it starts wounded). */
@@ -29,7 +27,6 @@ export const BALANCE = {
   hungerRiseBase: 4,
   /** Hunger rises by one more per this many follower heads (a bigger flock, a bigger appetite). */
   hungerPerFollowers: 4,
-  hungerPerCrystal: 10,
   starvingAt: 70,
   satedBelow: 30,
   starvingNetherMult: 0.6,
@@ -41,8 +38,6 @@ export const BALANCE = {
   ravenousPublic: 10,
   /** Ichor lost each night the god starves with no follower left to eat. */
   starveIchor: 1,
-  /** Crystals eaten in one go that make a gorge (#16: gorging gains Ichor). */
-  gorgeCrystals: 5,
 
   startMalice: 10,
   maliceRiseBase: 4,
@@ -66,8 +61,6 @@ export const BALANCE = {
   warinessFree: 2,
   /** Conversion odds lose Resistance / this. */
   oddsResistDivisor: 200,
-  /** Whispers a night = Presence + this. */
-  whispersPerNightBase: 1,
   convertDevotion: 12,
   /** Grieving converts start this much higher. */
   grievingConvertBonus: 5,
@@ -79,8 +72,6 @@ export const BALANCE = {
   /** Flat Devotion loss per Dawn in a strongly / weakly Flame-lit zone. */
   kilnDrainStrong: 3,
   kilnDrainWeak: 1,
-  kilnResistStrong: 15,
-  kilnResistWeak: 8,
   /** Temple vigils: Resistance per cult level (Wary 1×, Alarmed 2×, Hostile+ 3×). */
   cultWaryResist: 5,
 
@@ -104,15 +95,12 @@ export const BALANCE = {
   holdBase: 2.5,
   holdPerV: 1,
   holdAsleep: 0.6,
-  /** Spreading the word (a sent follower) stains half again as much. */
-  holdSpread: 1.5,
   /** Town blocks are bigger: a follower's stain counts this much there. */
   holdTown: 0.5,
   /** Pushback per Day: the Flame's ward in its area / next to it; each non-follower guard, overseer or priest per half-day present; a hunter; a raid. */
   wardPush: 6,
   wardPushNear: 2,
   watcherPush: 3,
-  hunterPush: 8,
   raidPush: 25,
   /** A guard or overseer who stands on ground at least this soaked notices (Council heat +stainNoticeGov). */
   stainNoticeAt: 50,
@@ -123,10 +111,6 @@ export const BALANCE = {
   sleeperBonus: 0.12,
   /** Share of mine workers (diggers, haulers, sorters) on the night shift. */
   nightShiftShare: 0.3,
-  /** Share of mine workers who sleep up top in Miners' Rows (the rest in the bunks). */
-  townHomeShare: 0.4,
-  /** Shade: XP each Day per 100 Hold of the town (the town's colour feeds the god). */
-  xpTownHoldPerDay: 2.5,
   /** A whisper that turns someone stains their area at once by this much (the ripple). */
   convertHold: 6,
 
@@ -135,12 +119,8 @@ export const BALANCE = {
   rootedOutHold: 10,
   /** Lit areas counted in the odds term (0.04 × min(lit areas, cap)). */
   presenceOddsCap: 6,
-  /** Malice at which Malice "matters" (introduced; evil acts can unlock at level III). */
-  maliceMattersAt: 40,
   /** Ichor torn away when territory is lost. */
   zoneLostIchor: 1,
-  /** At most this much Ichor can be lost in a single Dawn (no one-night wipe-outs). */
-  ichorLossCapPerDawn: 3,
 
   // --- suspicion ---
   /** Suspicion cools by this each Dawn at Divinity 1 ... */
@@ -153,8 +133,6 @@ export const BALANCE = {
   /** The Inquisitor's song: Devotion lost by each exposed follower in its zone (pious: more). */
   cantorSong: 10,
   cantorSongPious: 15,
-  /** Whether the song alone can make a follower lapse. */
-  cantorCanLapse: 0,
   mobHarm: 60,
   /** Violet crests are seen: public Suspicion per follower head per Dawn. */
   crestPublicPerFollower: 0.25,
@@ -167,8 +145,7 @@ export const BALANCE = {
   /** The inspection (inspector.ts): announced each Day with chance inspectChance + Council × inspectChancePer while the Council is Wary. */
   inspectChance: 0.25,
   inspectChancePer: 0.004,
-  /** Galleries an inspection walks (picked by 1 + inspectFlockWeight × your followers there); the grave once the Council is at inspectGraveAt. */
-  inspectStops: 3,
+  /** The gallery an inspection walks to, picked by 1 + inspectFlockWeight × your followers there; the grave too once the Council is at inspectGraveAt. */
   inspectFlockWeight: 3,
   inspectGraveAt: 50,
   /** Chance he catches a follower in the open at his stop: carrying stones, a made thing, skimming or delving / only seen at prayer; the crackdown looks harder. */
@@ -218,9 +195,6 @@ export const BALANCE = {
   shadeLevel: 4,
   /** Level that ends this build (with the town gate Active). */
   winLevel: 7,
-  /** Merge rule (§13.2): mine followers at this Devotion or more may stay individual as Apostles. */
-  apostleDevotion: 70,
-  apostleMax: 4,
   /** At the stage advance every Suspicion track cools to at most this (the deep's hunters lose your new shape). */
   shadeBreather: 40,
   /** At the stage advance the town opens (Sensed) this many steps around the pit head. */
@@ -239,10 +213,6 @@ export const BALANCE = {
   graveyardCultPerHead: 0.5,
   /** Council patrols: government Suspicion per follower head per Dawn in the Keep. */
   keepGovPerHead: 1.2,
-  /** A strike on a group takes this share of its heads (at least 1) instead of the whole crowd. */
-  groupStrikeShare: 0.25,
-  /** XP for a converted group: xpFollower × S^0.85 × this. */
-  xpGroupMult: 0.6,
   /** XP for a converted Elite. */
   xpElite: 60,
   /** A turned Elite cools its faction's track once by this much. */
@@ -328,9 +298,6 @@ export const BALANCE = {
   moveFarAt: 2,
   moveFailCouncil: 1,
   moveFailDevotion: 2,
-  lieLowCool: 1.5,
-  lieLowCap: 4,
-  echoDevotion: 40,
   /** The hoard: loose stones above this many draw the Temple (1 per `hoardPer`, at most `hoardCap` a day). */
   hoardFree: 12,
   hoardPer: 4,
@@ -346,22 +313,6 @@ export const BALANCE = {
   vaultRoyal: 1,
   /** The Council's heat when it finds its vault opened (its writ follows). */
   vaultCouncil: 25,
-} as const;
-
-/** Preach and Stand watch (spec §8; `preach.ts`). */
-export const PREACH = {
-  /** A preacher's listener comes over by themselves with the whisper odds × this, each Day. */
-  turn: 0.25,
-  /** Devotion of one who came over to a preacher. */
-  devotion: 20,
-  /** Resistance a listener loses when they do not come over. */
-  soften: 2,
-  /** Temple heat per preacher a Day (all preachers together at most heatCap); the town hears this share of it. */
-  heat: 1.5,
-  heatCap: 6,
-  publicShare: 0.5,
-  /** Nights a watcher who warned everyone rests before they can watch again. */
-  watchRest: 3,
 } as const;
 
 /** Flame stones profaned by an act of evil done where they lie (`profane.ts`): the Temple's heat per stone, at most heatCap. */
@@ -394,21 +345,11 @@ export const TIES = {
 
 /** The town's people (docs/town.md §2, §4). A gathered group resists by `BALANCE.groupResist` more. */
 export const TOWN = {
-  /** A master of a building is an Elite: this much harder to turn than their trade. */
-  masterResist: 10,
-  /** XP for turning a master who is not an officer of the three powers (officers pay `BALANCE.xpElite`). */
-  masterXp: 20,
-  /** XP for an ordinary townsperson = `BALANCE.xpFollower` × this. */
-  commonerXpMult: 0.6,
-  /** An ordinary watcher (a soldier, a priest of the crowd) pushes this share of a named one's colour back. */
-  commonerWatch: 0.3,
   /** A group is gathered when at least this share of its living members (and at least gatherMin) are at one place. */
   gatherShare: 0.5,
   gatherMin: 2,
   /** An area with at least this many ordinary people not yours holds a crowd (Sermon of Ash, Riot). */
   crowdAt: 4,
-  /** The one sent to carry out a pending move is on their guard: this much harder to turn until it lands. */
-  agentGuard: 20,
   /** Trades of a place without working there (a child at school, an elder at the well, a beggar on the steps): never a building's hands. */
   notWorkers: ['child', 'elder', 'beggar'] as readonly string[],
 } as const;

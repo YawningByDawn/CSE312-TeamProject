@@ -80,6 +80,3 @@ export const PEOPLE: readonly PersonDef[] = [
   { id: 'e04', name: 'Guild Master Petra', role: 'guildmaster', trait: 'greedy', work: 'market', command: 44 },
   { id: 'e05', name: 'Smuggler Boss Vix', role: 'smugglerboss', trait: 'bitter', work: 'rows', command: 24 },
 ];
-
-/** Names for people who arrive mid-run (pilgrims, new hands). */
-export const SPARE_NAMES: readonly string[] = ['Dara', 'Kell', 'Lena', 'Joss', 'Ruth', 'Neve', 'Cade', 'Thea', 'Abel', 'Gwen', 'Hugh', 'Ines'];

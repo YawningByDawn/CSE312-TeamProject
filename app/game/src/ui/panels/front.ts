@@ -1,6 +1,7 @@
-import type { GameEvent, GameState, Reason, ViewModel } from '../../types';
+import type { Bind, GameEvent, GameState, Reason, Settings, ViewModel } from '../../types';
 import { AREAS } from '../../content/world';
 import { uiText } from '../../content/text';
+import { bound } from '../../content/keys';
 import { DIM, PALE, VIOLET, Words, atlasMeta, attr, cell, div, line, mask, natural, tinted } from './art';
 import type { Ctx, Panel } from './index';
 
@@ -27,7 +28,7 @@ function item(parent: HTMLElement, x: number, y: number, size: number, text: str
   return el;
 }
 
-/** Up and down move the lit word; Enter takes it. */
+/** Its two binds move the lit word; confirm takes it. */
 class Menu {
   private i = 0;
   constructor(private readonly items: HTMLDivElement[], private readonly acts: (() => void)[]) {
@@ -42,10 +43,10 @@ class Menu {
       (el.lastChild as HTMLElement).hidden = j !== this.i;
     });
   }
-  press(e: KeyboardEvent, back: string, next: string): boolean {
-    if (e.key === back) this.light(this.i - 1);
-    else if (e.key === next) this.light(this.i + 1);
-    else if (e.key === 'Enter' || e.key === ' ') this.acts[this.i]!();
+  press(e: KeyboardEvent, set: Readonly<Settings>, back: Bind, next: Bind): boolean {
+    if (bound(set, back, e)) this.light(this.i - 1);
+    else if (bound(set, next, e)) this.light(this.i + 1);
+    else if (bound(set, 'confirm', e)) this.acts[this.i]!();
     else return false;
     return true;
   }
@@ -173,8 +174,8 @@ export class Title implements Panel {
     }
   }
 
-  press(e: KeyboardEvent): boolean {
-    return this.menu?.press(e, 'ArrowUp', 'ArrowDown') ?? false;
+  press(e: KeyboardEvent, vm: ViewModel): boolean {
+    return this.menu?.press(e, vm.settings, 'up', 'down') ?? false;
   }
 }
 
@@ -266,11 +267,11 @@ export class Defeat implements Panel {
   }
 
   press(e: KeyboardEvent, vm: ViewModel): boolean {
-    if (e.key === 'r' || e.key === 'R') {
+    if (bound(vm.settings, 'again', e)) {
       this.c.send({ kind: 'newRun', seed: vm.state.seed });
       return true;
     }
-    return this.menu?.press(e, 'ArrowLeft', 'ArrowRight') ?? false;
+    return this.menu?.press(e, vm.settings, 'left', 'right') ?? false;
   }
 }
 
@@ -334,7 +335,7 @@ export class Ending implements Panel {
   }
 
   press(e: KeyboardEvent, vm: ViewModel): boolean {
-    if (vm.film || !['Enter', ' ', 'Escape'].includes(e.key)) return false;
+    if (vm.film || !(bound(vm.settings, 'confirm', e) || bound(vm.settings, 'back', e))) return false;
     this.c.send({ kind: 'title' });
     return true;
   }

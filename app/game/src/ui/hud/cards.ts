@@ -5,13 +5,15 @@ import { cardFee, evilBonus } from '../../sim/cards';
 import { handMax } from '../../sim/core';
 import { CARD_H, CARD_W, card, cell, verb } from '../panels/art';
 import { DIM, INK, PALE, Pic, Words, attr, div, surface } from '../kit';
-import { CLOCK_W } from './clock';
-import { POUCH_W } from './pouch';
+import { CLOCK_H, CLOCK_W } from './clock';
+import { POUCH_H, POUCH_W } from './pouch';
 
 // The cards (inventory #113, DECISIONS §43). The hand, bottom centre: up to five plates resting small, a card rising on
-// hover with its Discard verb; after the first card of a night each carries the Nether fee, and a card you cannot pay
-// for rests dim. A click (or 1..9) plays it through the pay slab (rb-panels). The deal, dealt at dusk once the panels
-// close: its cards large over the dimmed world; take one (1..3) into the hand, or none (Esc, 0), or redraw them.
+// hover; after the first card of a night each carries the Nether fee, and a card you cannot pay for rests dim. A card
+// dragged follows the pointer and the discard zone shows on the right: dropped on the field it plays through the pay
+// slab (rb-panels), as 1..9 does; dropped back on the hand it returns; dropped on the zone it is discarded. The deal,
+// dealt at dusk once the panels close: its cards large over the dimmed world; take one (1..3) into the hand, or none
+// (Esc, 0), or redraw them.
 // Each rebuilds only when its key changes; at rest neither writes.
 
 const REST = 0.92;
@@ -19,8 +21,10 @@ const BIG = 1.5;
 const GAP = 10;
 /** The band the hand may use is the screen's width between the pouch and the clock, each kept this far from it. */
 const CLEAR = 12;
-/** The deck's box, left of the hand by its gap; it stands this far above the cards' feet. */
-const DECK_W = 128, DECK_H = 168, DECK_GAP = 30, DECK_UP = 34;
+/** A press that moves less than this (screen px) is no drag. */
+const CLICK_PX = 5;
+/** The discard zone at the screen's right edge, its foot clear of the bottom-right panel. */
+const TRASH_W = 190, TRASH_H = 340, TRASH_Y = -Math.max(CLOCK_H, POUCH_H) - 3 * CLEAR - TRASH_H;
 /** The ui atlas names the powers by their old tracks. */
 const TRACK = { temple: 'cult', council: 'gov', public: 'public' } as const;
 
@@ -41,6 +45,8 @@ function plate(parent: HTMLElement, s: Readonly<GameState>, id: CardId, x: numbe
 /** A card's tip: its name and line, then its details. */
 const tipOf = (id: CardId): string => ['name', 'line', 'details'].map((k) => uiText(`card.${id}.${k}`, cardSlots(id))).join('\n');
 
+const inside = (r: DOMRect, e: PointerEvent): boolean => e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
+
 /** A refused click shakes the thing clicked. */
 function deny(el: HTMLElement): void {
   el.classList.remove('hg-deny');
@@ -58,15 +64,24 @@ export class Hand {
   private phase = '';
 
   private band = 0;
+  /** The card pressed: where the press began and, once it has moved into a drag, the hand's place on screen. */
+  private drag: { id: CardId; slot: HTMLElement; x: number; y: number; home: DOMRect | null } | null = null;
+  private readonly trash: HTMLDivElement;
 
-  /** `half`: design px from the screen's centre to the margin at its side. */
-  constructor(anchor: HTMLElement, private readonly send: (i: Intent) => void, private readonly pay: (card: CardId) => void, private readonly half: () => number) {
+  /** `half`: design px from the screen's centre to the margin at its side; `k`: screen px per design px. */
+  constructor(anchor: HTMLElement, private readonly send: (i: Intent) => void, private readonly pay: (card: CardId) => void, private readonly half: () => number, private readonly k: () => number) {
     this.el = div(anchor, 'hg-b');
+    this.trash = surface(anchor, 'violet', 0, TRASH_Y, TRASH_W, TRASH_H);
+    new Words(this.trash, 0, 30, 28, PALE, 'center', TRASH_W).set(uiText('hand.trash'));
+    this.trash.hidden = true;
     window.addEventListener('keydown', (e) => {
       const i = Number(e.key);
       if (!this.live || e.repeat || !Number.isInteger(i) || i < 1 || i > this.ids.length) return;
       this.play(this.ids[i - 1]!);
     });
+    window.addEventListener('pointermove', (e) => this.move(e));
+    window.addEventListener('pointerup', (e) => this.drop(e));
+    window.addEventListener('pointercancel', () => this.drop(null));
   }
 
   frame(vm: ViewModel): void {
@@ -80,20 +95,17 @@ export class Hand {
     this.phase = s.phase;
     this.band = band;
     const fee = cardFee(s);
-    const key = `${g.hand.join()}|${fee}|${fee > g.nether}|${evilBonus(g.malice)}|${s.phase}|${!!g.deal}|${band}`;
+    const key = `${g.hand.join()}|${fee}|${fee > g.nether}|${evilBonus(g.malice)}|${s.phase}|${band}`;
     if (key === this.key) return;
     this.key = key;
     this.ids = g.hand.slice();
     this.el.replaceChildren();
     if (s.phase !== 'live') return;
-    // the deck stands left of the hand (alone and centred with none in hand), lit while its deal is on the table
     const n = g.hand.length, w = CARD_W * REST;
-    const need = DECK_W + (n ? DECK_GAP + n * w + (n - 1) * GAP : 0);
+    const need = n * w + Math.max(0, n - 1) * GAP;
     const k = Math.min(1, band / need), x0 = (-need * k) / 2;
-    const deck = div(this.el, 'hg-b hg-deck', x0, -(DECK_H + DECK_UP) * k, DECK_W * k, DECK_H * k);
-    cell(deck, 'ui', g.deal ? 'deck.ready' : 'deck.spent', 0, 0, 0.5 * k);
     g.hand.forEach((id, i) => {
-      const x = x0 + (DECK_W + DECK_GAP + i * (w + GAP) + w / 2) * k;
+      const x = x0 + (i * (w + GAP) + w / 2) * k;
       const slot = div(this.el, 'hg-b hg-hit hg-card', x - CARD_W / 2, -CARD_H, CARD_W, CARD_H);
       slot.style.setProperty('--k', String(REST * k));
       plate(slot, s, id, 0, 0);
@@ -110,15 +122,46 @@ export class Hand {
         new Words(surface(slot, 'inktab', 12, 88, CARD_W - 24, 30), 0, 6, 17, PALE, 'center', CARD_W - 24).set(uiText('why.nether', { n: fee }));
         attr(slot, 'title', `${uiText(`card.${id}.name`)}\n${uiText('hand.extraCardCost', { n: fee })}`);
       }
-      const dis = verb(slot, CARD_W - 96, -58, 96, 38, uiText('btn.discard'), '', () => this.send({ kind: 'act', action: { type: 'discard', card: id } }), () => {});
-      dis.classList.add('hg-dis');
-      slot.addEventListener('click', () => this.play(id));
+      slot.addEventListener('pointerdown', (e) => {
+        if (e.isPrimary && e.button === 0) this.drag = { id, slot, x: e.clientX, y: e.clientY, home: null };
+      });
     });
   }
 
+  /** A press moved past a few px becomes a drag: the card follows the pointer and the discard zone shows, lit under it. */
+  private move(e: PointerEvent): void {
+    const d = this.drag;
+    if (!d || !e.isPrimary) return;
+    const dx = e.clientX - d.x, dy = e.clientY - d.y;
+    if (!d.home) {
+      if (Math.hypot(dx, dy) < CLICK_PX) return;
+      const rs = [...this.el.children].map((c) => c.getBoundingClientRect());
+      const l = Math.min(...rs.map((r) => r.left)), t = Math.min(...rs.map((r) => r.top));
+      d.home = new DOMRect(l, t, Math.max(...rs.map((r) => r.right)) - l, Math.max(...rs.map((r) => r.bottom)) - t);
+      this.trash.style.left = `${this.half() - TRASH_W}px`;
+      this.trash.hidden = false;
+    }
+    d.slot.style.translate = `${dx / this.k()}px ${dy / this.k()}px`;
+    this.trash.classList.toggle('hg-lit', inside(this.trash.getBoundingClientRect(), e));
+  }
+
+  /** The press ends: a drag dropped on the discard zone discards its card, on the field plays it, on the hand returns it. */
+  private drop(e: PointerEvent | null): void {
+    const d = this.drag;
+    if (!d || (e && !e.isPrimary)) return;
+    this.drag = null;
+    if (!d.home) return;
+    const binned = !!e && inside(this.trash.getBoundingClientRect(), e);
+    d.slot.style.translate = '';
+    this.trash.hidden = true;
+    this.trash.classList.remove('hg-lit');
+    if (!e || inside(d.home, e)) return;
+    if (binned) this.send({ kind: 'act', action: { type: 'discard', card: d.id } });
+    else this.play(d.id);
+  }
+
   private play(id: CardId): void {
-    // the deck is the first child, the cards after it
-    const slot = this.el.children[this.ids.indexOf(id) + 1] as HTMLElement;
+    const slot = this.el.children[this.ids.indexOf(id)] as HTMLElement;
     if (!this.live || slot.classList.contains('hg-rest')) deny(slot);
     else this.pay(id);
   }

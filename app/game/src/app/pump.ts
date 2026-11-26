@@ -117,6 +117,13 @@ export class Pump {
       }
       case 'focus': vm.focus = i.focus; return;
       case 'pause': vm.paused = i.paused; return;
+      case 'endDay': {
+        const end = this.t.query.dayEnd(this.state.tick);
+        vm.paused = false;
+        while (this.running() && this.state.tick < end) this.take(this.t.sim.step(this.state));
+        this.carry = 0;
+        return;
+      }
       case 'menu': vm.menu = i.menu; return;
       case 'skipFilm':
         if (vm.film) {

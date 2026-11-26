@@ -10,7 +10,6 @@ import { makeSim } from './sim';
 import { createUi } from './ui';
 import { mountPanels } from './ui/panels';
 import { createView } from './view';
-import { world } from './sim/world';
 
 // Boot: the tracks behind their interfaces, one pump, one rAF frame. `?scene=play` begins a run at once (no title, no
 // opening); `?seed=N` fixes the seed; `?mute=1` mutes this load; `?fast=1` plays films eight times faster. A build
@@ -25,10 +24,11 @@ const seed = Number.isInteger(seedFlag) && seedFlag > 0 ? seedFlag : Math.floor(
 const netPath = import.meta.env.VITE_HG_NET as string | undefined;
 const framework = netPath ? connectFramework(netPath) : null;
 
-const { sim, query } = makeSim(world);
-const view = createView(canvas, window.devicePixelRatio || 1, query);
+const { sim, query } = makeSim();
+const muted = flag('mute') === '1';
+const view = createView(canvas, window.devicePixelRatio || 1, query, muted);
 const ui = createUi(mountPanels(framework?.account ?? null));
-const audio = createAudio(query, SOUNDS, flag('mute') === '1');
+const audio = createAudio(query, SOUNDS, muted);
 const pump = new Pump({ sim, query, view, ui, audio, tickHz: TICK_HZ }, seed, flag('fast') === '1' ? FAST_FILMS : 1);
 const input = new Input(pump, view, canvas);
 installDebug(pump, sim, input, framework?.net ?? null);
@@ -48,7 +48,7 @@ document.addEventListener('visibilitychange', () => {
 });
 window.addEventListener('resize', resize);
 
-await Promise.all([view.load(() => {}), audio.load()]);
+await Promise.all([view.load(), audio.load()]);
 ui.mount(uiRoot, (i) => pump.send(i), query, (target, out) => view.where(target, out));
 resize();
 if (flag('scene') === 'play') pump.begin(sim.create(seed));

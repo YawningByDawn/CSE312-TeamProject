@@ -1,11 +1,13 @@
+// src/audio, the sound (implements `Audio`). Owns the one AudioContext, its four buses (master, music, sfx, ambience,
+// from the settings), the voices and their ducking, and the streamed clips (loop.ts). Reads the view model each frame
+// (fresh events, film, camera, title, state), the sim's Query (hour, daylight, part of day, weekday), content's sound tables
+// (handed in at boot) and the baked packs of assets/audio (docs/art-pipeline.md). Plays a cue for each fresh event, the
+// films' beats, a bed by what is on screen (the title is silent), ambience by where the camera looks, the hour, the
+// weekday, the weather and the town's mood. Silent until the first gesture lets the AudioContext run; `?mute=1` makes
+// no context at all.
 import raw from '../../assets/audio/manifest.json';
 import type { Affinity, Audio, Crystal, Film, GameEvent, Query, Settings, SoundCue, SoundTables, ViewModel, Weather } from '../types';
 import { Loop, type Clip } from './loop';
-
-// The baked sounds (assets/audio, written by scripts/bake-audio.ts): a cue for each fresh event from content's table, the
-// films' beats, a bed by what is on screen (the title is silent), ambience by where the camera looks, the hour, the
-// weekday, the weather and the town's mood, and four buses from the settings. Silent until the first gesture lets the
-// AudioContext run; `?mute=1` makes no context at all.
 
 interface Sfx { v: Clip[]; mat?: Record<string, Clip[]>; night?: Clip[]; minGap: number; maxVoices?: number; duck?: number; duckHold?: number }
 export interface Manifest {
@@ -204,7 +206,7 @@ class Player implements Audio {
     const st = vm.state;
     const film = vm.film?.kind;
     const bed = vm.title ? null
-      : film === 'opening' ? 'cutscene' : film === 'watershed' ? 'watershed' : film === 'ending' || st.phase === 'won' ? 'ending'
+      : film === 'opening' ? null : film === 'watershed' ? 'watershed' : film === 'ending' || st.phase === 'won' ? 'ending'
       : st.phase === 'lost' ? 'defeat' : st.phase === 'bonus' ? 'bonus' : st.stage;
     for (const name in MANIFEST.beds) this.level(`bed.${name}`, MANIFEST.beds[name]!, this.bedIn, name === bed ? 1 : 0, BED_FADE);
 

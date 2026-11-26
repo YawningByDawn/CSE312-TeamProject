@@ -3,7 +3,6 @@ import type { Activity, PlaceId, RoleId, UnitId } from '../../types';
 import { MINE_FRAME } from '../../content/map';
 import { AREAS, PLACES } from '../../content/world';
 import { ROLES } from '../../content/roles';
-import { below } from '../camera';
 import { decode, upload } from '../pictures';
 import { Body, type Kit, type LookBody, type Rest, type Series } from './rig';
 import { nameId, unpack } from './ids';

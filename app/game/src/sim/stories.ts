@@ -63,7 +63,7 @@ export function storyDawn(c: Ctx): void {
 /** Story `id` happens now if its cast is found: it rests its cooldown, says its body, and waits or happens. */
 export function tell(c: Ctx, id: StoryId): boolean {
   const s = c.s;
-  const k = RULES[id]!.cast(s, c.w);
+  const k = RULES[id]!.cast(s);
   if (!k) return false;
   const cd = STORIES[id]!.cooldown;
   addEffect(s, 'used', restKey(id), cd === null ? Number.MAX_SAFE_INTEGER : s.tick + cd * DAY_TICKS);

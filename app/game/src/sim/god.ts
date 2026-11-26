@@ -4,7 +4,7 @@
  * Ember's flare; the loss by being rooted out.
  */
 import { BALANCE } from '../content/balance';
-import { BLESSING as N, BLESSINGS, BLESSING_IDS } from '../content/blessings';
+import { BLESSING as N, BLESSING_IDS } from '../content/blessings';
 import { EFFECT } from '../content/crystals';
 import { ROLES } from '../content/roles';
 import { dayOf } from '../content/clock';
@@ -138,7 +138,7 @@ export function godDawn(c: Ctx): void {
 /** 3 blessings to pick from (Second Sight more), none taken before. */
 export function offerBlessings(c: Ctx): void {
   const s = c.s;
-  const pool = BLESSING_IDS.filter((id) => !BLESSINGS[id]!.startOnly && !s.god.blessings.includes(id));
+  const pool = BLESSING_IDS.filter((id) => !s.god.blessings.includes(id));
   const offers = shuffled(s.rng, pool).slice(0, 3 + bonus(s, 'blessingChoices'));
   if (offers.length > 0) s.pending = { kind: 'blessing', offers };
 }

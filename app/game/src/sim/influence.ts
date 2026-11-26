@@ -18,9 +18,9 @@ import { worn } from './items';
 import { uiText } from '../content/text';
 import { STAGE_MAX_STANDING, STAGE_TIER, TIER, conversionOdds, conversionTerms, devotionValue, directCost, influenceCost, round1, standingRank } from './formulas';
 import { rand } from './rng';
-import { haunts } from './world';
+import { haunts, members, route, together } from './world';
 import { regularsMult } from './gifts';
-import type { GameState, GroupId, Person, PlaceId, Reason, Routine, Visibility, World } from '../types';
+import type { GameState, GroupId, Person, PlaceId, Reason, Routine, Visibility } from '../types';
 
 // Hold lives on areas (`s.places` is keyed by area id); every read below takes any place and looks at its area.
 
@@ -228,11 +228,11 @@ export function whisper(c: Ctx, ps: readonly Person[], day: number, odds: number
 // ---------- the group whisper (inventory #20) ----------
 
 /** Where the group is gathered now and those of it there open to a whisper: not yours, not whispered today, reachable by the stage. */
-function gathered(s: Readonly<GameState>, w: World, g: GroupId, day: number): { at: PlaceId; open: Person[] } | null {
-  const at = w.together(s, g);
+function gathered(s: Readonly<GameState>, g: GroupId, day: number): { at: PlaceId; open: Person[] } | null {
+  const at = together(s, g);
   if (!at) return null;
   const open: Person[] = [];
-  for (const id of w.members(s, g)) {
+  for (const id of members(s, g)) {
     const p = s.people[id]!;
     if (!p.follower && p.whispered !== day && 'place' in p.at && p.at.place === at
       && standingRank(standingOf(p)) <= standingRank(STAGE_MAX_STANDING[s.stage])) open.push(p);
@@ -253,28 +253,28 @@ function asOne(open: readonly Person[]): Person {
   return { ...open[0]!, trait, resistance: Math.max(0, Math.min(BALANCE.groupResistCap, res / open.length + BALANCE.groupResist)) };
 }
 
-export function groupWhy(s: Readonly<GameState>, w: World, fl: Flock, g: GroupId, day: number): Reason[] {
+export function groupWhy(s: Readonly<GameState>, fl: Flock, g: GroupId, day: number): Reason[] {
   if (s.stage === 'whisper') return [{ key: 'why.shade' }];
-  const ms = w.members(s, g);
+  const ms = members(s, g);
   if (ms.length === 0) return [{ key: 'why.noOne' }];
   if (ms.every((id) => s.people[id]!.follower)) return [{ key: 'why.already' }];
-  const o = gathered(s, w, g, day);
+  const o = gathered(s, g, day);
   if (!o) return [{ key: 'why.notTogether' }];
   if (o.open.length === 0) return [{ key: 'why.allHeard' }];
   return placeInReach(s, fl, o.at) || o.open.some((p) => heard(s, fl, p)) ? [] : [{ key: 'why.outOfReach' }];
 }
 
 /** A gathered group's price: Nether by its open headcount at a mortal's tier, and the odds of the one roll. */
-export function groupPrice(s: Readonly<GameState>, w: World, fl: Flock, g: GroupId, day: number): { nether: number; odds: number } | null {
-  const o = gathered(s, w, g, day);
+export function groupPrice(s: Readonly<GameState>, fl: Flock, g: GroupId, day: number): { nether: number; odds: number } | null {
+  const o = gathered(s, g, day);
   if (!o || o.open.length === 0) return null;
   const one = asOne(o.open);
   return { nether: round1(influenceCost(o.open.length, TIER.mortal, resistance(s, fl, one))), odds: whisperOdds(s, fl, one) };
 }
 
 /** Whisper to a gathered group: one roll; every open member there is turned, or each is softened. */
-export function whisperGroup(c: Ctx, w: World, g: GroupId, day: number, odds: number): boolean {
-  return whisper(c, gathered(c.s, w, g, day)!.open, day, odds, g);
+export function whisperGroup(c: Ctx, g: GroupId, day: number, odds: number): boolean {
+  return whisper(c, gathered(c.s, g, day)!.open, day, odds, g);
 }
 
 
@@ -293,21 +293,21 @@ export function routineWhy(s: Readonly<GameState>, p: Readonly<Person> | undefin
 export const directNether = (p: Readonly<Person>): number => round1(directCost(1, TIER[standingOf(p)]));
 
 /** The places of a person's usual day: home, work and the way between (and a miner's way to the lift). */
-function offPath(s: Readonly<GameState>, w: World, p: Readonly<Person>, to: PlaceId): number {
-  const usual = w.route(s, p.home, p.work).path;
+function offPath(s: Readonly<GameState>, p: Readonly<Person>, to: PlaceId): number {
+  const usual = route(s, p.home, p.work).path;
   if (usual.includes(to) || to === p.home || to === p.work) return 0;
-  return Math.max(1, w.route(s, p.work, to).path.length - 1);
+  return Math.max(1, route(s, p.work, to).path.length - 1);
 }
 
-export function moveOdds(s: Readonly<GameState>, w: World, p: Readonly<Person>, to: PlaceId): number {
+export function moveOdds(s: Readonly<GameState>, p: Readonly<Person>, to: PlaceId): number {
   if (has(s, 'sure', p.id)) return 1;
-  const raw = BALANCE.moveBase - BALANCE.movePerStep * offPath(s, w, p, to) + (p.stats.devotion - 50) / BALANCE.moveDevotionSpan;
+  const raw = BALANCE.moveBase - BALANCE.movePerStep * offPath(s, p, to) + (p.stats.devotion - 50) / BALANCE.moveDevotionSpan;
   return Math.max(BALANCE.moveMin, Math.min(BALANCE.moveMax, Math.round(raw * 100) / 100));
 }
-export const moveAp = (s: Readonly<GameState>, w: World, p: Readonly<Person>, to: PlaceId): number =>
-  offPath(s, w, p, to) >= BALANCE.moveFarAt || inMine(to) !== inMine(p.work) ? 2 : 1;
+export const moveAp = (s: Readonly<GameState>, p: Readonly<Person>, to: PlaceId): number =>
+  offPath(s, p, to) >= BALANCE.moveFarAt || inMine(to) !== inMine(p.work) ? 2 : 1;
 
-export function moveWhy(s: Readonly<GameState>, w: World, p: Readonly<Person> | undefined, to: PlaceId): Reason[] {
+export function moveWhy(s: Readonly<GameState>, p: Readonly<Person> | undefined, to: PlaceId): Reason[] {
   if (!p || !p.follower || !here(p)) return [{ key: 'why.notYours' }];
   if (standingOf(p) !== 'mortal') return [{ key: 'why.tooGreat' }];
   if (!PLACES[to] || to === p.work) return [{ key: 'why.nowhere' }];
@@ -315,7 +315,7 @@ export function moveWhy(s: Readonly<GameState>, w: World, p: Readonly<Person> | 
   if (def.kind === 'shaft' || def.kind === 'gate') return [{ key: 'why.noPost' }];
   if (visibility(s, to) === 'void') return [{ key: 'why.unseen' }];
   if (area(to) === DEEP && s.stage === 'whisper' && !s.flags.deepOpen) return [{ key: 'why.deepSealed' }];
-  if (w.route(s, p.work, to).path.length === 0) return [{ key: 'why.noWay' }];
+  if (route(s, p.work, to).path.length === 0) return [{ key: 'why.noWay' }];
   return [];
 }
 

@@ -15,14 +15,15 @@ import { active, visibility } from './influence';
 import { chance, pick } from './rng';
 import { noticeWearers } from './town';
 import { ITEM } from '../content/items';
-import type { GameState, Person, PlaceId, Reason, StoryId, World } from '../types';
+import { spawn } from './world';
+import type { GameState, Person, PlaceId, Reason, StoryId } from '../types';
 
 export interface Cast { unit?: Person; unit2?: Person; place?: PlaceId; count?: number }
 /** An outcome's words: `outcome`, or `outcome.<what>`. */
 type Did = string | void;
 export interface StoryRule {
   /** Who and where, or null when it cannot happen now (a newcomer the world makes as it is cast). */
-  cast(s: GameState, w: World): Cast | null;
+  cast(s: GameState): Cast | null;
   /** A weight that depends on the state (else content's). */
   weight?(s: Readonly<GameState>): number;
   /** What happens at once (a story with no choice). */
@@ -35,7 +36,7 @@ export interface StoryRule {
 const n = (id: StoryId): Readonly<Record<string, number>> => STORIES[id]!.n;
 const day = (s: Readonly<GameState>): number => dayOf(s.tick);
 const people = (s: Readonly<GameState>, f: (p: Person) => boolean): Person[] => everyone(s).filter((p) => here(p) && f(p));
-const strangers = (s: Readonly<GameState>, f: (p: Person) => boolean = () => true): Person[] => people(s, (p) => !p.follower && !p.echoOf && f(p));
+const strangers = (s: Readonly<GameState>, f: (p: Person) => boolean = () => true): Person[] => people(s, (p) => !p.follower && f(p));
 const flock = (s: Readonly<GameState>, f: (p: Person) => boolean = () => true): Person[] => people(s, (p) => p.follower && f(p));
 const strongest = (ps: readonly Person[]): Person | undefined => ps.reduce<Person | undefined>((b, p) => (!b || p.stats.strength > b.stats.strength ? p : b), undefined);
 const one = <T>(s: GameState, xs: readonly T[]): T | undefined => pick(s.rng, xs);
@@ -379,7 +380,7 @@ export const RULES: Readonly<Record<StoryId, StoryRule>> = {
       return strangers(s, (p) => inMine(p.work)).length < n('freshHands').maxShare! * ever ? STORIES.freshHands!.weight : 0;
     },
     // the newcomer comes off the lift as the story is told: the world makes them
-    cast: (s, w) => ({ unit: w.spawn(s, 'fresh', 'bunks'), place: 'bunks' }),
+    cast: (s) => ({ unit: spawn(s, 'fresh', 'bunks'), place: 'bunks' }),
     now: () => {},
   },
 };

@@ -53,7 +53,7 @@ export function shiftTick(c: Ctx): void {
   const span = AT.shiftEnd - AT.shift;
   for (const p of everyone(s)) {
     if (!here(p) || !digs(p) || sick(s, p) || p.routine === 'delve' || whereNow(p, s.tick) !== p.work) continue;
-    const rolls = BALANCE.strikeRolls + (has(s, 'bloom', p.work) ? 2 : 0);
+    const rolls = BALANCE.strikeRolls + (has(s, 'bloom', p.work) ? CARD.bloomRolls : 0);
     const h = idKey(p.id) / 4294967296;
     for (let r = 0; r < rolls; r++) if (Math.floor(((r + h) / rolls) * span) === k) swing(c, p);
   }
@@ -61,11 +61,11 @@ export function shiftTick(c: Ctx): void {
 
 function swing(c: Ctx, p: Person): void {
   const s = c.s;
-  if (!p.echoOf && !has(s, 'sabotage', p.work)) s.mine.expected += BALANCE.strikeChance * BALANCE.rarityMean * BALANCE.councilExpect;
+  if (!has(s, 'sabotage', p.work)) s.mine.expected += BALANCE.strikeChance * BALANCE.rarityMean * BALANCE.councilExpect;
   if (!chance(s.rng, strikeChance(s, p))) return;
   const depth = workDepth(s, p.work);
   if (p.follower && p.routine !== 'lieLow') {
-    const luck = bonus(s, 'strikeLuck') + worn(s, p, 'strikeLuck') + (has(s, 'veinSight', p.work) ? 40 : 0);
+    const luck = bonus(s, 'strikeLuck') + worn(s, p, 'strikeLuck') + (has(s, 'veinSight', p.work) ? CARD.veinSightLuck : 0);
     let floor = 0;
     if (oddCount(s, 'lodestone') > 0 && !has(s, 'used', 'lodestone')) {
       floor = EFFECT.lodestoneTier;
@@ -250,7 +250,7 @@ export function searchOne(c: Ctx, p: Person): void {
   for (const id of found) delete s.crystals[id];
   p.caught += 1;
   ev(c, { kind: 'search', unit: p.id, place: whereNow(p, s.tick), found });
-  if (value > 0) addHeat(c, 'council', round1(value * BALANCE.searchHeatPerValue * (p.echoOf ? EFFECT.echoHeatMult : 1)), 'caughtWithStones');
+  if (value > 0) addHeat(c, 'council', round1(value * BALANCE.searchHeatPerValue), 'caughtWithStones');
   if (p.worn.length > 0) evidence(c, p);
   else if (p.caught >= BALANCE.caughtTaken) remove(c, p, 'taken');
 }
@@ -285,6 +285,6 @@ function spotted(c: Ctx, p: Person): void {
   const on = new Set<PlaceId>([at, ...nbrs(s, at)]);
   for (const w of everyone(s)) {
     if (!here(w) || w.follower || asleep(w) || !councilEye(w) || !on.has(area(whereNow(w, s.tick)))) continue;
-    if (rand(s.rng) < BALANCE.offerSpot * (1 - p.stats.cunning / 200)) return addHeat(c, 'council', BALANCE.offerSpotHeat * (p.echoOf ? EFFECT.echoHeatMult : 1), 'offeringSeen');
+    if (rand(s.rng) < BALANCE.offerSpot * (1 - p.stats.cunning / 200)) return addHeat(c, 'council', BALANCE.offerSpotHeat, 'offeringSeen');
   }
 }

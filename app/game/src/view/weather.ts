@@ -48,10 +48,10 @@ const rgb = (c: string): number => {
   return (r! << 16) | (g! << 8) | b!;
 };
 
-/** The light of the hour as the old weather read it: day, night, and the dawn and dusk bumps. */
+/** The light of the hour: day, night, and the dawn and dusk bumps. */
 function lightOf(q: Query, hour: number): { day: number; night: number; dawn: number; dusk: number } {
   const c = hour / 24, bump = (c0: number) => smooth(0, 1, 1 - Math.min(Math.abs(c - c0), 1 - Math.abs(c - c0)) / 0.075);
-  return { day: q.daylight(hour), night: smooth(0.02, -0.16, Math.sin((c - 0.25) * Math.PI * 2)), dawn: bump(0.262), dusk: bump(0.742) };
+  return { day: q.daylight(hour), night: smooth(0.02, -0.16, q.sun(hour)), dawn: bump(0.262), dusk: bump(0.742) };
 }
 
 /** Sprites of one blend placed afresh each step: `put` the next, `end` hides the rest. */

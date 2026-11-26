@@ -1,25 +1,30 @@
 /**
- * The people's lives (src/sim/world implements `World`): everyone placed by their plan, walking the world graph
- * between places and riding the lift between the mine and the town, the weather by the hour, the opposition's
- * walkers on their way, and the groups that gather. A person plans when they arrive and when their plan can change:
- * its hour comes, or the weather or a crew or lift door it read turns, or their routine does.
+ * src/sim/world, the people's lives, which the rules import. Owns who lives in the world
+ * (society: every trade's headcount, the named people, homes, households, ties), where each is and what they do by
+ * the hour (plans), the routes on content's world graph (graph, area), the calendar and the weather (sky), the
+ * world's events and the day's feed (events), and the keyed draws they roll (draw). Reads content's world, day,
+ * clock, calendar, weather, roles, people, names, traits, worldEvents and discoveries, and the rules' standing and
+ * whereabouts (sim/core); writes only the people (populated, placed, newcomers), the weather and wind, and events.
+ * Everyone is placed by their plan, walking the world graph between places and riding the lift between the mine and
+ * the town, the opposition's walkers on their way, and the groups that gather. A person plans when they arrive and
+ * when their plan can change: its hour comes, or the weather or a crew or lift door it read turns, or their routine does.
  */
 import { TPH, dayOf } from '../../content/clock';
 import { TOWN } from '../../content/balance';
 import { TRAVEL } from '../../content/world';
-import type { Activity, Effect, GameEvent, GameState, GroupId, Person, PlaceId, Threat, UnitId, Weather, World } from '../../types';
+import type { Activity, Effect, GameEvent, GameState, GroupId, Person, PlaceId, Threat, UnitId, Weather } from '../../types';
 import { standingOf, whereNow } from '../core';
 import { inMine } from './area';
 import { K, keyedInt } from './draw';
-import { dawnOf, echoes, stepEvents, variants } from './events';
+import { dawnOf, stepEvents, variants } from './events';
 import { route } from './graph';
 import { DOORS, WEATHER, habitPlace, plan, planned, shiftOf, hasHabit, haunts, type Target } from './plans';
-import { populate, roster, spawn, tieKind, type Roster } from './society';
+import { populate as settle, roster, type Roster } from './society';
 import { liftRuns, weatherAt, windAt } from './sky';
 
 export { calendarOf, indoorsAt, liftRuns, regimeOf, weatherAt } from './sky';
-export { eventsOf } from './events';
-export { makeName, tieKind } from './society';
+export { echoes, eventsOf } from './events';
+export { makeName, spawn, tieKind } from './society';
 export { haunts, route };
 
 const SEARCHERS = new Set<Threat['kind']>(['inspection', 'purge', 'inquisitor', 'crusade']);
@@ -112,7 +117,7 @@ function live(s: GameState, r: Roster, L: Lives, i: number): void {
 }
 
 /** A group's members: `house:<home>`, `crew:<work>:<shift>`, `flock:<place>` (who keep that chapel), `watch:<shift>`; never an Elite. */
-function members(s: Readonly<GameState>, g: GroupId): UnitId[] {
+export function members(s: Readonly<GameState>, g: GroupId): UnitId[] {
   const out: UnitId[] = [];
   const [kind, x, y] = g.split(':', 3) as [string, string, string | undefined];
   const r = roster(s);
@@ -131,7 +136,7 @@ function members(s: Readonly<GameState>, g: GroupId): UnitId[] {
 }
 
 /** The groups `p` is one of, in `members`' terms: their household, their crew, the flock of their chapel, the watch. */
-function groupsOf(s: Readonly<GameState>, p: Readonly<Person>): GroupId[] {
+export function groupsOf(s: Readonly<GameState>, p: Readonly<Person>): GroupId[] {
   if (standingOf(p) === 'elite') return [];
   const shift = shiftOf(s.seed, p);
   const out = [p.household, `crew:${p.work}:${shift}`];
@@ -141,7 +146,7 @@ function groupsOf(s: Readonly<GameState>, p: Readonly<Person>): GroupId[] {
 }
 
 /** Where most of the group stands now, if that is at least content's share of it and two of them. */
-function together(s: Readonly<GameState>, g: GroupId): PlaceId | null {
+export function together(s: Readonly<GameState>, g: GroupId): PlaceId | null {
   const ms = members(s, g);
   const count = new Map<PlaceId, number>();
   let best: PlaceId | null = null, most = 0;
@@ -155,52 +160,46 @@ function together(s: Readonly<GameState>, g: GroupId): PlaceId | null {
   return most >= TOWN.gatherMin && most >= TOWN.gatherShare * ms.length ? best : null;
 }
 
-export const world: World = {
-  populate(s) {
-    populate(s);
-    s.weather = weatherAt(s.seed, s.tick);
+/** Everyone, with homes, work, households and ties, from the seed and content's tables, each where their plan has them. */
+export function populateWorld(s: GameState): void {
+  settle(s);
+  s.weather = weatherAt(s.seed, s.tick);
+  s.wind = windAt(s.seed, s.tick);
+  const r = roster(s);
+  for (let i = 0; i < r.all.length; i++) {
+    const p = r.all[i]!;
+    const t = plan(s, p, r.key[i]);
+    p.at = { place: t.place, spot: r.key[i]! & 63, doing: t.doing };
+  }
+}
+
+/** One tick of lives: whereabouts by the hour, calendar, weather, world events, the opposition's walkers. */
+export function stepWorld(s: GameState, out: GameEvent[]): void {
+  if (s.tick % TPH === 0) {
     s.wind = windAt(s.seed, s.tick);
-    const r = roster(s);
-    for (let i = 0; i < r.all.length; i++) {
-      const p = r.all[i]!;
-      const t = plan(s, p, r.key[i]);
-      p.at = { place: t.place, spot: r.key[i]! & 63, doing: t.doing };
+    const w = weatherAt(s.seed, s.tick);
+    const dawn = s.tick === dawnOf(dayOf(s.tick));
+    if (w !== s.weather || dawn) {
+      s.weather = w;
+      const key = `weather.${w}.${dawn ? 'dawn' : 'turn'}`;
+      out.push({ tick: s.tick, kind: 'weather', weather: w, note: { key: `${key}.${keyedInt(s.seed, K.note, variants(key), s.tick)}` } });
     }
-  },
-  step(s: GameState, out: GameEvent[]) {
-    if (s.tick % TPH === 0) {
-      s.wind = windAt(s.seed, s.tick);
-      const w = weatherAt(s.seed, s.tick);
-      const dawn = s.tick === dawnOf(dayOf(s.tick));
-      if (w !== s.weather || dawn) {
-        s.weather = w;
-        const key = `weather.${w}.${dawn ? 'dawn' : 'turn'}`;
-        out.push({ tick: s.tick, kind: 'weather', weather: w, note: { key: `${key}.${keyedInt(s.seed, K.note, variants(key), s.tick)}` } });
-      }
+  }
+  stepEvents(s, out);
+  const r = roster(s);
+  const L = livesOf(r);
+  const turn = turned(s, L);
+  for (let t = 0; t < s.threats.length; t++)
+    for (let w = 0, ws = s.threats[t]!.walkers; w < ws.length; w++) {
+      const i = r.index.get(ws[w]!);
+      if (i !== undefined && L.chase[i] !== s.tick) { L.chase[i] = s.tick; L.threat[i] = t; }
     }
-    stepEvents(s, out, world);
-    const r = roster(s);
-    const L = livesOf(r);
-    const turn = turned(s, L);
-    for (let t = 0; t < s.threats.length; t++)
-      for (let w = 0, ws = s.threats[t]!.walkers; w < ws.length; w++) {
-        const i = r.index.get(ws[w]!);
-        if (i !== undefined && L.chase[i] !== s.tick) { L.chase[i] = s.tick; L.threat[i] = t; }
-      }
-    // each one keeps on while walking, or while their plan holds and nothing it read has turned
-    for (let i = 0; i < r.all.length; i++) {
-      const p = r.all[i]!;
-      const a = p.at;
-      if (p.gone || ('route' in a ? s.tick < a.to
-        : L.chase[i] !== s.tick && !L.chased[i] && s.tick < L.until[i]! && !(L.uses[i]! & turn) && L.routine[i] === (p.follower ? p.routine : null))) continue;
-      live(s, r, L, i);
-    }
-  },
-  echo: (s, out, from) => echoes(s, out, world, from, out.length),
-  members,
-  groupsOf,
-  together,
-  route,
-  tieKind,
-  spawn,
-};
+  // each one keeps on while walking, or while their plan holds and nothing it read has turned
+  for (let i = 0; i < r.all.length; i++) {
+    const p = r.all[i]!;
+    const a = p.at;
+    if (p.gone || ('route' in a ? s.tick < a.to
+      : L.chase[i] !== s.tick && !L.chased[i] && s.tick < L.until[i]! && !(L.uses[i]! & turn) && L.routine[i] === (p.follower ? p.routine : null))) continue;
+    live(s, r, L, i);
+  }
+}

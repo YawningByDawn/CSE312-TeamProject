@@ -1,3 +1,12 @@
+// src/view, the world on the canvas (implements `View`; #6, #72, #129). Owns the one PixiJS renderer and stage, the
+// layers in ORDER (one file each: ground, sheen, gray, lights, town, surface, grade, valley, weather, sky, fog; people,
+// effects and the hoard in src/view/life; the films in src/view/film), the camera's transform (camera.ts) and picking
+// (hits.ts). Reads the view model each frame, the sim's Query (hour, daylight, sun, visibility, hearths), content's map,
+// world, clock, crystals and roles, and the baked files under assets/ (docs/art-pipeline.md); writes nothing back.
+// The world layers sit in one render group whose matrix is the camera, so pan and zoom are one transform write; each
+// layer places baked sprites and picks frames and says when what it shows changed. A frame renders only on a change of
+// camera, size or a layer; a frame where nothing changed issues no GL call. Pixi's own ticker is stopped: the app's one
+// rAF frame is the only loop. Picking is the scene graph's: the places' disks lie under every layer.
 import { Container, Texture, Ticker, WebGLRenderer } from 'pixi.js';
 import type { AtlasManifest, Layer, LayerName, Query, View, ViewModel } from '../types';
 import { below, frameOf, scale } from './camera';
@@ -21,16 +30,12 @@ import { Weather } from './weather';
 import { Sheen } from './sheen';
 import { Fx, GRAVE_AT, anchor, type Anchor } from './life/fx';
 import { Films, filmLength } from './film/films';
-
-// The world on the canvas (#6, #72, #129): one PixiJS stage over one world. The world layers sit in one render group
-// whose matrix is the camera, so pan and zoom are one transform write; each layer places baked sprites and picks
-// frames and says when what it shows changed. A frame renders only on a change of camera, size or a layer; a frame
-// where nothing changed issues no GL call. Pixi's own ticker is stopped: the app's one rAF frame is the only loop.
-// Picking is the scene graph's (hits.ts): the places' disks lie under every layer.
+import { Opening } from './film/opening';
 
 const ORDER: readonly LayerName[] = ['ground', 'stain', 'props', 'people', 'fx', 'above', 'weather', 'fog', 'grade', 'lit', 'land', 'notes'];
 
-export function createView(canvas: HTMLCanvasElement, dpr: number, q: Query): View {
+export function createView(canvas: HTMLCanvasElement, dpr: number, q: Query, muted: boolean): View {
+  const opening = new Opening(canvas, muted);
   const renderer = new WebGLRenderer();
   const stage = new Container();
   const world = new Container({ isRenderGroup: true });
@@ -60,7 +65,7 @@ export function createView(canvas: HTMLCanvasElement, dpr: number, q: Query): Vi
   };
 
   return {
-    async load(onProgress) {
+    async load() {
       await renderer.init({
         canvas, width: screen.w, height: screen.h, resolution: dpr, autoDensity: false, antialias: false, background: '#000000',
         powerPreference: 'high-performance', hello: false,
@@ -70,7 +75,6 @@ export function createView(canvas: HTMLCanvasElement, dpr: number, q: Query): Vi
       // the grade's sheet and the films' veil are Pixi's white texture: on the GPU now, not when first shown
       renderer.texture.initSource(Texture.WHITE.source);
       renderer.events.rootBoundary.rootTarget = stage;
-      onProgress(0.1);
       const ground = new Ground(q);
       const lifeP = Atlas.load(renderer, lifeManifest as unknown as AtlasManifest, lifeUrl);
       people = new People(q, renderer, screen, dpr);
@@ -81,8 +85,8 @@ export function createView(canvas: HTMLCanvasElement, dpr: number, q: Query): Vi
       films = new Films(life, people, world, screen, renderer);
       // the sheen lies on the mine's ground, over the lit picture
       add(ground, sheen, gray, new Lights(q, life), people, new Fx(q, life, people), new Weather(q, sky, fog, life, renderer, screen), fog, films);
-      onProgress(1);
       ready = true;
+      opening.load();
       // the first screen is the mine: the town, its ground and the land are fetched after it, and placed when they arrive
       const light = Atlas.load(renderer, lightManifest as unknown as AtlasManifest, lightUrl);
       void Promise.all([
@@ -93,6 +97,7 @@ export function createView(canvas: HTMLCanvasElement, dpr: number, q: Query): Vi
 
     frame(live: ViewModel) {
       if (!ready) return;
+      opening.frame(live);
       const vm = films.view(live);
       let changed = dirty;
       dirty = false;

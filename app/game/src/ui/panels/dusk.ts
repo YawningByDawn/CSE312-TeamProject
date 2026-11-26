@@ -1,10 +1,11 @@
 import type { CrystalId, FactionId, GameState, ViewModel } from '../../types';
 import { uiText } from '../../content/text';
+import { bound } from '../../content/keys';
 import { BLOOD, DIM, PALE, VIOLET, Words, slab, stone, surface, verb } from './art';
 import type { Ctx, Panel } from './index';
 
 // Dusk (inventory #122, 47): each stone brought to the grave revealed in turn, the rarer the longer it is held, then the
-// day's ledger. The clock runs on under them; Enter or Space hurries the reveal and moves on, Escape closes.
+// day's ledger. The clock runs on under them; the confirm key hurries the reveal and moves on, back closes.
 
 const TIER: Record<string, number> = { dull: 0, clear: 1, bright: 2, blazing: 3, royal: 4, impossible: 5 };
 const loud = (oneIn: number): number => (oneIn >= 10000 ? 3 : oneIn >= 1000 ? 2 : oneIn >= 100 ? 1 : 0);
@@ -140,10 +141,10 @@ export class Dusk implements Panel {
   }
 
   press(e: KeyboardEvent, vm: ViewModel): boolean {
-    if (e.key === 'Escape') {
+    if (bound(vm.settings, 'back', e)) {
       this.stage = null;
       this.c.redraw();
-    } else if (e.key === 'Enter' || e.key === ' ') {
+    } else if (bound(vm.settings, 'confirm', e)) {
       if (this.stage === 'reveal' && vm.time - this.start < this.done) {
         this.fast = true;
         this.c.redraw();

@@ -7,7 +7,6 @@
     "prof":  { "what": "1: the profiled game (F3 toggles it; docs/perf.md)", "row": "contract.md", "until": "permanent" }
   },
   "sheets": {
-    "atlas":    { "page": "dev/atlas.html", "what": "contact sheet of a baked atlas (assets/<a>/)", "row": "SHRINK", "until": "2026-12-15" },
     "workshop": { "page": "dev/workshop.html", "what": "nav shell listing the dev pages", "row": "GUARDS", "until": "2027-03-31", "why": "the shell stays while any other dev page does" }
   }
 }

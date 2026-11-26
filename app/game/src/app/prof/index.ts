@@ -1,10 +1,12 @@
+// src/app/prof, the profiled page (`?prof=1`; F3 on the game's page loads it, F3 here leaves; docs/perf.md). Owns the
+// probes' runtime (probe.ts: the `__P` calls tools/probes.ts wraps every named function of the profiled copy in), the
+// GPU's call and upload counts (gpu.ts), the report and its text (report.ts) and the panel. Reads the page's rAF, the
+// WebGL context and the heap; adds `prof` and `profText` to `window.__hg`. Every rAF callback runs as a frame's
+// segment, the GPU's calls are counted, and the panel shows the top of the report twice a second.
 import type { DebugApi } from '../../types';
 import { wrapGpu } from './gpu';
 import { count, resolution, segment } from './probe';
 import { report, setResolution, text } from './report';
-
-// The profiled page (`?prof=1`; F3 on the game's page loads it, F3 here leaves): every rAF callback runs as a frame's
-// segment, the GPU's calls are counted, and a panel shows the top of the report twice a second.
 
 /** Frames between panel refreshes. */
 const EVERY = 30;

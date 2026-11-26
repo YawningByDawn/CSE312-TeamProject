@@ -1,11 +1,17 @@
 /**
- * The sim (inventory #9-12): `makeSim(world)` gives the `Sim` the pump steps and the `Query` the view and the ui read.
+ * src/sim, the rules. Owns the run's state (`GameState`) and every change to it: `makeSim()` gives the pump's
+ * `Sim` (create, step one tick, act, legal) and the `Query` the view, the ui and the audio read (checks, odds, stats,
+ * goal, slots), never writing. Reads content's tables (balance, cards, crystals, gems, world, clock, stages, threats,
+ * stories, items, gifts, blessings) and src/sim/world, the people's lives; its one RNG lives in the state (rng.ts).
+ * No DOM, IO, wall clock or Math.random. One rule area a file: the god's day (god), the mine's (mining), colour and the
+ * whisper (influence), the cards, the grave and its stones (grave, crystals, bonus), the town's benches, buildings,
+ * gifts and tithe, the powers' moves (threats), the stories, discoveries; core.ts holds what they share.
  * Tick 0 is the opening's night; the run waits in `bonus` on the first deal, and the take begins the clock. Each tick
  * the action points refill (`apMax` a day) and the hour's rules run: dawn, the shift's swings, its end, dusk.
  */
 import { BALANCE } from '../content/balance';
 import { GIFTS } from '../content/gifts';
-import { AT, DAY_TICKS, dayOf, hourOf, partOf, tod } from '../content/clock';
+import { AT, DAY_TICKS, dayOf, hourOf, nextAt, partOf, tod } from '../content/clock';
 import { AREAS, NEIGHBOURS, PLACES } from '../content/world';
 import { dealCards, discard, discardWhy, cardCost, play, playWhy, reroll, rerollWhy, take, takeWhy, cardFee, cardTargets, payment, faithOf } from './cards';
 import { bonus } from './bonus';
@@ -20,7 +26,7 @@ import {
   recombineWhy, set, setWhy, unset, unsetWhy,
 } from './grave';
 import {
-  creep, devotionDay, directNether, groupPrice, groupWhy, inReach, move, moveAp, moveOdds, moveWhy, routineWhy, visibility, whisper,
+  creep, devotionDay, directNether, groupPrice, groupWhy, move, moveAp, moveOdds, moveWhy, routineWhy, visibility, whisper,
   whisperCost, whisperGroup, whisperOdds, whisperOddsWhy, whisperWhy,
 } from './influence';
 import { discoverDawn } from './discoveries';
@@ -31,9 +37,9 @@ import { chooseStory, pendingSlots, storyDawn, storyWhy } from './stories';
 import { answer, answerNether, answerWhy, crossings, powersDawn, powersDusk } from './threats';
 import { newCrystal } from './crystals';
 import { seedRng } from './rng';
-import { calendarOf, tieKind } from './world';
+import { calendarOf, echoes, groupsOf, populateWorld, stepWorld, tieKind } from './world';
 import { CARDS } from '../content/cards';
-import type { Action, Check, Facility, GameEvent, GameState, GroupId, JewelForm, Query, Reason, Routine, Sim, Weekday, World } from '../types';
+import type { Action, Check, Facility, GameEvent, GameState, GroupId, JewelForm, Query, Reason, Routine, Sim, Weekday } from '../types';
 
 const ROUTINES: readonly Routine[] = ['pray', 'offer', 'lieLow', 'delve', 'skim', 'preach', 'standWatch'];
 const FORMS: readonly JewelForm[] = ['ring', 'amulet', 'circlet'];
@@ -72,7 +78,7 @@ function blank(seed: number): GameState {
 }
 
 /** What an action costs now: action points, Nether, crystal worth; the odds of a chance action. */
-function price(s: Readonly<GameState>, w: World, fl: Flock, a: Action): Omit<Check, 'ok' | 'why'> {
+function price(s: Readonly<GameState>, fl: Flock, a: Action): Omit<Check, 'ok' | 'why'> {
   const none = { ap: 0, nether: 0, crystals: 0 };
   switch (a.type) {
     case 'whisper': {
@@ -80,13 +86,13 @@ function price(s: Readonly<GameState>, w: World, fl: Flock, a: Action): Omit<Che
       return p ? { ap: s.god.free > 0 ? 0 : 1, nether: whisperCost(s, fl, p), crystals: 0, odds: whisperOdds(s, fl, p) } : none;
     }
     case 'whisperGroup': {
-      const g = groupPrice(s, w, fl, a.group, dayOf(s.tick));
+      const g = groupPrice(s, fl, a.group, dayOf(s.tick));
       return g ? { ap: s.god.free > 0 ? 0 : 1, nether: g.nether, crystals: 0, odds: g.odds } : none;
     }
     case 'setRoutine': return s.people[a.unit] ? { ap: 1, nether: directNether(s.people[a.unit]!), crystals: 0 } : none;
     case 'move': {
       const p = s.people[a.unit];
-      return p ? { ap: moveAp(s, w, p, a.to), nether: directNether(p), crystals: 0, odds: moveOdds(s, w, p, a.to) } : none;
+      return p ? { ap: moveAp(s, p, a.to), nether: directNether(p), crystals: 0, odds: moveOdds(s, p, a.to) } : none;
     }
     case 'play': return { ap: 0, nether: cardFee(s), crystals: s.god.hand.includes(a.card) ? cardCost(s, a.card) : 0 };
     case 'enchant': return s.crystals[a.crystal] ? { ap: 0, nether: enchantCost(s, s.crystals[a.crystal]!), crystals: 0 } : none;
@@ -101,7 +107,7 @@ function price(s: Readonly<GameState>, w: World, fl: Flock, a: Action): Omit<Che
 }
 
 /** Why an action is refused now (empty: it may be taken). */
-function why(s: Readonly<GameState>, w: World, fl: Flock, a: Action): Reason[] {
+function why(s: Readonly<GameState>, fl: Flock, a: Action): Reason[] {
   if (s.phase === 'won' || s.phase === 'lost') return [{ key: 'why.over' }];
   if (s.phase === 'bonus') return a.type === 'take' ? takeWhy(s, a.card) : [{ key: 'why.pickBonus' }];
   if (s.pending?.kind === 'story') return a.type === 'story' ? storyWhy(s, a.option) : [{ key: 'why.pending' }];
@@ -111,9 +117,9 @@ function why(s: Readonly<GameState>, w: World, fl: Flock, a: Action): Reason[] {
   const r = ((): Reason[] => {
     switch (a.type) {
       case 'whisper': return whisperWhy(s, fl, s.people[a.target], day);
-      case 'whisperGroup': return groupWhy(s, w, fl, a.group, day);
+      case 'whisperGroup': return groupWhy(s, fl, a.group, day);
       case 'setRoutine': return routineWhy(s, s.people[a.unit], a.routine);
-      case 'move': return moveWhy(s, w, s.people[a.unit], a.to);
+      case 'move': return moveWhy(s, s.people[a.unit], a.to);
       case 'take': return takeWhy(s, a.card);
       case 'discard': return discardWhy(s, a.card);
       case 'reroll': return rerollWhy(s);
@@ -130,13 +136,13 @@ function why(s: Readonly<GameState>, w: World, fl: Flock, a: Action): Reason[] {
       case 'give': return giveWhy(s, a.item, a.unit, a.by);
       case 'takeBack': return takeBackWhy(s, a.item);
       case 'openVault': return vaultWhy(s);
-      case 'useGift': return giftWhy(s, w, a);
+      case 'useGift': return giftWhy(s, a);
       case 'pickBlessing': return [{ key: 'why.notOffered' }];
       default: return [{ key: 'why.closed' }];
     }
   })();
   if (r.length > 0) return r;
-  const p = price(s, w, fl, a);
+  const p = price(s, fl, a);
   if (p.ap > s.god.ap) return [{ key: 'why.ap', slots: { n: p.ap } }];
   return p.nether > s.god.nether ? [{ key: 'why.nether', slots: { n: round1(p.nether) } }] : [];
 }
@@ -145,13 +151,13 @@ function why(s: Readonly<GameState>, w: World, fl: Flock, a: Action): Reason[] {
 function apply(c: Ctx, fl: Flock, a: Action): void {
   const s = c.s;
   const g = s.god;
-  const p = price(s, c.w, fl, a);
+  const p = price(s, fl, a);
   g.ap -= p.ap;
   g.nether = round1(g.nether - p.nether);
   if (g.free > 0 && (a.type === 'whisper' || a.type === 'whisperGroup')) g.free -= 1;
   switch (a.type) {
     case 'whisper': whisper(c, [s.people[a.target]!], dayOf(s.tick), p.odds!); break;
-    case 'whisperGroup': whisperGroup(c, c.w, a.group, dayOf(s.tick), p.odds!); break;
+    case 'whisperGroup': whisperGroup(c, a.group, dayOf(s.tick), p.odds!); break;
     case 'setRoutine':
       s.people[a.unit]!.routine = a.routine;
       ev(c, { kind: 'routine', unit: a.unit, routine: a.routine });
@@ -195,9 +201,9 @@ function cheapestPay(s: Readonly<GameState>, card: string): string[] | null {
   return payment(s, card, pay).ichor !== null ? pay : null;
 }
 
-export function makeSim(w: World): { sim: Sim; query: Query } {
+export function makeSim(): { sim: Sim; query: Query } {
   const out: GameEvent[] = [];
-  const c: Ctx = { s: null as unknown as GameState, out, w };
+  const c: Ctx = { s: null as unknown as GameState, out };
 
   function dawn(): void {
     const s = c.s;
@@ -220,7 +226,7 @@ export function makeSim(w: World): { sim: Sim; query: Query } {
   const sim: Sim = {
     create(seed, opts) {
       const s = blank(seed);
-      w.populate(s);
+      populateWorld(s);
       if (opts?.stage === 'shade') {
         s.stage = 'shade';
         s.god.level = BALANCE.shadeLevel;
@@ -261,18 +267,18 @@ export function makeSim(w: World): { sim: Sim; query: Query } {
       }
       if (t === AT.night) ev(c, { kind: 'night', weekday: weekdayOf(s.tick) });
       if (s.phase === 'live') crossings(c);
-      if (s.phase === 'live') w.step(s, out);
+      if (s.phase === 'live') stepWorld(s, out);
       pruneEffects(s);
       return out;
     },
 
     act(s, a) {
       const fl = flockOf(s);
-      const r = why(s, w, fl, a);
+      const r = why(s, fl, a);
       if (r.length > 0) return { ok: false, why: r, events: [] };
       const events: GameEvent[] = [];
-      apply({ s, out: events, w }, fl, a);
-      if (s.phase === 'live') w.echo(s, events, 0);
+      apply({ s, out: events }, fl, a);
+      if (s.phase === 'live') echoes(s, events, 0, events.length);
       return { ok: true, why: [], events };
     },
 
@@ -290,7 +296,7 @@ export function makeSim(w: World): { sim: Sim; query: Query } {
         const id = p.id;
         if (!p.follower) {
           all.push({ type: 'whisper', target: id });
-          if (s.stage === 'shade') for (const group of w.groupsOf(s, p)) groups.add(group);
+          if (s.stage === 'shade') for (const group of groupsOf(s, p)) groups.add(group);
           continue;
         }
         for (const routine of ROUTINES) all.push({ type: 'setRoutine', unit: id, routine });
@@ -326,27 +332,25 @@ export function makeSim(w: World): { sim: Sim; query: Query } {
         all.push({ type: 'answer', threat: t.id, with: 'favour' }, { type: 'answer', threat: t.id, with: 'hide' });
         for (const id in s.items) all.push({ type: 'answer', threat: t.id, with: id });
       }
-      return all.filter((a) => why(s, w, fl, a).length === 0);
+      return all.filter((a) => why(s, fl, a).length === 0);
     },
   };
 
   const query: Query = {
     check(s, a) {
       const fl = flockOf(s);
-      const r = why(s, w, fl, a);
-      return { ok: r.length === 0, why: r, ...price(s, w, fl, a) };
+      const r = why(s, fl, a);
+      return { ok: r.length === 0, why: r, ...price(s, fl, a) };
     },
     tieKind: (s, a, b) => tieKind(s, s.people[a]!, s.people[b]!),
     hour: hourOf,
     day: dayOf,
+    dayEnd: (t) => (tod(t) >= AT.dawn && tod(t) < AT.dusk ? nextAt(t, AT.dusk) : nextAt(t, AT.dawn)),
     weekday: weekdayOf,
     part: partOf,
-    daylight: (h) => Math.max(0, Math.sin(((h - 6) / 12) * Math.PI)),
+    sun: (h) => Math.sin(((h - 6) / 12) * Math.PI),
+    daylight(h) { return Math.max(0, this.sun(h)); },
     visibility,
-    reach(s) {
-      const fl = flockOf(s);
-      return everyone(s).filter((p) => inReach(s, fl, p)).map((p) => p.id);
-    },
     stats(s) {
       const next = XP_THRESHOLDS[s.god.level];
       return {
@@ -371,7 +375,7 @@ export function makeSim(w: World): { sim: Sim; query: Query } {
     },
     storySlots: pendingSlots,
     odds: (s, unit) => whisperOddsWhy(s, flockOf(s), s.people[unit]!),
-    groups: (s, unit) => w.groupsOf(s, s.people[unit]!),
+    groups: (s, unit) => groupsOf(s, s.people[unit]!),
     hearths,
   };
   return { sim, query };

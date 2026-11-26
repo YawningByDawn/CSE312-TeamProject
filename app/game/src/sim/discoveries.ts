@@ -6,6 +6,7 @@
  */
 import { DISCOVERIES, DISCOVERY_NUMBERS } from '../content/discoveries';
 import { addHeat, area, ev, followers, handMax, mint, type Ctx } from './core';
+import { spawn } from './world';
 import type { Person, PlaceId } from '../types';
 
 /** Find what area `a` hides, if it is not found yet and can be now. */
@@ -24,7 +25,7 @@ export function discover(c: Ctx, a: PlaceId, by?: Person): void {
     case 'seam': ps.seam = (ps.seam ?? 0) + 1; break;
     case 'danger': addHeat(c, d.heat!.track, d.heat!.amount, 'found'); break;
     case 'relic': s.god.hand.push(d.miracle!); break;
-    case 'loner': c.w.spawn(s, 'loner', a); break;
+    case 'loner': spawn(s, 'loner', a); break;
     // its edge is in the world's graph once the area is found
     case 'shortcut': break;
   }

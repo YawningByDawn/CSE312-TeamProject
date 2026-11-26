@@ -2,6 +2,7 @@ import type { Action, CardId, Check, Crystal, CrystalId, GameState, Mod, ViewMod
 import { CARDS } from '../../content/cards';
 import { MODS } from '../../content/gems';
 import { uiText } from '../../content/text';
+import { bound } from '../../content/keys';
 import { BLOOD, DIM, PALE, TILE_H, TILE_W, VIOLET, Words, itemText, line, slab, stone, stoneTile, surface, verb } from './art';
 import type { Ctx, Panel } from './index';
 
@@ -150,8 +151,8 @@ export class Grave implements Panel {
     return vy + 132;
   }
 
-  press(e: KeyboardEvent): boolean {
-    if (e.key !== 'Escape') return false;
+  press(e: KeyboardEvent, vm: ViewModel): boolean {
+    if (!bound(vm.settings, 'back', e)) return false;
     if (this.first) {
       this.first = null;
       this.c.redraw();
@@ -259,8 +260,8 @@ export class Pay implements Panel {
   }
 
   press(e: KeyboardEvent, vm: ViewModel): boolean {
-    if (e.key === 'Escape') this.close();
-    else if (e.key === 'Enter' && this.card && (this.target !== undefined || CARDS[this.card]!.target === 'none')) {
+    if (bound(vm.settings, 'back', e)) this.close();
+    else if (bound(vm.settings, 'confirm', e) && this.card && (this.target !== undefined || CARDS[this.card]!.target === 'none')) {
       if (this.c.q.check(vm.state, { type: 'play', card: this.card, pay: this.pay, ...(this.target ? { target: this.target } : {}) }).ok) this.play();
     } else return false;
     return true;

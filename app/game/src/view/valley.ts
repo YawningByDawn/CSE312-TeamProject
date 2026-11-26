@@ -215,7 +215,7 @@ export class Valley implements Layer {
     const hour = this.q.hour(vm.state.tick);
     if (differs(this.shown, zoom, hour)) {
       this.root.visible = true;
-      const day = this.q.daylight(hour), lit = landLight(day, Math.sin(((hour - 6) / 12) * Math.PI)), u = this.uni.uniforms;
+      const day = this.q.daylight(hour), lit = landLight(day, this.q.sun(hour)), u = this.uni.uniforms;
       (u.uLight as Float32Array).set(lit.rgb);
       Object.assign(u, { uDesat: lit.desat, uK: k, uFarK: far, uNearOn: this.dpr * a > NEAR_PX ? 1 : 0 });
       changed = true;

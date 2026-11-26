@@ -1,3 +1,8 @@
+// src/ui/panels, what opens over the rest layout (inventory #1, 5, 7, 47, 94, 115-123): the title, the defeat and the
+// ending (front), what the clock waits on: the starting gift, a blessing, a story's choice, a cut (choice), a building, a person, the grave and the pay slab
+// (grave), the dusk's ledger; art.ts the baked sheets they show (assets/ui, cardart, crystals, crystalmarks, portraits,
+// interiors, front, title, defeat). Reads the view model, the sim's Query and card helpers, content's tables, rooms
+// and words, the framework's login; sends intents.
 import type { Account, Action, CardId, Focus, Intent, Query, ViewModel } from '../../types';
 import type { Anchors, MountPanels, Part, Where } from '../index';
 import { div } from '../kit';
@@ -9,8 +14,7 @@ import { Defeat, Ending, Title } from './front';
 import { Grave, Pay } from './grave';
 import { Person } from './person';
 
-// The panels (src/ui/panels; inventory #1, 5, 7, 47, 94, 115-123): what opens over the rest layout. Each panel says what it
-// shows now as one key, and is built again only when that key changes; its key carries `ctx.rev`, which moves when the
+// Each panel says what it shows now as one key, and is built again only when that key changes; its key carries `ctx.rev`, which moves when the
 // state can have moved (fresh events, a whole action point, the hour) or a panel's own choice moved. The first open panel
 // in the list below owns the keys it answers to; the rest fall through to app's input.
 
@@ -84,7 +88,8 @@ export const mountPanels = (account: Account | null): MountPanels => (at, send, 
   };
 
   window.addEventListener('keydown', (e) => {
-    if (!vmNow) return;
+    // a menu stands over the panels: its keys are the menu's
+    if (!vmNow || vmNow.menu) return;
     const i = sync(vmNow);
     if (i >= 0 && list[i]!.press?.(e, vmNow)) {
       e.preventDefault();

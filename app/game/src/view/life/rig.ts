@@ -1,5 +1,5 @@
 import type { Weather } from '../../types';
-import { ID, LANTERN, holdIds, pack, type HoldIds } from './ids';
+import { ID, LANTERN, pack, type HoldIds } from './ids';
 
 // A person's body this frame (#76-78): two baked steps of a loop (assets/poses) lerped, the blend
 // from the last loop and a reaction over it, the weather's posture, the rig solved for the look's height and hunch, and

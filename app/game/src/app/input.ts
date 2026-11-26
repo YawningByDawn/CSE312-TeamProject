@@ -1,10 +1,11 @@
 import { reloadFlipped } from '../content/flags';
-import type { Camera, View } from '../types';
+import { bound } from '../content/keys';
+import type { Bind, Camera, View } from '../types';
 import type { Pump } from './pump';
 
 // The player's hands: the pointer picks by the view's own hit areas, drag pans 1:1, wheel, pinch and keys zoom toward
-// a goal the camera eases to, and the keys I, P, Esc and Space. The canvas gets the pointer only where the ui lets it
-// through (#ui is pointer-events: none outside its panels).
+// a goal the camera eases to, and the keys bound to the stats, the characters, back (settings) and pause. The canvas
+// gets the pointer only where the ui lets it through (#ui is pointer-events: none outside its panels).
 
 const ZOOM_MIN = 0;
 const ZOOM_MAX = 3;
@@ -17,12 +18,14 @@ const PAN_KEY = 900;
 const EASE = 0.2;
 /** A press that moves less than this is a click, not a drag. */
 const CLICK_PX = 5;
-/** Space held this long skips a film. */
+/** The pause key held this long skips a film. */
 const SKIP_HOLD_S = 1;
 
-const PAN_KEYS: Record<string, [number, number]> = {
-  arrowleft: [-1, 0], a: [-1, 0], arrowright: [1, 0], d: [1, 0], arrowup: [0, -1], w: [0, -1], arrowdown: [0, 1], s: [0, 1],
+/** The held binds' pan (x, y) and zoom. */
+const MOVES: Partial<Record<Bind, [number, number, number]>> = {
+  left: [-1, 0, 0], right: [1, 0, 0], up: [0, -1, 0], down: [0, 1, 0], zoomOut: [0, 0, 1], zoomIn: [0, 0, -1],
 };
+const MOVE_BINDS = Object.keys(MOVES) as Bind[];
 
 export class Input {
   /** Where the camera eases to; drag moves both at once. */
@@ -32,8 +35,8 @@ export class Input {
   private readonly pointers = new Map<number, { x: number; y: number }>();
   private press: { x: number; y: number; moved: boolean } | null = null;
   private pinchD = 0;
-  private readonly held = new Set<string>();
-  private spaceAt = -1;
+  private readonly held = new Set<Bind>();
+  private spaceHeld = -1;
   /** A film held the camera at the last update. */
   private filming = false;
   private w = 1;
@@ -66,11 +69,11 @@ export class Input {
     this.anchor.on = false;
   }
 
-  /** Each frame before the pump's: held keys, the Space hold, the camera easing to its goal. */
+  /** Each frame before the pump's: held keys, the pause key's hold, the camera easing to its goal. */
   update(dt: number): void {
     const vm = this.pump.vm;
-    if (this.spaceAt >= 0 && vm.film && performance.now() - this.spaceAt >= SKIP_HOLD_S * 1000) {
-      this.spaceAt = -1;
+    if (this.spaceHeld >= 0 && vm.film && (this.spaceHeld += dt) >= SKIP_HOLD_S) {
+      this.spaceHeld = -1;
       this.pump.send({ kind: 'skipFilm' });
     }
     // a film owns the camera: the goal rides with it to its last pose, so play resumes where the film left it
@@ -81,11 +84,9 @@ export class Input {
       if (vm.film) return;
     }
     let dx = 0, dy = 0, dz = 0;
-    for (const k of this.held) {
-      const p = PAN_KEYS[k];
-      if (p) dx += p[0], dy += p[1];
-      else if (k === '-' || k === '_') dz += 1;
-      else if (k === '=' || k === '+') dz -= 1;
+    for (const b of this.held) {
+      const [x, y, z] = MOVES[b]!;
+      dx += x, dy += y, dz += z;
     }
     const s = this.view.scale(this.goal.zoom);
     this.goal.x += (dx * PAN_KEY * dt) / s;
@@ -165,30 +166,31 @@ export class Input {
 
   private key(e: KeyboardEvent, down: boolean): void {
     if (e.ctrlKey || e.metaKey || e.altKey || (e.target as Element).closest?.('input, textarea, select')) return;
-    const k = e.key.toLowerCase();
+    const vm = this.pump.vm;
+    const on = (b: Bind): boolean => bound(vm.settings, b, e);
+    const moves = MOVE_BINDS.filter(on);
     if (!down) {
-      this.held.delete(k);
-      if (k === ' ') this.spaceAt = -1;
+      for (const b of moves) this.held.delete(b);
+      if (on('pause')) this.spaceHeld = -1;
       return;
     }
-    const vm = this.pump.vm;
-    if (k in PAN_KEYS || k === '-' || k === '_' || k === '=' || k === '+') {
-      if (!vm.title && !vm.film) this.held.add(k);
+    if (moves.length > 0) {
+      if (!vm.title && !vm.film) for (const b of moves) this.held.add(b);
       return;
     }
     if (e.repeat) return;
-    if (k === 'f3') {
-      // the profiler is a page of its own (src/app/boot.ts): F3 reloads into it or out of it
+    if (on('profiler')) {
+      // the profiler is a page of its own (src/app/boot.ts): its key reloads into it or out of it
       e.preventDefault();
       reloadFlipped('prof');
-    } else if (k === 'escape') {
+    } else if (on('back')) {
       this.pump.send(vm.film ? { kind: 'skipFilm' } : { kind: 'menu', menu: vm.menu ? null : 'settings' });
-    } else if (k === ' ') {
+    } else if (on('pause')) {
       e.preventDefault();
-      if (vm.film) this.spaceAt = performance.now();
+      if (vm.film) this.spaceHeld = 0;
       else if (!vm.title) this.pump.send({ kind: 'pause', paused: !vm.paused });
-    } else if ((k === 'i' || k === 'p') && !vm.title && !vm.film) {
-      const menu = k === 'i' ? 'stats' : 'people';
+    } else if ((on('stats') || on('people')) && !vm.title && !vm.film) {
+      const menu = on('stats') ? 'stats' : 'people';
       this.pump.send({ kind: 'menu', menu: vm.menu === menu ? null : menu });
     }
   }

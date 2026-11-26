@@ -43,11 +43,12 @@ export function installCss(sheets: readonly Sheet[]): void {
     '.hg-n { font-family: "Bitstream Charter", Georgia, serif; font-weight: 600; }',
     `.hg-ink { color: ${INK}; text-shadow: none; }`,
     `.hg-veil { position: absolute; inset: 0; background: rgba(8, 6, 12, 0.55); pointer-events: none; }`,
-    // the cards: a hand card rests small and rises from its foot on hover with its Discard; the deal's cards come in,
-    // the kept one flies to the hand and the rest fall away
-    '.hg-card { transform: scale(var(--k)); transform-origin: 50% 100%; transition: transform 0.16s ease-out; }',
+    // the cards: a hand card rests small and rises from its foot on hover, and a touch drags it rather than pans; the
+    // deal's cards come in, the kept one flies to the hand and the rest fall away
+    '.hg-card { transform: scale(var(--k)); transform-origin: 50% 100%; transition: transform 0.16s ease-out; touch-action: none; }',
     '.hg-card:hover { transform: translateY(-34px) scale(calc(var(--k) * 1.2)); z-index: 2; filter: drop-shadow(0 0 16px rgba(201, 168, 255, 0.5)); }',
-    '.hg-card .hg-dis { display: none; } .hg-card:hover .hg-dis { display: block; }',
+    // the discard zone lit under a dragged card
+    '.hg-lit { filter: brightness(1.5) drop-shadow(0 0 18px rgba(201, 168, 255, 0.7)); }',
     '.hg-card.hg-rest, .hg-card.hg-rest:hover { filter: brightness(0.7) saturate(0.45); }',
     '.hg-deny { animation: hg-deny 0.3s ease-out; } @keyframes hg-deny { 25% { translate: -5px 0; } 50% { translate: 5px 0; } 75% { translate: -3px 0; } }',
     '.hg-big { transition: transform 0.36s ease-in, opacity 0.3s ease-in; } .hg-big:hover { transform: translateY(-16px) scale(1.04); }',

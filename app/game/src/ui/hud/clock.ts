@@ -2,11 +2,12 @@ import type { Intent, Query, ViewModel } from '../../types';
 import { DAY_PART_HOUR } from '../../content/clock';
 import { WEEK } from '../../content/calendar';
 import { uiText } from '../../content/text';
-import { DIM, PALE, Pic, Words, attr, row, surface } from '../kit';
+import { DIM, PALE, Pic, Words, row, surface } from '../kit';
 
 // The clock, bottom right (inventory #98, LIVE): the sun's dial through the day and the moon by night, the weekday and
-// the day, the weather, the action points refilling as lit shards, and the pause: a click (or Space) holds the clock.
-// It changes on the hour, on a whole action point and on a new day: never per frame.
+// the day, the weather, the action points refilling as lit shards. Held down for HOLD_S it ends the day (a lit fill
+// sweeps across it while held). It changes on the hour, on a whole action point and on a new day: never per frame,
+// but for the fill while held.
 
 export const CLOCK_W = 340;
 export const CLOCK_H = 120;
@@ -15,9 +16,12 @@ const DIAL_STEPS = 24;
 const SUN_HOURS = DAY_PART_HOUR.night - DAY_PART_HOUR.dawn;
 /** The most action points a cost tab shows. */
 const AP_TABS = 8;
+/** Seconds the clock is held to end the day. */
+const HOLD_S = 1;
 
 export class Clock {
   private readonly box: HTMLDivElement;
+  private readonly fill: HTMLDivElement;
   private readonly dial: Pic;
   private readonly weather: Pic;
   private readonly apMax: Pic;
@@ -29,12 +33,17 @@ export class Clock {
   private day = -1;
   private ap = -1;
   private top = -1;
-  private paused: boolean | null = null;
+  /** Wall ms the press began, or -1 when the clock is not held. */
+  private heldAt = -1;
 
-  constructor(anchor: HTMLElement, send: (i: Intent) => void, private readonly q: Query, paused: () => boolean) {
+  constructor(anchor: HTMLElement, private readonly send: (i: Intent) => void, private readonly q: Query) {
     this.box = surface(anchor, 'violet', -CLOCK_W, -CLOCK_H, CLOCK_W, CLOCK_H, 'hg-hit');
-    this.box.addEventListener('click', () => send({ kind: 'pause', paused: !paused() }));
     const b = this.box;
+    this.fill = surface(b, 'violet', 0, 0, CLOCK_W, CLOCK_H);
+    this.fill.style.filter = 'brightness(1.8)';
+    this.release();
+    b.addEventListener('pointerdown', () => { this.heldAt = performance.now(); });
+    for (const k of ['pointerup', 'pointerleave', 'pointercancel'] as const) b.addEventListener(k, () => this.release());
     this.dial = new Pic(b, 60, 60, 'moon');
     const dr = row(b, 116, 14);
     this.dayLine = new Words(dr, 0, 0, 24, PALE);
@@ -46,7 +55,19 @@ export class Clock {
     this.weather = new Pic(b, CLOCK_W - 40, 74, 'weather.clear');
   }
 
+  private release(): void {
+    this.heldAt = -1;
+    this.fill.style.clipPath = 'inset(0 100% 0 0)';
+  }
+
   frame(vm: ViewModel): void {
+    if (this.heldAt >= 0) {
+      const k = (performance.now() - this.heldAt) / (HOLD_S * 1000);
+      if (k >= 1) {
+        this.release();
+        this.send({ kind: 'endDay' });
+      } else this.fill.style.clipPath = `inset(0 ${(1 - k) * 100}% 0 0)`;
+    }
     const s = vm.state, q = this.q;
     const hour = Math.floor(q.hour(s.tick));
     if (hour !== this.hour) {
@@ -72,10 +93,6 @@ export class Clock {
       this.apLit.on(ap > 0);
       if (ap > 0) this.apLit.show(`card.cost.${Math.min(top, ap)}`);
       this.apWords.set(uiText('hud.ap', { n: ap }));
-    }
-    if (vm.paused !== this.paused) {
-      this.paused = vm.paused;
-      attr(this.box, 'title', uiText(vm.paused ? 'hud.resume' : 'hud.pause'));
     }
   }
 }

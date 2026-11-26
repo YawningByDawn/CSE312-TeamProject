@@ -1,3 +1,7 @@
+// src/view/life, the people and fx layers. Owns every figure (here; looks.ts a look's parts, rig.ts its body a frame,
+// stamps.ts small figures as one sprite, ids.ts part ids) and every effect (fx.ts plays clips.ts; hoard.ts the grave's
+// stones). Reads the view model (people, crystals, alpha, time, fresh events, focus, hover), the sim's Query, content's
+// map, roles, world and crystals, and assets/people, assets/poses and the life atlas.
 import { Container, Matrix, Rectangle, Sprite, Texture, type Renderer } from 'pixi.js';
 import type { Activity, GameEvent, Layer, Person, PlaceId, Query, RoleId, UnitId, ViewModel } from '../../types';
 import { AT, MINE_FRAME, SHAFT, spotsOf, way } from '../../content/map';
@@ -14,7 +18,7 @@ import { BONE, CLIP, FALL, FIGURE_H, GOLD, HOVER, LOW_DETAIL_PX, Look, MINE_RIG,
 import peopleUrl from '../../../assets/people/people.json?url';
 import posesUrl from '../../../assets/poses/poses.json?url';
 
-// Everyone in frame (#76-81): each person from the baked parts of their look (a mine hand one of their family's, a
+// Everyone in frame (#76-81; the people layer): each person from the baked parts of their look (a mine hand one of their family's, a
 // townsperson their trade's own), posed by what the rules say they do, walking their route by the tick and `alpha`,
 // their wick in their allegiance's paint with its light pooled at their feet, the marks of yours, the picked and the
 // hovered under them. A person in the void, indoors or off screen costs nothing. The low-detail pictures come in pages:

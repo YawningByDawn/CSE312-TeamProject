@@ -1,3 +1,7 @@
+// src/view/film, the films: the view's `notes` layer and its camera poses. Owns each film's length and keyed camera
+// (`filmLength`, `pose`: the opening, the watershed, the ending, a take) and what it lays over the world. Reads the
+// view model's film and its fresh events, the people and effect anchors (src/view/life), content's map, world and
+// crystals, and assets/defeat.
 import { Container, Filter, GlProgram, Sprite, Texture, defaultFilterVert, type Renderer } from 'pixi.js';
 import type { AtlasManifest, Camera, Film, GameEvent, Layer, PlaceId, ViewModel } from '../../types';
 import { AT, MINE_FRAME, SHAFT, TOWN } from '../../content/map';
@@ -7,6 +11,7 @@ import { ORIGIN, scale } from '../camera';
 import { Atlas } from '../atlas';
 import type { People } from '../life/people';
 import { anchor, GRAVE_AT, type Anchor } from '../life/fx';
+import { OPENING_S } from './opening';
 import defeatManifest from '../../../assets/defeat/manifest.json';
 import defeatUrl from '../../../assets/defeat/defeat.png?url';
 
@@ -17,8 +22,8 @@ import defeatUrl from '../../../assets/defeat/defeat.png?url';
 // war's red, the closing dark; the defeat's drain to gray then black, closing on the grave's eye (assets/defeat's
 // ramps). The words over them are the panels'.
 
-/** Seconds each film runs. The opening waits on its pictures (INTRO). */
-const LENGTH: Record<Film['kind'], number> = { opening: 0, watershed: 22, ending: 33.5, take: 3.2 };
+/** Seconds each film runs. The opening is a video over the canvas (./opening.ts); the camera holds on play's start under it. */
+const LENGTH: Record<Film['kind'], number> = { opening: OPENING_S, watershed: 22, ending: 33.5, take: 3.2 };
 export const filmLength = (kind: Film['kind']): number => LENGTH[kind];
 
 /** The zoom showing `px` screen px per town unit on the 1600-wide canvas the old films were keyed on. */

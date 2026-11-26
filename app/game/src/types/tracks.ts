@@ -18,28 +18,6 @@ export interface Sim {
   legal(s: Readonly<GameState>): Action[];
 }
 
-/** The seam between the rules (src/sim, rb-sim) and the people's lives (src/sim/world, rb-world). */
-export interface World {
-  /** Everyone, with homes, work, households and ties, from the seed and content's tables. */
-  populate(s: GameState): void;
-  /** One tick of lives: whereabouts by the hour, calendar, weather, world events, the opposition's walkers. */
-  step(s: GameState, out: GameEvent[]): void;
-  /** The world's echoes of an action's rule events (`out` from `from` on), the one path a tick's take too. */
-  echo(s: GameState, out: GameEvent[], from: number): void;
-  members(s: Readonly<GameState>, g: GroupId): UnitId[];
-  /** The groups a person is one of: their household, crew, chapel flock and watch. */
-  groupsOf(s: Readonly<GameState>, p: Readonly<Person>): GroupId[];
-  /** Where the group is gathered now, or null (a group whisper lands only then). */
-  together(s: Readonly<GameState>, g: GroupId): PlaceId | null;
-  /** Shortest route on content's world graph, by the shortcuts found, and its length in ticks. */
-  route(s: Readonly<GameState>, from: PlaceId, to: PlaceId): { path: PlaceId[]; ticks: number };
-  /** What `a`'s tie to `b` is, read the same from both ends. */
-  tieKind(s: Readonly<GameState>, a: Readonly<Person>, b: Readonly<Person>): TieKind;
-  /** A newcomer from the seed, into `s.people`: the loner a discovery finds at area `at`, or fresh hands off the lift. */
-  spawn(s: GameState, kind: 'loner' | 'fresh', at: PlaceId): Person;
-}
-
-/** Read helpers ui and view use instead of re-deriving rules. All pure; no allocation per frame for scalars. */
 /** What a tie is: household, a debt seen from either end, a rivalry, love, or plain friendship. */
 export type TieKind = 'kin' | 'owes' | 'owed' | 'rival' | 'lover' | 'friend';
 
@@ -57,19 +35,21 @@ export interface GodStats {
   cooling: number;
 }
 
+/** Read helpers ui and view use instead of re-deriving rules. All pure; no allocation per frame for scalars. */
 export interface Query {
   check(s: Readonly<GameState>, a: Action): Check;
   /** What `a`'s tie to `b` is. */
   tieKind(s: Readonly<GameState>, a: UnitId, b: UnitId): TieKind;
   hour(tick: Tick): Hour;
   day(tick: Tick): number;
+  /** The tick a held day ends on: the next dusk by day, the next dawn by dusk and night. */
+  dayEnd(tick: Tick): Tick;
   weekday(tick: Tick): Weekday;
   part(tick: Tick): DayPart;
-  /** 0..1 daylight: the one light curve. */
+  /** The sun's height, -1 at midnight to 1 at noon: the one light curve; daylight is its 0..1 above the horizon. */
+  sun(hour: Hour): number;
   daylight(hour: Hour): number;
   visibility(s: Readonly<GameState>, place: PlaceId): Visibility;
-  /** People you can whisper to now, and why each is in reach. */
-  reach(s: Readonly<GameState>): UnitId[];
   /** Nether a night, Faith, Influence, XP to next rank: the stats menu's numbers. */
   stats(s: Readonly<GameState>): GodStats;
   /** The god's urges as their state words (sated / starving...). */
@@ -132,7 +112,7 @@ export interface ViewModel {
 
 /** The world on the canvas (src/view). Places baked sprites and picks frames; draws nothing itself. */
 export interface View {
-  load(onProgress: (k: number) => void): Promise<void>;
+  load(): Promise<void>;
   frame(vm: ViewModel): void;
   /** Screen point to the thing under it, by the scene graph's own hit areas. */
   pick(x: number, y: number, vm: ViewModel): Focus;
@@ -167,16 +147,29 @@ export type Intent =
   | { kind: 'act'; action: Action }
   | { kind: 'focus'; focus: Focus }
   | { kind: 'pause'; paused: boolean }
+  /** The clock runs at once to `Query.dayEnd`, stopping where anything holds it. */
+  | { kind: 'endDay' }
   | { kind: 'skipFilm' }
   | { kind: 'menu'; menu: Menu }
   | { kind: 'newRun'; seed?: Seed }
-  /** Back to the title (from the defeat or the ending): a fresh run waits behind it. */
+  /** Back to the title (from settings, the defeat or the ending), the save kept: a fresh run waits behind it. */
   | { kind: 'title' }
   | { kind: 'continue' }
   | { kind: 'settings'; patch: Partial<Settings> };
 
-/** Volumes 0..1, the interface's size, whether the hints teach, and the hints already taught (kept across runs). */
-export interface Settings { master: number; music: number; sfx: number; ambience: number; uiSize: 'small' | 'medium' | 'large'; hints: boolean; seenHints: string[] }
+/** What a key does: each is bound to the keys (`KeyboardEvent.key`, lower case) in `Settings.keys`. */
+export type Bind =
+  | 'up' | 'down' | 'left' | 'right' | 'zoomIn' | 'zoomOut' | 'pause' | 'confirm' | 'back' | 'stats' | 'people' | 'again'
+  | 'details' | 'pick1' | 'pick2' | 'pick3' | 'pick4' | 'pick5' | 'profiler';
+
+/**
+ * Volumes 0..1, the interface's size, whether the hints teach, the hints already taught (kept across runs), and the keys
+ * bound to each `Bind`.
+ */
+export interface Settings {
+  master: number; music: number; sfx: number; ambience: number; uiSize: 'small' | 'medium' | 'large'; hints: boolean; seenHints: string[];
+  keys: Record<Bind, string[]>;
+}
 
 /** The DOM HUD and cards (src/ui). */
 export interface Ui {
@@ -209,7 +202,8 @@ export interface Save { day: number; state: GameState }
 /**
  * Every baked atlas ships as assets/<name>/<file> plus manifest.json in this one shape (the life atlas's).
  * cells: name -> [x, y, w, h, k, ax, ay]: the cell's rect in the picture, k px per world unit, its origin.
- * clips: name -> cell names in frame order at fps. levels: halved copies <file>@1..@n for distance.
+ * clips: name -> cell names in frame order at fps. levels: mip levels; a compressed atlas ships each as <file>@1..@n,
+ * a PNG or WebP one is mipmapped on the GPU from <file> alone.
  */
 export interface AtlasManifest {
   file: string;

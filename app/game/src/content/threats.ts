@@ -77,16 +77,14 @@ export const THREAT = {
   mobCool: 10,
   riotCool: 30,
   riotHeat: 5,
-  /** Levy: share of a crowd's heads taken; chance each person is taken; at most this many people. */
-  levyGroupShare: 0.25,
+  /** Levy: chance each person is taken; at most this many people. */
   levyPersonChance: 0.6,
   levyMax: 2,
   /** Ward: days it lasts and the colour pushed back when it falls. */
   wardDays: 5,
   wardHold: 15,
-  /** Burning: colour lost, days before the building's craft can be taken again, public heat spent. */
+  /** Burning: colour lost, public heat spent. */
   burnHold: 40,
-  burnDays: 8,
   burnCool: 10,
   /** The Council's heat spent when a seal is set. */
   writCool: 8,
@@ -113,7 +111,6 @@ export const THREAT_SLOTS: Readonly<Record<string, Record<string, number>>> = {
   'threat.crusade.lands': { days: THREAT.crusadeDays },
   'rule.writ': { max: THREAT.writMax },
   'rule.ward': { days: THREAT.wardDays },
-  'rule.burning': { days: THREAT.burnDays },
   'rule.favour': { nights: FAVOUR.nights, dev: FAVOUR.devotion, cooldown: FAVOUR.cooldown },
   'rule.crusade': { days: THREAT.crusadeWarn },
   'rule.late': { days: THREAT.lateDays, floor: THREAT.lateFloor },

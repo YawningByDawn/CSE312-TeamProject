@@ -1,15 +1,16 @@
-import type { Action, Pending, ViewModel } from '../../types';
+import type { Action, Pending, Settings, ViewModel } from '../../types';
 import { uiText } from '../../content/text';
+import { PICKS, bound, keyName, pickOf } from '../../content/keys';
 import { BLOOD, CARD_H, CARD_W, DIM, PALE, Words, card, div, line, slab, stone, verb } from './art';
 import { modLine } from './grave';
 import type { Ctx, Panel } from './index';
 
 // What the clock waits on (inventory #5, 29, 120, 121): the opening's first deal (the starting gift: take one of the
-// cards on the opening's last frame), a blessing at a new rank, a story's choice, a faceted stone's cut. Keys 1..n pick.
+// cards on the opening's last frame), a blessing at a new rank, a story's choice, a faceted stone's cut. The pick keys pick.
 
 const GAP = 34;
 
-/** A row of picks centred under a title: cards, or cuts. Each is clickable; the n-th answers key n. */
+/** A row of picks centred under a title: cards, or cuts. Each is clickable; the n-th answers the n-th pick key. */
 function picks(root: HTMLElement, title: string, foot: string, n: number, w: number, h: number, draw: (box: HTMLElement, i: number) => void, take: (i: number) => void): void {
   const dim = div(root, 'hg-b hgp-slab', -1200, -700, 2400, 1400);
   dim.style.background = 'rgba(0,0,0,0.42)';
@@ -23,11 +24,10 @@ function picks(root: HTMLElement, title: string, foot: string, n: number, w: num
   new Words(root, -800, h / 2 + 10, 17, DIM, 'center', 1600).set(foot);
 }
 
-const footOf = (n: number): string => (n > 1 ? uiText('pick.keys', { n }) : uiText('pick.click'));
-const numberKey = (e: KeyboardEvent, n: number): number => {
-  const k = Number(e.key);
-  return Number.isInteger(k) && k >= 1 && k <= n ? k - 1 : -1;
-};
+/** The first key of the i-th pick (none past the last pick bind). */
+const pickKey = (set: Readonly<Settings>, i: number): string => keyName(set.keys[PICKS[i]!]?.[0] ?? '');
+const footOf = (set: Readonly<Settings>, n: number): string =>
+  n > 1 ? uiText('pick.keys', { a: pickKey(set, 0), b: pickKey(set, Math.min(n, PICKS.length) - 1) }) : uiText('pick.click');
 
 /** The starting gift: the first deal on the opening's last frame; taking one starts the clock. */
 export class Bonus implements Panel {
@@ -40,7 +40,7 @@ export class Bonus implements Panel {
 
   build(root: HTMLElement, vm: ViewModel): void {
     const deal = vm.state.god.deal!;
-    picks(root, uiText('bonus.pickHead'), footOf(deal.length), deal.length, CARD_W, CARD_H, (box, i) => card(box, vm.state, deal[i]!, 0, 0), (i) => this.take(deal[i]!));
+    picks(root, uiText('bonus.pickHead'), footOf(vm.settings, deal.length), deal.length, CARD_W, CARD_H, (box, i) => card(box, vm.state, deal[i]!, 0, 0), (i) => this.take(deal[i]!));
   }
 
   private take(card: string): void {
@@ -49,7 +49,7 @@ export class Bonus implements Panel {
 
   press(e: KeyboardEvent, vm: ViewModel): boolean {
     const deal = vm.state.god.deal!;
-    const i = numberKey(e, deal.length);
+    const i = pickOf(vm.settings, e, deal.length);
     if (i < 0) return false;
     this.take(deal[i]!);
     return true;
@@ -74,12 +74,12 @@ export class Choice implements Panel {
     const s = vm.state, p = s.pending!;
     const acts = this.actions(p);
     if (p.kind === 'blessing') {
-      picks(root, uiText('blessing.choose'), footOf(acts.length), acts.length, CARD_W, CARD_H, (box, i) => card(box, s, p.offers[i]!, 0, 0, true), (i) => this.c.act(acts[i]!));
+      picks(root, uiText('blessing.choose'), footOf(vm.settings, acts.length), acts.length, CARD_W, CARD_H, (box, i) => card(box, s, p.offers[i]!, 0, 0, true), (i) => this.c.act(acts[i]!));
       return;
     }
     if (p.kind === 'facet') {
       const c = s.crystals[p.crystal]!;
-      picks(root, uiText('facet.choose'), footOf(acts.length), acts.length, 220, 280, (box, i) => {
+      picks(root, uiText('facet.choose'), footOf(vm.settings, acts.length), acts.length, 220, 280, (box, i) => {
         const b = slab(box, 0, 0, 220, 280, uiText(`facet.cut.${i}`)).el;
         stone(b, c, 110, 164, 90);
         p.cuts[i]!.forEach((m, j) => line(b, 14, 178 + j * 22, 192, 15, m.curse ? BLOOD : PALE, modLine(m)));
@@ -96,14 +96,14 @@ export class Choice implements Panel {
     acts.forEach((a, i) => {
       const check = this.c.q.check(s, a);
       const why = check.ok ? '' : uiText(check.why[0]!.key, check.why[0]!.slots);
-      const label = `${i + 1}  ${uiText(`${words}.opt${i + 1}.label`, slots)}`;
+      const label = `${pickKey(vm.settings, i)}  ${uiText(`${words}.opt${i + 1}.label`, slots)}`;
       verb(el, 36, 96 + bodyH + 18 + i * 74, 568, 64, label, why, () => this.c.act(a), say, uiText(`${words}.opt${i + 1}.does`, slots));
     });
   }
 
   press(e: KeyboardEvent, vm: ViewModel): boolean {
     const acts = this.actions(vm.state.pending!);
-    const i = e.key === 'Enter' && acts.length === 1 ? 0 : numberKey(e, acts.length);
+    const i = bound(vm.settings, 'confirm', e) && acts.length === 1 ? 0 : pickOf(vm.settings, e, acts.length);
     if (i < 0) return false;
     this.c.act(acts[i]!);
     return true;

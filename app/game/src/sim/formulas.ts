@@ -47,20 +47,6 @@ export function devotionValue(devotion: number): number {
 }
 
 /**
- * Devotion gain rate: Gain = Base / (1 + 10(x − 0.4)²).
- * Returns the Devotion gained per base point at Devotion D.
- */
-export function gainRate(devotion: number): number {
-  const x = devotion / 100;
-  return 1 / (1 + 10 * (x - 0.4) ** 2);
-}
-
-/** Instantaneous Gain for a given Base at Devotion D (the spec formula verbatim). */
-export function gain(base: number, devotion: number): number {
-  return base * gainRate(devotion);
-}
-
-/**
  * Base points needed to raise Devotion from d0 to d1 (closed-form integral of
  * 1/gainRate). 0→100 ≈ 193.3; 90→100 ≈ 40.3.
  */
@@ -115,11 +101,6 @@ export function netherMultiplier(level: number): number {
   return 1.5 ** (level - 1) * (4 / 3) ** Math.floor((level - 1) / 3);
 }
 
-/** Nether = Faith × 1.5^(L−1) × (4/3)^floor((L−1)/3). */
-export function netherFromFaith(faithValue: number, level: number): number {
-  return faithValue * netherMultiplier(level);
-}
-
 /** InfluenceCost = 6 · S^0.85 · T · (1 + Resistance/50). */
 export function influenceCost(size: number, tier: number, resistance: number): number {
   return 6 * size ** 0.85 * tier * (1 + resistance / 50);
@@ -128,15 +109,6 @@ export function influenceCost(size: number, tier: number, resistance: number): n
 /** DirectCost = S^0.85 · T. */
 export function directCost(size: number, tier: number): number {
   return size ** 0.85 * tier;
-}
-
-/**
- * Target size S: the headcount of a group, or 25 % of a leader's command;
- * an individual is S = 1.
- */
-export function targetSize(headcount: number, command: number): number {
-  if (command > 0) return Math.max(1, command * 0.25);
-  return Math.max(1, headcount);
 }
 
 /** Miracle cost = base (2–6 crystals) × stage tier T, rounded. */
@@ -164,18 +136,6 @@ export function levelForXp(xp: number): number {
     if (xp >= (XP_THRESHOLDS[i] ?? Infinity)) level = i + 1;
   }
   return level;
-}
-
-/** Stage of a Divinity level: L1–3 Whisper, L4–6 Shade, L7+ beyond. */
-export function stageForLevel(level: number): 'whisper' | 'shade' | 'omen' {
-  if (level <= 3) return 'whisper';
-  if (level <= 6) return 'shade';
-  return 'omen';
-}
-
-/** Realm within a stage (1..3). */
-export function realmForLevel(level: number): number {
-  return ((level - 1) % 3) + 1;
 }
 
 /** Inputs to the conversion-odds formula (DECISIONS §4). */

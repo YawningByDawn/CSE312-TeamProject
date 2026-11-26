@@ -19,10 +19,10 @@ import { calendarOf } from './world/sky';
 import { area, areaDef, inMine } from './world/area';
 import { nbrs } from './world/graph';
 import { roster } from './world/society';
-import type { Effect, FactionId, GameEvent, GameState, GoneReason, Person, PlaceId, Tick, UnitId, World } from '../types';
+import type { Effect, FactionId, GameEvent, GameState, GoneReason, Person, PlaceId, Tick, UnitId } from '../types';
 
-/** One rule's working set: the state, the step's event list, the people's lives. */
-export interface Ctx { s: GameState; out: GameEvent[]; w: World }
+/** One rule's working set: the state and the step's event list. */
+export interface Ctx { s: GameState; out: GameEvent[] }
 
 type Body = GameEvent extends infer E ? (E extends GameEvent ? Omit<E, 'tick'> : never) : never;
 export function ev(c: Ctx, e: Body): void {
@@ -211,8 +211,8 @@ export function whereNow(p: Readonly<Person>, t: Tick): PlaceId {
 /** The living people standing in an area now. */
 export const peopleIn = (s: Readonly<GameState>, a: PlaceId, f: (p: Person) => boolean): Person[] =>
   everyone(s).filter((p) => here(p) && area(whereNow(p, s.tick)) === a && f(p));
-/** Neither yours nor an echo of one. */
-export const stranger = (p: Readonly<Person>): boolean => !p.follower && !p.echoOf;
+/** Not yours. */
+export const stranger = (p: Readonly<Person>): boolean => !p.follower;
 export const asleep =(p: Readonly<Person>): boolean => 'place' in p.at && p.at.doing === 'sleep';
 export const digs = (p: Readonly<Person>): boolean => ROLES[p.role]!.labour === 'dig' && inMine(p.work);
 export const loyal = (p: Readonly<Person>): boolean => p.trait === 'loyal';

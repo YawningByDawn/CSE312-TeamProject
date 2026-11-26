@@ -30,11 +30,6 @@ export function rand(r: RngState): number {
   return nextU32(r) / 4294967296;
 }
 
-/** Uniform integer in [lo, hi] inclusive. */
-export function randInt(r: RngState, lo: number, hi: number): number {
-  return lo + Math.floor(rand(r) * (hi - lo + 1));
-}
-
 /** True with probability p. */
 export function chance(r: RngState, p: number): boolean {
   return rand(r) < p;

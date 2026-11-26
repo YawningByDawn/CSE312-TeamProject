@@ -66,8 +66,6 @@ export const CARD = {
   frameCouncil: -10,
   caveInKills: [1, 2] as readonly number[],
   robShare: 0.5,
-  sabotageShare: 0.5,
-  madnessDays: 2,
   bloodRiteDevotion: 4,
   riotThin: 0.25,
   assassinateLuck: 200,
@@ -144,7 +142,6 @@ const SLOTS: Readonly<Record<CardId, Record<string, number>>> = {
   devour: { own: C.devourFollowerHunger },
   terrorize: { pct: resistPct(C.terrorizeResistance) },
   frame: { cool: -C.frameCouncil },
-  madness: { days: C.madnessDays },
   bloodRite: { n: C.bloodRiteDevotion },
 };
 

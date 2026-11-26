@@ -32,38 +32,14 @@ export const CRYSTAL = {
   flameTemple: 1,
 } as const;
 
-/** The odd effects, in the order the roll indexes them; `flaw`: can come out of a flaw when cutting. */
-export const ODD_EFFECTS: Readonly<Record<OddEffectId, { flaw: boolean }>> = {
-  echo: { flaw: true },
-  secondSight: { flaw: false },
-  loaded: { flaw: false },
-  lodestone: { flaw: false },
-  twinning: { flaw: false },
-  murmur: { flaw: false },
-  bloodPrice: { flaw: true },
-  heavyHeart: { flaw: false },
-  glutton: { flaw: false },
-  feast: { flaw: false },
-  paleLight: { flaw: false },
-  rot: { flaw: false },
-  weeping: { flaw: true },
-  prophet: { flaw: false },
-  spite: { flaw: true },
-  kinship: { flaw: false },
-  tithe: { flaw: false },
-  unstable: { flaw: true },
-  hush: { flaw: false },
-  beacon: { flaw: false },
-  magpie: { flaw: false },
-  sleepwalker: { flaw: false },
-};
-export const ODD_EFFECT_IDS = Object.keys(ODD_EFFECTS) as OddEffectId[];
+/** The odd effects, in the order the roll indexes them. */
+export const ODD_EFFECT_IDS: readonly OddEffectId[] = [
+  'secondSight', 'loaded', 'lodestone', 'twinning', 'murmur', 'bloodPrice', 'heavyHeart', 'glutton', 'feast', 'paleLight', 'rot',
+  'weeping', 'prophet', 'spite', 'kinship', 'tithe', 'unstable', 'hush', 'beacon', 'magpie', 'sleepwalker',
+];
 
 /** The odd effects' numbers. */
 export const EFFECT = {
-  echoChance: 0.3,
-  echoMax: 2,
-  echoHeatMult: 2,
   lodestoneTier: 2,
   twinChance: 0.12,
   bloodPriceValuePerIchor: 3,

@@ -10,7 +10,7 @@ import { AT, DAY_TICKS, TPH, dayOf } from '../../content/clock';
 import { DIGGER_FACES } from '../../content/day';
 import { hasText, uiText } from '../../content/text';
 import { CHAIN_WAIT, EVENT_DAY, FEED, GATHER_KIN, LIFE_NOTES, WORLD_EVENTS, type CastSlot, type Gather, type WorldEventDef } from '../../content/worldEvents';
-import type { Activity, FactionId, GameEvent, GameState, Person, PlaceId, RoleId, StoryId, Tick, UnitId, Weather, World } from '../../types';
+import type { Activity, FactionId, GameEvent, GameState, Person, PlaceId, RoleId, StoryId, Tick, UnitId, Weather } from '../../types';
 import { addHeat, remove, type Ctx } from '../core';
 import { area, inMine } from './area';
 import { K, idKey, keyed, keyedInt } from './draw';
@@ -270,7 +270,7 @@ function comers(s: Readonly<GameState>, g: Gather, cast: readonly Person[]): Per
 export const gatheringsOf = (s: Readonly<GameState>, id: UnitId): readonly Gathering[] | undefined => today(s).gather.get(id);
 
 /** Make `h` happen now: its people, place, words and doors. */
-function happen(s: GameState, out: GameEvent[], w: World, h: Happening, echo: GameEvent | null): void {
+function happen(s: GameState, out: GameEvent[], h: Happening, echo: GameEvent | null): void {
   const def = WORLD_EVENTS[h.e]!;
   const who = echo?.unit ?? h.who;
   const them = who ? s.people[who] : undefined;
@@ -283,7 +283,7 @@ function happen(s: GameState, out: GameEvent[], w: World, h: Happening, echo: Ga
   const holds = v === 'mine' ? inMine(place) : v === 'fog' ? today(s).ws.includes('fog') : v === 'rain' ? today(s).ws.some((x) => x === 'rain' || x === 'storm')
     : v === 'bad' ? s.mine.shortDays > 0 : v === 'unpaid' ? keyed(s.seed, K.event, h.od, k) < 0.5 : v === 'follower' ? !!cast[1]?.follower : false;
   const effects = (holds ? def.variant![1] : undefined) ?? def.effects ?? [];
-  const c: Ctx = { s, out, w };
+  const c: Ctx = { s, out };
   const until = dawnOf(dayOf(s.tick));
   for (const [kind, target, value, days] of effects) {
     for (const on of targets(target, cast, place, s)) {
@@ -339,7 +339,7 @@ function lifePool(s: Readonly<GameState>, p: Readonly<Person>): string | null {
 }
 
 /** The world's answer to the rule events `out[from, to)`, a tick's or an action's: each echo whose words name one happens now. */
-export function echoes(s: GameState, out: GameEvent[], w: World, from: number, to: number): void {
+export function echoes(s: GameState, out: GameEvent[], from: number, to: number): void {
   const day = today(s).day;
   for (let i = from; i < to; i++) {
     const e = out[i]!;
@@ -347,13 +347,13 @@ export function echoes(s: GameState, out: GameEvent[], w: World, from: number, t
     if (keys.length === 0) continue;
     for (const j of ECHOES) {
       const def = WORLD_EVENTS[j]!;
-      if (def.echo!.some((x) => keys.includes(x)) && !echoing(s, def, e)) happen(s, out, w, { e: j, tick: s.tick, od: day, oe: j }, e);
+      if (def.echo!.some((x) => keys.includes(x)) && !echoing(s, def, e)) happen(s, out, { e: j, tick: s.tick, od: day, oe: j }, e);
     }
   }
 }
 
 /** The world's events and feed for this tick. */
-export function stepEvents(s: GameState, out: GameEvent[], w: World): void {
+export function stepEvents(s: GameState, out: GameEvent[]): void {
   const m = today(s);
   const day = m.day;
   const ruled = out.length;
@@ -362,8 +362,8 @@ export function stepEvents(s: GameState, out: GameEvent[], w: World): void {
     out.push({ tick: s.tick, kind: 'story', story: 'day', note: { key: noteKey(s, `day.${kind.kind}`, day, 0) } });
     if (kind.carts) out.push({ tick: s.tick, kind: 'story', story: 'day', note: { key: noteKey(s, 'day.carts', day, 1) } });
   }
-  for (let i = 0; i < m.list.length; i++) if (m.list[i]!.tick === s.tick) happen(s, out, w, m.list[i]!, null);
-  echoes(s, out, w, 0, ruled);
+  for (let i = 0; i < m.list.length; i++) if (m.list[i]!.tick === s.tick) happen(s, out, m.list[i]!, null);
+  echoes(s, out, 0, ruled);
   for (let i = 0; i < m.life.length; i++) {
     if (m.life[i] !== s.tick) continue;
     for (let t = 0; t < 8; t++) {

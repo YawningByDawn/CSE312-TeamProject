@@ -49,7 +49,7 @@ export const THREAT_WORDS: Readonly<Record<string, string>> = {
   'rule.levy': 'The levy: the strong of one area are taken for the war. Followers there who lie low are passed over.',
   'rule.purge': 'The naming: the High Priest names one of yours for the fire. Lying low does not hide a named wick: only a profaned relic, a Temple Elite’s favour, Silence the Preacher or a cooler Temple saves them.',
   'rule.ward': 'The ward: priests ward one of your areas; your colour is pushed back there for {days} days.',
-  'rule.burning': 'The burning: a mob burns a building you hold; its colour and its craft are lost for {days} days.',
+  'rule.burning': 'The burning: a mob burns a building you hold, and its colour is lost.',
   'rule.answers': 'Answers: false weights, a profaned relic or a black draught made at a building you hold; a turned Elite’s favour; an act of evil; or cooling the faction below the move’s mark before dusk.',
   'rule.favour': 'A turned Elite’s favour (1 action): their faction’s moves fail and it gains no heat for {nights} nights. The Elite risks {dev} devotion; the favour returns after {cooldown} nights.',
   'rule.crusade': 'At Shade III the Temple calls a crusade on the city road. It reaches the town in {days} days and burns wherever your faithful gather, unless a profaned relic, a Temple Elite’s favour or Silence the Preacher stops it.',

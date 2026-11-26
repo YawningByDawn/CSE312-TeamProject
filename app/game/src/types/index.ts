@@ -111,8 +111,6 @@ export interface Person {
   gone: GoneReason | null;
   /** The day they went (with `gone`): the world's events that follow a going read it. */
   goneDay?: number;
-  /** Echo copies: the person this one copies (twice the suspicion). */
-  echoOf?: UnitId;
   /** The day they were last whispered to (one whisper a person a day). */
   whispered?: number;
   /** The highest Devotion milestone (25/50/75/100) already paid out as XP. */
@@ -316,8 +314,6 @@ export type Action =
    * from `target`, a town area, tomorrow; the records lose a seal of the writ.
    */
   | { type: 'useGift'; gift: Gift; target?: FactionId | UnitId | PlaceId; mode?: 'poison' | 'bless'; day?: number };
-
-export type ActionType = Action['type'];
 
 /** Why an action is refused, or why its odds are what they are: a content word key plus slots. */
 export interface Reason { key: string; slots?: Record<string, string | number> }

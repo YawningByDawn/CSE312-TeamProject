@@ -96,7 +96,7 @@ export const ITEM = {
 /** What a set power adds to the god's sums. */
 export type SetEffect =
   | 'hungerSlow' | 'maliceSlow' | 'devotion' | 'whisperOdds' | 'calm' | 'ichorMax'
-  | 'searchMult' | 'strikeLuck' | 'freeWhispers' | 'miraclePower';
+  | 'searchCut' | 'strikeLuck' | 'freeWhispers' | 'miraclePower';
 
 /** Set powers (DECISIONS §15.12): `SET_SIZE` set stones of one affinity wake its power. */
 export const SET_SIZE = 3;
@@ -106,7 +106,7 @@ export const SET_POWER: Readonly<Record<Affinity, Readonly<Partial<Record<SetEff
   faith: { devotion: 1, whisperOdds: 0.05 },
   fear: { calm: 0.1 },
   blood: { ichorMax: 2 },
-  shadow: { searchMult: 0.75 },
+  shadow: { searchCut: 0.25 },
   stone: { strikeLuck: 10 },
   echo: { freeWhispers: 1 },
   flame: { miraclePower: 0.2 },

@@ -12,7 +12,8 @@ import { uiText } from '../content/text';
 import { buildingYours, hearths, placesBy } from './buildings';
 import { FACTIONS, addEffect, addHeat, area, ev, everyone, gainDevotion, has, here, remove, setHold, tearWrit, untilShiftEnd, type Ctx } from './core';
 import { pick } from './rng';
-import type { Action, FactionId, GameState, Gift, PlaceId, Reason, World } from '../types';
+import { tieKind } from './world';
+import type { Action, FactionId, GameState, Gift, PlaceId, Reason } from '../types';
 
 type UseGift = Extract<Action, { type: 'useGift' }>;
 const restKey = (g: Gift): string => `gift:${g}`;
@@ -28,7 +29,7 @@ const landing = (s: Readonly<GameState>, day: number): number => nextAt(s.tick, 
 export const regularsMult = (s: Readonly<GameState>, haunts: readonly PlaceId[]): number =>
   (GIVERS.get('rumour') ?? []).some((b) => haunts.includes(b) && buildingYours(s, b)) ? GIFTS.rumour.regularsCost : 1;
 
-export function giftWhy(s: Readonly<GameState>, w: World, a: UseGift): Reason[] {
+export function giftWhy(s: Readonly<GameState>, a: UseGift): Reason[] {
   const g = a.gift;
   if (!giver(s, g)) return [{ key: 'why.noGift' }];
   if (has(s, 'used', restKey(g))) return [{ key: 'why.resting' }];
@@ -37,7 +38,7 @@ export function giftWhy(s: Readonly<GameState>, w: World, a: UseGift): Reason[] 
     case 'rumour': return t && FACTIONS.includes(t as FactionId) ? [] : [{ key: 'why.badTarget' }];
     case 'debt': {
       const p = t ? s.people[t] : undefined;
-      return p && here(p) && !p.follower && p.ties.some((id) => w.tieKind(s, p, s.people[id]!) === 'owes') ? [] : [{ key: 'why.noDebt' }];
+      return p && here(p) && !p.follower && p.ties.some((id) => tieKind(s, p, s.people[id]!) === 'owes') ? [] : [{ key: 'why.noDebt' }];
     }
     case 'food': {
       const d = a.day ?? 1;

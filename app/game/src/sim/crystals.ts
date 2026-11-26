@@ -8,6 +8,7 @@ import {
   AFFINITY_IDS, BASES, BASE_BELOW, BASE_IDS, CURSE_IDS, GRADE, MINE_TIER, MINE_TIERS, MODS, MOD_IDS, MOD_RARE_AT,
   type MineTierId, type ModField, type StatLineId,
 } from '../content/gems';
+import { SET_POWER, SET_SIZE, type SetEffect } from '../content/items';
 import { chance, nextU32, rand } from './rng';
 import { uiText } from '../content/text';
 import type { Affinity, BaseId, Crystal, GameState, Grade, Mod, ModId, OddEffectId, RngState } from '../types';
@@ -253,7 +254,12 @@ export function setCount(s: Readonly<GameState>, a: Affinity): number {
   return n;
 }
 
-export const setPower = (s: Readonly<GameState>, a: Affinity): boolean => setCount(s, a) >= 3;
+/** What the awake set powers (`SET_SIZE` set stones of one affinity, content's `SET_POWER`) add to `e`. */
+export function setBonus(s: Readonly<GameState>, e: SetEffect): number {
+  let v = 0;
+  for (const a of AFFINITY_IDS) if (setCount(s, a) >= SET_SIZE) v += SET_POWER[a][e] ?? 0;
+  return v;
+}
 
 /** A hallowed (unprofaned) Flame stone is set: it quarrels with the rest and costs its price each day. */
 export function hallowed(s: Readonly<GameState>): number {

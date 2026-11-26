@@ -3,6 +3,7 @@
  * and what the set stones do at dawn (the Flame's price, Rot, Unstable, Weeping).
  */
 import { BALANCE } from '../content/balance';
+import { BLESSING } from '../content/blessings';
 import { CRYSTAL, EFFECT, GRADES } from '../content/crystals';
 import { CURSE_IDS, GRADE, MINE_TIER, MODS } from '../content/gems';
 import { dayOf } from '../content/clock';
@@ -55,12 +56,11 @@ export function unset(c: Ctx, id: string): void {
   s.crystals[id]!.at = { pouch: true };
   s.god.ichor = Math.min(s.god.ichor, maxIchor(s));
   ev(c, { kind: 'unset', crystal: id });
-  fadeEchoes(c);
 }
 
 
 export const enchantCost = (s: Readonly<GameState>, x: Crystal): number =>
-  Math.max(1, Math.round(CRYSTAL.enchantCost[tierOf(x.grade)]! * (gemcutter(s) ? 0.5 : 1)));
+  Math.max(1, Math.round(CRYSTAL.enchantCost[tierOf(x.grade)]! * (gemcutter(s) ? BLESSING.cutCostMult : 1)));
 export const recombineCost = (a: Crystal, b: Crystal): number => CRYSTAL.recombineCost[Math.max(tierOf(a.grade), tierOf(b.grade))]!;
 
 function enchantPool(x: Crystal, keep: number | undefined): ModId[] {
@@ -106,11 +106,11 @@ export function recombine(c: Ctx, a: string, b: string): void {
   const y = s.crystals[b]!;
   const grafter = s.god.blessings.includes('grafter');
   const top = Math.max(tierOf(x.grade), tierOf(y.grade));
-  const tier = top + (top < 5 && chance(s.rng, grafter ? 0.25 : CRYSTAL.gradeUp) ? 1 : 0);
+  const tier = top + (top < 5 && chance(s.rng, grafter ? BLESSING.graftGradeUp : CRYSTAL.gradeUp) ? 1 : 0);
   const base = rand(s.rng) < 0.5 ? x.base : y.base;
   const affinity = rand(s.rng) < 0.5 ? x.affinity : y.affinity;
   const extra = (p: Crystal): number => Math.max(0, p.slots - GRADE.slots[tierOf(p.grade)]!);
-  const slots = GRADE.slots[tier]! + (grafter ? 1 : 0) + Math.max(extra(x), extra(y));
+  const slots = GRADE.slots[tier]! + (grafter ? BLESSING.graftCap : 0) + Math.max(extra(x), extra(y));
   const pool = [...x.mods, ...y.mods.filter((m) => !x.mods.some((n) => n.id === m.id))];
   const mods: Mod[] = [];
   while (mods.length < slots && pool.length > 0) mods.push(pool.splice(Math.floor(rand(s.rng) * pool.length), 1)[0]!);
@@ -137,7 +137,7 @@ const setSig = (cuts: readonly Mod[][]): string => cuts.map(cutSig).sort().join(
 const dropCut = (x: Crystal, k: number): Mod[] => x.mods.filter((_, j) => j !== k).map((m) => ({ ...m, value: reshapes(m) ? Math.round(m.value * 1.5) : m.value }));
 
 export const facetCost = (s: Readonly<GameState>, x: Crystal): number =>
-  Math.max(1, Math.round(CRYSTAL.facetCost[tierOf(x.grade)]! * (gemcutter(s) ? 0.5 : 1)));
+  Math.max(1, Math.round(CRYSTAL.facetCost[tierOf(x.grade)]! * (gemcutter(s) ? BLESSING.cutCostMult : 1)));
 
 /** Can a re-cut ever offer anything but what the stone is: a number that can move, or two lines whose dropping differs. */
 export function canFacet(x: Crystal): boolean {
@@ -227,7 +227,6 @@ export function graveDawn(c: Ctx): void {
         delete s.crystals[x.id];
       } else crackDown(x);
       ev(c, { kind: 'unset', crystal: x.id });
-      fadeEchoes(c);
     }
   }
   const weeping = oddCount(s, 'weeping');
@@ -239,11 +238,5 @@ function rot(c: Ctx): void {
   const s = c.s;
   const pool = everyone(s).filter((p) => here(p) && !p.follower && active(s, p.home));
   if (pool.length > 0) pool[Math.floor(rand(s.rng) * pool.length)]!.resistance += EFFECT.rotResistance;
-}
-
-/** An Echo copy fades when the stone that called it is no longer set. */
-export function fadeEchoes(c: Ctx): void {
-  const s = c.s;
-  for (const p of everyone(s)) if (p.echoOf && here(p) && oddCount(s, 'echo') === 0) p.gone = 'left';
 }
 

@@ -70,7 +70,7 @@ function areaOk(s: Readonly<GameState>, fl: Flock, a: PlaceId, kind: CardArea | 
 function unitOk(s: Readonly<GameState>, fl: Flock, p: Person, id: CardId): boolean {
   const d = def(id);
   if (!here(p)) return false;
-  if (d.target === 'follower') return p.follower && !p.echoOf;
+  if (d.target === 'follower') return p.follower;
   if (id === 'devour' && p.follower) return true;
   if (p.follower) return false;
   if (d.elite) return standingOf(p) === 'elite' && standingRank('elite') <= standingRank(STAGE_MAX_STANDING[s.stage]) && placeInReach(s, fl, whereNow(p, s.tick));
@@ -343,7 +343,7 @@ export function evil(c: Ctx, id: CardId, target: string | undefined, o: { by?: P
   const before = s.god.malice;
   addMalice(c, -relief);
   if (hunger > 0) addHunger(c, -(o.half ? hunger / 2 : hunger));
-  if (!o.quiet) for (const h of d.heat ?? []) addHeat(c, h.faction, round1(h.amount * (o.by?.echoOf ? EFFECT.echoHeatMult : 1)), 'evil');
+  if (!o.quiet) for (const h of d.heat ?? []) addHeat(c, h.faction, round1(h.amount), 'evil');
   if (!o.half && !o.noXp) gainXp(c, round1((before - s.god.malice) / BALANCE.xpEvilDivisor));
 }
 
@@ -387,7 +387,7 @@ export function followersEvil(c: Ctx): void {
   const p = Math.min(BALANCE.followerEvilMax, s.god.malice * BALANCE.followerEvilPerMalice);
   if (p <= 0 || !chance(s.rng, p)) return;
   const pool: Person[] = [];
-  followers(s, (f) => { if (f.routine !== 'lieLow' && !f.echoOf) pool.push(f); });
+  followers(s, (f) => { if (f.routine !== 'lieLow') pool.push(f); });
   const f = pick(s.rng, pool);
   if (!f) return;
   const card = pick(s.rng, IDS.filter((id) => def(id).followerAct && (!def(id).shadeOnly || s.stage === 'shade') && ownTarget(s, f, id) !== undefined));
