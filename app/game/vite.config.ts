@@ -42,12 +42,12 @@ function workshop(base: string): Plugin {
 
 export default defineConfig(({ mode }) => {
   const shell = mode === 'workshop';
-  // `npm run build` is the course's build (`--mode course`): the Go app serves it under /game/ and the game joins the app's hub
-  // (app/websocket) on the same host. Every other command serves the game at its root with no hub.
+  // `npm run build` is the course's build (`--mode course`): the Go app serves it at the site's root and the game joins the
+  // app's hub (app/websocket) on the same host. Every other command serves the game with no hub.
   const course = mode === 'course';
   const base = '/workshop/hgi/';
   return {
-    base: shell ? base : course ? '/game/' : './',
+    base: shell ? base : course ? '/' : './',
     define: course ? { 'import.meta.env.VITE_HG_NET': JSON.stringify('/ws') } : {},
     // probes(): the rebuilt game's profiled copy (`?prof=1`), built beside the game and loaded only on that page.
     plugins: shell ? [workshop(base), probes(root)] : [probes(root)],
