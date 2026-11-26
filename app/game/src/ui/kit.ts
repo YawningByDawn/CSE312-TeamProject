@@ -55,6 +55,8 @@ export function installCss(sheets: readonly Sheet[]): void {
     '.hg-big { perspective: 1200px; }',
     '.hg-dealt { animation: hg-dealt cubic-bezier(0.2, 0.8, 0.25, 1) both; } @keyframes hg-dealt { from { transform: translateY(1000px); } }',
     '.hg-turn { transform-style: preserve-3d; animation: hg-turn ease-in-out both; } @keyframes hg-turn { from { transform: rotateY(180deg); } }',
+    // the deal's buttons wait, unseen and unpressable, until the cards are face up
+    '.hg-wait { animation: hg-wait 0.2s both; } @keyframes hg-wait { from { opacity: 0; visibility: hidden; } }',
     '.hg-face { backface-visibility: hidden; } .hg-backface { transform: rotateY(180deg); }',
     '.hg-big.hg-kept { transform: translate(var(--tx), var(--ty)) scale(0.6); opacity: 0.3; }',
     '.hg-big.hg-drop { transform: translateY(110px); opacity: 0; }',

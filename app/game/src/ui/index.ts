@@ -29,7 +29,7 @@ import { People } from './hud/people';
 // The rest layout frames the world from its corners: each corner is an anchor 24 px in from the screen's edge, all
 // scaled by one factor from the window and the Interface size setting, their parts laid out in design px of a
 // 1600x900 screen. A frame hands the view model to each part; a part writes only what changed. The panels mount in
-// their own layer over the rest layout, and are framed after it.
+// their own layer over the rest layout, and are framed before it: the deal reads which of them is open this frame.
 
 /** The design screen the parts are laid out on. */
 const DESIGN_W = 1600, DESIGN_H = 900;
@@ -139,10 +139,11 @@ export function createUi(mountPanels?: MountPanels): Ui {
       const film = vm.film !== null && vm.film.kind !== 'take';
       if (film === skip.el.hidden) skip.el.hidden = !film;
       if (film) skip.set(uiText('hud.skip', { back: name('back'), skip: name('skip') }));
+      // the panels first: the deal waits for them, and reads what is open this frame
+      panels?.frame(vm);
       if (!off) for (const p of parts) p.frame(vm);
       // the settings open over the title and the defeat too
       menus.frame(vm);
-      panels?.frame(vm);
       tip.frame(vm);
     },
   };

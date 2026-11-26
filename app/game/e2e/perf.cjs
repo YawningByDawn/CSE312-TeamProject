@@ -1,6 +1,7 @@
 // The frame's cost on seed 7, measured on the game's own page (no probe in it): its rAF callbacks timed and the heap's
 // growth in them summed over 240 frames, in each state the target names (docs/contracts/perf.md): the mine at rest,
-// panning, zooming, and the mine with the Day running. Then the profiled page (`?prof=1`) at rest
+// panning, zooming, and the mine with the Day running; the mine at rest is the first night, the deal waiting (the day
+// played to dusk by ticks). Then the profiled page (`?prof=1`) at the same rest
 // for where the frame goes by function (its probes add their own time and allocation).
 //   python tools/browser_job.py --build [OUT=<dir>] node e2e/perf.cjs
 // Writes <OUT, default screenshots>/perf.json (`game` by state, the profiler's report and the VM's 1-minute load before
@@ -89,9 +90,24 @@ function timeFrames() {
     await page.waitForTimeout(SETTLE_MS);
     return page;
   };
+  /** The first night, the deal waiting: the day played by ticks to dusk, the dusk panel closed, the world still. */
+  const toNight = async (page) => {
+    await page.evaluate(() => {
+      const hg = window.__hg, s = hg.state();
+      for (let i = 0; i < 20000 && !(s.tick > 700 && s.god.deal); i++) {
+        if (s.pending) { hg.act(s.pending.kind === 'story' ? { type: 'story', option: 1 } : { type: 'pickBlessing', blessing: s.pending.offers[0] }); continue; }
+        hg.ticks(1);
+      }
+    });
+    await page.waitForSelector('.hgp-slab', { timeout: 10000 });
+    await page.keyboard.press('Escape');
+    await page.waitForSelector('.hg-dealt', { timeout: 10000 });
+    await page.waitForTimeout(SETTLE_MS);
+  };
   const game = {};
   try {
     const plain = await open(PAGE, timeFrames);
+    await toNight(plain);
     /** One window of FRAMES frames; `sway` (a function's source, of seconds, giving a camera) moves the camera in it. */
     const measure = async (name, sway) => {
       await plain.evaluate((s) => {
@@ -112,11 +128,13 @@ function timeFrames() {
     await measure('rest');
     await measure('pan', `(t) => ({ x: ${PAN} * Math.sin(2 * Math.PI * ${SWAY_HZ} * t), y: 0, zoom: 1 })`);
     await measure('zoom', `(t) => ({ x: 0, y: 0, zoom: 1 + ${ZOOM} * Math.sin(2 * Math.PI * ${SWAY_HZ} * t) })`);
+    await plain.evaluate(() => { if (!window.__hg.act({ type: 'take', card: null }).ok) throw new Error('perf: the first deal could not be passed'); });
     await plain.waitForTimeout(2000);
     await measure('day');
     await plain.close();
 
     const prof = await open(`${PAGE}&prof=1`);
+    await toNight(prof);
     const r = await prof.evaluate(() => window.__hg.prof());
     const txt = await prof.evaluate(() => window.__hg.profText());
     fs.writeFileSync(path.join(OUT, 'perf.json'), JSON.stringify({ game, ...r, vm }, null, 1));

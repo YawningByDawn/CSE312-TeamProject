@@ -262,10 +262,9 @@ export class Deal {
     });
     const by = top + 86 + h + 26;
     const none = verb(this.el, g.rerolls > 0 ? -170 : -80, by, 160, 46, uiText('btn.takeNone'), '', () => this.take(null), () => {});
-    none.classList.add('hg-fade');
-    if (g.rerolls > 0) {
-      verb(this.el, 10, by, 160, 46, uiText('btn.redraw', { n: g.rerolls }), '', () => this.send({ kind: 'act', action: { type: 'reroll' } }), () => {}).classList.add('hg-fade');
-    }
+    const wait = (b: HTMLElement): void => { b.classList.add('hg-fade', 'hg-wait'); b.style.animationDelay = `${this.faceUp}s`; };
+    wait(none);
+    if (g.rerolls > 0) wait(verb(this.el, 10, by, 160, 46, uiText('btn.redraw', { n: g.rerolls }), '', () => this.send({ kind: 'act', action: { type: 'reroll' } }), () => {}));
   }
 
   /** The kept card flies to the hand and the rest fall away; then the take is sent. */
