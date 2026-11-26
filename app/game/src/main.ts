@@ -1,5 +1,6 @@
 import { installDebug } from './app/debug';
 import { Input } from './app/input';
+import { connectNet } from './app/net';
 import { Pump } from './app/pump';
 import { flag } from './content/flags';
 import { SOUNDS } from './content/sounds';
@@ -12,7 +13,8 @@ import { createView } from './view';
 import { world } from './sim/world';
 
 // Boot: the tracks behind their interfaces, one pump, one rAF frame. `?scene=play` begins a run at once (no title, no
-// opening); `?seed=N` fixes the seed; `?mute=1` mutes this load; `?fast=1` plays films eight times faster.
+// opening); `?seed=N` fixes the seed; `?mute=1` mutes this load; `?fast=1` plays films eight times faster. A build
+// with `VITE_HG_NET` (the course framework's) joins its multiplayer hub.
 
 const FAST_FILMS = 8;
 
@@ -27,7 +29,8 @@ const ui = createUi(mountPanels);
 const audio = createAudio(query, SOUNDS, flag('mute') === '1');
 const pump = new Pump({ sim, query, view, ui, audio, tickHz: TICK_HZ }, seed, flag('fast') === '1' ? FAST_FILMS : 1);
 const input = new Input(pump, view, canvas);
-installDebug(pump, sim, input);
+const netPath = import.meta.env.VITE_HG_NET as string | undefined;
+installDebug(pump, sim, input, netPath ? connectNet(netPath) : null);
 
 function resize(): void {
   const w = uiRoot.parentElement!.clientWidth;

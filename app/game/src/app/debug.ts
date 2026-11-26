@@ -1,9 +1,9 @@
-import type { DebugApi, Sim } from '../types';
+import type { DebugApi, Net, Sim } from '../types';
 import type { Input } from './input';
 import type { Pump } from './pump';
 
 /** `window.__hg`: the debug and test API over the one pump. */
-export function installDebug(pump: Pump, sim: Sim, input: Input): void {
+export function installDebug(pump: Pump, sim: Sim, input: Input, net: Net | null): void {
   const vm = pump.vm;
   const api: DebugApi = {
     app: { get time() { return vm.time; } },
@@ -15,6 +15,7 @@ export function installDebug(pump: Pump, sim: Sim, input: Input): void {
     camera: (c) => input.jump(c),
     legal: () => sim.legal(vm.state),
     show: (e) => pump.take([e]),
+    ...(net && { net }),
   };
   Object.assign(window, { __hg: api });
 }

@@ -239,6 +239,18 @@ export interface DebugApi {
   prof?(): ProfReport;
   /** The same as the text Copy report gives. */
   profText?(): string;
+  /** The multiplayer socket, in a build that names one (src/app/net.ts). */
+  net?: Net;
+}
+
+/** The multiplayer socket: who is on, and game messages to and from the other players. */
+export interface Net {
+  /** the players the hub has on, this one included (names as the hub sends them) */
+  players: string[];
+  open: boolean;
+  /** `data` to every other player; dropped while the socket is not open */
+  send(data: unknown): void;
+  onGame(f: (from: string, data: unknown) => void): void;
 }
 
 /** One function's cost, per frame (or per sim tick): mean over the window, its worst frame, its share of the callback. */

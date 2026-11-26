@@ -58,7 +58,13 @@ func RunHub() {
 				disconnect(p)
 			}
 		case in := <-inputChan:
-			if p := players[in.username]; p != nil && p.client != nil {
+			p := players[in.username]
+			if p == nil || p.client == nil {
+				continue
+			}
+			if in.msg.Type == "game" {
+				relay(players, in.username, encodeGame(in.username, in.msg.Data))
+			} else {
 				p.dx, p.dy = clamp(in.msg.DX), clamp(in.msg.DY)
 			}
 		case <-ticker.C:
@@ -81,9 +87,13 @@ func tick(players map[string]*player) {
 		states = append(states, playerState{Name: name, X: p.x, Y: p.y})
 	}
 
-	data := encodeState(states)
-	for _, p := range players {
-		if p.client == nil {
+	relay(players, "", encodeState(states))
+}
+
+// relay sends data to every connected player but `except`.
+func relay(players map[string]*player, except string, data []byte) {
+	for name, p := range players {
+		if p.client == nil || name == except {
 			continue
 		}
 		select {
