@@ -1,4 +1,5 @@
-FROM node:24 AS game
+# the npm that wrote game/package-lock.json; a newer one refuses it under `npm ci`
+FROM node:24.11.1 AS game
 
 WORKDIR /game
 
