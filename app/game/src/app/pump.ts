@@ -28,7 +28,7 @@ export class Pump {
     t.audio.settings(settings);
     this.state = t.sim.create(seed);
     this.vm = {
-      title: true, saved: readSave()?.day ?? null, settings, state: this.state, alpha: 0, time: 0,
+      title: true, saved: readSave()?.day ?? null, settings, state: this.state, alpha: 0, time: 0, dt: 0,
       camera: { x: 0, y: 0, zoom: 1 }, focus: null, hover: null, film: null, paused: false, menu: null, fresh: this.fresh,
     };
   }
@@ -52,6 +52,7 @@ export class Pump {
   /** `dt` real seconds of render time, film and clock, drawing nothing. */
   advance(dt: number): void {
     const vm = this.vm;
+    vm.dt = dt;
     if (!vm.paused) vm.time += dt;
     const film = vm.film;
     if (film) {

@@ -33,8 +33,8 @@ export class Clock {
   private day = -1;
   private ap = -1;
   private top = -1;
-  /** Wall ms the press began, or -1 when the clock is not held. */
-  private heldAt = -1;
+  /** Seconds the clock has been held, or -1 when it is not. */
+  private held = -1;
 
   constructor(anchor: HTMLElement, private readonly send: (i: Intent) => void, private readonly q: Query) {
     this.box = surface(anchor, 'violet', -CLOCK_W, -CLOCK_H, CLOCK_W, CLOCK_H, 'hg-hit');
@@ -42,7 +42,7 @@ export class Clock {
     this.fill = surface(b, 'violet', 0, 0, CLOCK_W, CLOCK_H);
     this.fill.style.filter = 'brightness(1.8)';
     this.release();
-    b.addEventListener('pointerdown', () => { this.heldAt = performance.now(); });
+    b.addEventListener('pointerdown', () => { this.held = 0; });
     for (const k of ['pointerup', 'pointerleave', 'pointercancel'] as const) b.addEventListener(k, () => this.release());
     this.dial = new Pic(b, 60, 60, 'moon');
     const dr = row(b, 116, 14);
@@ -56,13 +56,13 @@ export class Clock {
   }
 
   private release(): void {
-    this.heldAt = -1;
+    this.held = -1;
     this.fill.style.clipPath = 'inset(0 100% 0 0)';
   }
 
   frame(vm: ViewModel): void {
-    if (this.heldAt >= 0) {
-      const k = (performance.now() - this.heldAt) / (HOLD_S * 1000);
+    if (this.held >= 0) {
+      const k = (this.held += vm.dt) / HOLD_S;
       if (k >= 1) {
         this.release();
         this.send({ kind: 'endDay' });

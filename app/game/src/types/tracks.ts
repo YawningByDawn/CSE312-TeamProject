@@ -98,6 +98,8 @@ export interface ViewModel {
   alpha: number;
   /** Render seconds since boot: animation frames are picked from it (frozen while paused). */
   time: number;
+  /** Real seconds of the last frame, paused or not: the interface's timers count it. */
+  dt: number;
   camera: Camera;
   focus: Focus;
   hover: Focus;

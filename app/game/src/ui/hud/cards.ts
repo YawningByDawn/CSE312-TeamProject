@@ -16,6 +16,8 @@ import { POUCH_H, POUCH_W } from './pouch';
 // (Esc, 0), or redraw them.
 // Each rebuilds only when its key changes; at rest neither writes.
 
+/** The kept card's flight to the hand, then the take. */
+const LEAVE_S = 0.38;
 const REST = 0.92;
 const BIG = 1.5;
 const GAP = 10;
@@ -173,6 +175,9 @@ export class Deal {
   private deal: CardId[] = [];
   private full = false;
   private leaving = false;
+  /** Seconds until the kept card has flown and `taking` is sent; -1 when none is on its way. */
+  private sendIn = -1;
+  private taking: CardId | null = null;
   private up = false;
 
   /** `busy`: a panel is open over the rest layout; the deal waits for it, and for a menu. */
@@ -190,6 +195,11 @@ export class Deal {
   }
 
   frame(vm: ViewModel): void {
+    if (this.sendIn >= 0 && (this.sendIn -= vm.dt) < 0) {
+      this.sendIn = -1;
+      this.el.classList.remove('hg-leaving');
+      this.send({ kind: 'act', action: { type: 'take', card: this.taking } });
+    }
     const s = vm.state, g = s.god;
     const up = s.phase === 'live' && !!g.deal && !vm.title && !vm.menu && !this.busy();
     if (up === this.up && vm.fresh.length === 0) return;
@@ -249,9 +259,7 @@ export class Deal {
       }
     });
     this.el.classList.add('hg-leaving');
-    window.setTimeout(() => {
-      this.el.classList.remove('hg-leaving');
-      this.send({ kind: 'act', action: { type: 'take', card: id } });
-    }, 380);
+    this.taking = id;
+    this.sendIn = LEAVE_S;
   }
 }
