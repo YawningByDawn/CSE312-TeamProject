@@ -9,10 +9,13 @@ import (
 )
 
 func Setup(app *fiber.App) {
-	app.Get("/", func(c fiber.Ctx) error { return c.Redirect().To("/game/") })
 	app.Get("/account", func(c fiber.Ctx) error { return c.SendFile("./public/index.html") })
 	app.Get("/api/me", me)
-	app.Use("/game", static.New("./public/game"))
+}
+
+// Game serves the built game at the site's root; registered after every other route.
+func Game(app *fiber.App) {
+	app.Use("/", static.New("./public/game"))
 }
 
 // me names who is logged in; a username of null means nobody.
