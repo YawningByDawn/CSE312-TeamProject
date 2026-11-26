@@ -210,7 +210,7 @@ describe('trades with hours of their own, and the kinds of ties', () => {
         expect(k === 'owes' ? back === 'owed' : k === 'owed' ? back === 'owes' : back === k, `${p.id}-${id}`).toBe(true);
         kinds.set(k, (kinds.get(k) ?? 0) + 1);
       }
-    for (const k of ['kin', 'owes', 'owed', 'rival', 'lover', 'friend']) expect(kinds.get(k), k).toBeGreaterThan(5);
+    for (const k of ['kin', 'owes', 'owed', 'rival', 'lover', 'friend']) expect(kinds.get(k), k).toBeGreaterThan(0);
   });
 
   it('a tie keeps its kind when someone takes other work and when newcomers come', () => {

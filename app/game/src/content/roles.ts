@@ -1,5 +1,5 @@
 /**
- * Every person's trade (#48): one table for the rules and the days. ~60 mine hands in 23 trades. `count` is the
+ * Every person's trade (#48): one table for the rules and the days. ~31 mine hands in 23 trades. `count` is the
  * trade's headcount in the society, the named people included.
  * Words: `role.<id>.name`, `.plural`, `.line`.
  */
@@ -38,26 +38,26 @@ const MINE_ROUND: PlaceId[] = ['westdrift', 'cartway', 'heartvein', 'eastworks',
 
 export const ROLES: Readonly<Record<RoleId, RoleDef>> = {
   digger: r(0, [0, 0, 0, 0], FACES, 4, { labour: 'dig', quota: 3 }),
-  hauler: r(5, [2, 2, 0, 2], ['cartway', 'lowgallery', 'eastworks'], 9, { labour: 'haul', reach: 1 }),
-  sorter: r(5, [-3, 3, 3, -2], ['sorting'], 4, { labour: 'sort' }),
-  timberman: r(0, [0, 0, 0, 0], ['westdrift'], 4, { rounds: ['westdrift', 'heartvein', 'eastworks', 'lowgallery', 'sump'], reach: 1 }),
-  lampman: r(0, [0, 0, 0, 0], ['cartway'], 3, { rounds: MINE_ROUND, reach: 1 }),
-  pumpman: r(0, [0, 0, 0, 0], ['pumphouse'], 3),
+  hauler: r(5, [2, 2, 0, 2], ['cartway', 'lowgallery', 'eastworks'], 3, { labour: 'haul', reach: 1 }),
+  sorter: r(5, [-3, 3, 3, -2], ['sorting'], 2, { labour: 'sort' }),
+  timberman: r(0, [0, 0, 0, 0], ['westdrift'], 1, { rounds: ['westdrift', 'heartvein', 'eastworks', 'lowgallery', 'sump'], reach: 1 }),
+  lampman: r(0, [0, 0, 0, 0], ['cartway'], 1, { rounds: MINE_ROUND, reach: 1 }),
+  pumpman: r(0, [0, 0, 0, 0], ['pumphouse'], 1),
   powderman: r(0, [0, 0, 0, 0], ['powderstore'], 1),
-  cartboy: r(5, [2, 2, 0, 2], ['cartway', 'sorting'], 4, { labour: 'haul', reach: 1 }),
+  cartboy: r(5, [2, 2, 0, 2], ['cartway', 'sorting'], 1, { labour: 'haul', reach: 1 }),
   farrier: r(0, [0, 0, 0, 0], ['beaststalls'], 1),
-  watercarrier: r(0, [0, 0, 0, 0], ['bunks'], 2, { rounds: ['heartvein', 'eastworks', 'westdrift', 'lowgallery', 'sorting'], reach: 2 }),
-  pitcook: r(0, [0, 0, 0, 0], ['pitkitchen'], 2, { reach: 1 }),
+  watercarrier: r(0, [0, 0, 0, 0], ['bunks'], 1, { rounds: ['heartvein', 'eastworks', 'westdrift', 'lowgallery', 'sorting'], reach: 2 }),
+  pitcook: r(0, [0, 0, 0, 0], ['pitkitchen'], 1, { reach: 1 }),
   surveyor: r(0, [0, 0, 0, 0], ['overseer'], 1, { rounds: ['heartvein', 'eastworks', 'lowgallery', 'sump', 'westdrift'], reach: 1 }),
   pitclerk: r(0, [0, 0, 0, 0], ['overseer'], 1),
-  chaplain: r(20, [-3, 0, 4, -2], ['kilnshrine'], 4, { serves: 'temple', watches: true, reach: 1 }),
-  overseer: r(40, [-1, 0, 5, -2], ['overseer'], 2, { standing: 'elite', serves: 'council', watches: true }),
-  pitguard: r(15, [3, 1, 0, 3], ['lift', 'overseer', 'cartway'], 5, { serves: 'council', watches: true }),
-  winder: r(0, [0, 0, 0, 0], ['lift'], 2),
-  trackman: r(0, [0, 0, 0, 0], ['cartway'], 2, { rounds: ['cartway', 'lowgallery', 'sorting', 'westdrift'], reach: 1 }),
+  chaplain: r(20, [-3, 0, 4, -2], ['kilnshrine'], 2, { serves: 'temple', watches: true, reach: 1 }),
+  overseer: r(40, [-1, 0, 5, -2], ['overseer'], 1, { standing: 'elite', serves: 'council', watches: true }),
+  pitguard: r(15, [3, 1, 0, 3], ['lift', 'overseer', 'cartway'], 2, { serves: 'council', watches: true }),
+  winder: r(0, [0, 0, 0, 0], ['lift'], 1),
+  trackman: r(0, [0, 0, 0, 0], ['cartway'], 1, { rounds: ['cartway', 'lowgallery', 'sorting', 'westdrift'], reach: 1 }),
   picksmith: r(0, [0, 0, 0, 0], ['cartway'], 1),
   bonesetter: r(0, [0, 0, 0, 0], ['bunks'], 1, { reach: 1 }),
-  ashboy: r(0, [0, 0, 0, 0], ['kilnshrine'], 2, { rounds: ['kilnshrine', 'westdrift', 'bunks', 'cartway'], reach: 1 }),
+  ashboy: r(0, [0, 0, 0, 0], ['kilnshrine'], 1, { rounds: ['kilnshrine', 'westdrift', 'bunks', 'cartway'], reach: 1 }),
   ventman: r(0, [0, 0, 0, 0], ['westdrift'], 1),
   ratcatcher: r(0, [0, 0, 0, 0], ['sump'], 1, { rounds: ['sump', 'lowgallery', 'pitkitchen', 'bunks'], reach: 1 }),
 };
