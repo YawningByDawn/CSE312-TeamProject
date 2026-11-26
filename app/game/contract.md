@@ -18,7 +18,7 @@ As `docs/spec.md` sets them: the opening cutscene into the first gameplay view w
 
 ## Work
 
-- The repo is CSE312-TeamProject; the game's root is its `app/game/`. Every path in this file and in `docs/` is relative to `app/game/`, and every tool runs from it. The team's server (`compose.yaml`, `app/Dockerfile`, the Go app, `auth/`, `nginx/`) is not ours: leave it alone unless the owner orders a change. `npm run build` is the team's build (`--mode course`: base `/game/`, the hub at `/ws`); `npm run dev` and every tool serve the game at `/`.
+- The repo is CSE312-TeamProject; the game's root is its `app/game/`. Every path in this file and in `docs/` is relative to `app/game/`, and every tool runs from it. The team's server (`compose.yaml`, `app/Dockerfile`, the Go app, `auth/`, `nginx/`) is not ours: leave it alone unless the owner orders a change. `npm run build` is the team's build (`--mode course`: served at the site's root, the hub at `/ws`); `npm run dev` and every tool serve the game at `/`.
 - Work only in your brief's worktree (`$ZS_ROOT/engine/Universal/tooling/lib/wt.py new CSE312-TeamProject <name>`). Never push, merge, land, restart, or touch the owner's checkout. Drop every other worktree you make before hand-back.
 - Before work or naming a cause, read the row's State and `docs/queue-log.md`: the fix may have landed.
 - Every commit in this repo is authored as `doritomayhem`, its `user.name`; never override the author.

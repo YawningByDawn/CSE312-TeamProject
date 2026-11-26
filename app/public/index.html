@@ -13,7 +13,7 @@
     <button data-path="/register">Register</button>
   </form>
   <button id="logout" hidden>Logout</button>
-  <p><a href="/game/">Back to the game</a></p>
+  <p><a href="/">Back to the game</a></p>
   <canvas id="world" width="800" height="600" style="border: 1px solid #ccc" hidden></canvas>
 
   <script>
@@ -103,7 +103,7 @@
         statusText.textContent = result.data.error || "Request failed";
         return;
       }
-      location.assign("/game/");
+      location.assign("/");
     });
 
     logoutButton.addEventListener("click", async () => {

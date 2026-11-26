@@ -18,5 +18,6 @@ func main() {
 	app.Use(recover.New())
 	router.Setup(app)
 	websocket.Setup(app)
+	router.Game(app)
 	log.Fatal(app.Listen(":8080"))
 }
