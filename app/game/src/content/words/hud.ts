@@ -11,6 +11,7 @@ export const HUD_WORDS: Readonly<Record<string, string>> = {
   'hud.outOf': '/{n}',
   'hud.ichor': 'Ichor',
   'hud.netherNight': '+{n} a night',
+  'hud.drop': '+{n} Nether',
   'hud.ap': '{n} {n|action|actions} left tonight',
   'hud.day': 'Day {n}',
   'power.temple': 'Temple',

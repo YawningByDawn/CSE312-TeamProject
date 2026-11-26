@@ -54,6 +54,8 @@ export function installCss(sheets: readonly Sheet[]): void {
     '.hg-dealt { animation: hg-dealt 0.56s cubic-bezier(0.2, 0.8, 0.25, 1) both; } @keyframes hg-dealt { from { opacity: 0; transform: translateY(420px) scale(0.4); } }',
     '.hg-big.hg-kept { transform: translate(var(--tx), var(--ty)) scale(0.6); opacity: 0.3; }',
     '.hg-big.hg-drop { transform: translateY(110px); opacity: 0; }',
+    // a number said over the place it fell: it rises and fades
+    '.hg-note { pointer-events: none; animation: hg-note 1.1s ease-out both; } @keyframes hg-note { from { opacity: 0; translate: 0 8px; } 15% { opacity: 1; } to { opacity: 0; translate: 0 -46px; } }',
     '.hg-leaving .hg-fade, .hg-leaving > .hgp-slab { opacity: 0; transition: opacity 0.26s; }',
     `.hg-range { position: absolute; width: 260px; margin: 0; accent-color: ${VIOLET}; pointer-events: auto; }`,
     '.hg-scroll { overflow-y: auto; pointer-events: auto; scrollbar-color: #5a4f66 transparent; }',

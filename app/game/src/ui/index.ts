@@ -13,6 +13,7 @@ import { uiText } from '../content/text';
 import { DIM, Words, div, installCss } from './kit';
 import { Deal, Hand } from './hud/cards';
 import { Clock } from './hud/clock';
+import { Drops } from './hud/drops';
 import { Feed } from './hud/feed';
 import { Hints } from './hud/hints';
 import { Menus } from './hud/menus';
@@ -115,7 +116,7 @@ export function createUi(mountPanels?: MountPanels): Ui {
         new HostPlate(at.tl, send, q), new Feed(at.tl, toggle),
         new God(at.tr, toggle, q), new Suspicion(at.tr), new Goal(at.tr, toggle, q),
         new Pouch(at.bl, toggle), new People(at.bl, send, POUCH_H), new Clock(at.br, send, q),
-        new Quests(at.tr, q), new Hints(at, (t) => q.day(t), send), hand, deal,
+        new Quests(at.tr, q), new Hints(at, (t) => q.day(t), send), new Drops(at.c, from('c')), hand, deal,
       );
       menus = new Menus(menuAt, at.tr, send, q);
       tip = new Tip(hud, () => k);
