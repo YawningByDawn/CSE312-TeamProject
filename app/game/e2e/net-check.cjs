@@ -1,7 +1,8 @@
 // The course framework's login and socket (src/app/net.ts) against stand-ins (Playwright routes `/ws` and the login's
 // paths): logged in, it joins, lists who the hub has on, sends a game message as `{type:'game',data}`, hands a relayed
 // one to its listeners, reconnects after a drop, and stays off after being kicked. The title's top right corner names
-// who `/api/me` says is logged in: it logs out with a POST to `/logout` (and opens no socket after), and in at `/account`.
+// who `/api/me` says is logged in: it logs out with a POST to `/logout` (and opens no socket after), and in through its popup:
+// a refusal shows in the popup, Escape closes it, Register posts to `/register` and then `/login` as JSON, and the page reloads logged in.
 //   VITE_HG_NET=/ws npx vite build --outDir dist/net
 //   python tools/browser_job.py --ship dist/net node e2e/net-check.cjs
 // Exits 1 on a failed check or a console error.
@@ -29,7 +30,14 @@ const { launchBrowser, startStatic, collectConsole } = require('./lib/browser.cj
     me.name = null;
     return r.fulfill({ status: 204 });
   });
-  await page.route(/\/account$/, (r) => r.fulfill({ contentType: 'text/html', body: 'account' }));
+  const posts = [];
+  await page.route(/\/(login|register)$/, (r) => {
+    const req = r.request();
+    posts.push({ path: new URL(req.url()).pathname, type: req.headers()['content-type'], body: req.postData() });
+    if (posts.length === 1) return r.fulfill({ status: 401, json: { error: 'wrong username or password' } });
+    me.name = 'ann';
+    return r.fulfill({ json: { username: 'ann' } });
+  });
   const corner = (text) => page.waitForFunction((t) => [...document.querySelectorAll('.hg-t.hg-hit')].find((e) => e.textContent === t), text, { timeout: 30000 })
     .then((h) => h.asElement().boundingBox(), () => null);
   const failed = [];
@@ -58,13 +66,28 @@ const { launchBrowser, startStatic, collectConsole } = require('./lib/browser.cj
     check(me.logouts === 1 && back !== null, `logs out with a POST to /logout and shows Log in (${me.logouts} posts)`);
     check(hub.joins === 2, `logged out, opens no socket (joins ${hub.joins})`);
     await page.getByText('Log in').click();
-    await page.waitForURL(/\/account$/, { timeout: 10000 }).catch(() => {});
-    check(new URL(page.url()).pathname === '/account', `logs in at /account: ${page.url()}`);
+    const dialog = page.getByRole('dialog');
+    const field = (name) => dialog.getByLabel(name);
+    await field('Username').fill('ann');
+    await field('Password').fill('hunter22x');
+    await field('Password').press('Enter');
+    await dialog.getByText('wrong username or password').waitFor({ timeout: 10000 });
+    check(posts.length === 1 && posts[0].path === '/login' && posts[0].type === 'application/json' && posts[0].body === '{"username":"ann","password":"hunter22x"}', `Log in posts JSON to /login and shows its refusal: ${JSON.stringify(posts[0])}`);
+    await field('Password').press('Escape');
+    check(await dialog.count() === 0, 'Escape closes the popup');
+    await page.getByText('Log in').click();
+    await dialog.getByText('No account? Register').click();
+    await field('Username').fill('ann');
+    await field('Password').fill('hunter22x');
+    await field('Password').press('Enter');
+    const back2 = await corner('ann · Log out');
+    check(posts.map((p) => p.path).join() === '/login,/register,/login' && back2 !== null, `Register posts /register then /login and reloads logged in: ${posts.map((p) => p.path)}`);
   } finally {
     await browser.close();
     await srv.stop();
   }
-  const bad = [...errors, ...failed];
+  // the browser logs the stubbed 401 refusal itself
+  const bad = [...errors.filter((e) => !/status of 401/.test(e)), ...failed];
   console.log(bad.length ? `FAILED\n${bad.join('\n')}` : 'ok: the multiplayer socket');
   process.exit(bad.length ? 1 : 0);
 })();

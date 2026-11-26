@@ -12,7 +12,7 @@ Then open http://localhost:8080. No `.env` is needed; `compose.yaml` has default
 
 ## Game
 
-Hungry God Inc. lives in `app/game` (TypeScript, Vite, PixiJS). The app image builds it in a Node stage and serves the build at the site's root, `/`, after every other route. The title's top right corner logs in (the account page, `/account`, which returns to the game) and out; `/api/me` names who is logged in, `null` for nobody.
+Hungry God Inc. lives in `app/game` (TypeScript, Vite, PixiJS). The app image builds it in a Node stage and serves the build at the site's root, `/`, after every other route. The title's top right corner opens a popup to log in or register (it posts to the auth service's `/register` and `/login`) and logs out; `/api/me` names who is logged in, `null` for nobody.
 
 Multiplayer: logged in, the game opens the app's `/ws` socket; logged out, it plays alone. The hub relays a `{"type":"game","data":...}` message to every other player as `{"type":"game","from":<name>,"data":...}`, and its `state` messages list who is on; the game reads them as `window.__hg.net` (`app/game/src/app/net.ts`). No game content uses it yet.
 

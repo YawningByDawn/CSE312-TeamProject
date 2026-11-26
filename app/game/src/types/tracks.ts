@@ -259,7 +259,8 @@ export interface Net {
 /** The framework's login: who is logged in (null until it answers, or nobody), and the ways in and out. */
 export interface Account {
   name: string | null;
-  logIn(): void;
+  /** Register (then log in) or log in. Resolves null once signed in (the page reloads), else with the server's complaint; rejects when the server cannot be reached. */
+  signIn(mode: 'login' | 'register', username: string, password: string): Promise<string | null>;
   logOut(): void;
 }
 
