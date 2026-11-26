@@ -2689,6 +2689,7 @@ Owner: "it's merely that the hitbox is off 99%" · "or just the hitbox is bad". 
 - **The day passes by itself** (dawn sets `until` to the dusk) and nothing may be done in it but what §120 gives the host (`why.day`, a pending choice excepted). The pump plays the day's 650 ticks in `DAY_SECONDS` = 180 real seconds (3 minutes, the overhaul's day; the turn-based archive's 6 s is replaced), and a night's actions at their own pace, `NIGHT_SECONDS` = 5 for the whole night (a third of the night about 1.7 s), `playTps` in `src/content/clock.ts`. The day card shows at dusk.
 - **The day's card** is dusk's ledger with what the day's notes said (the day's noted events but the weather and the day's own line, the last five).
 - A save is the dawn's (a resumed run plays its day); the shape's version is 4 (§120).
+- **The hand rests by day.** The sim refuses every card action by day (`why.day`, 'Act at dusk'), so the hand (`src/ui/hud/cards.ts`) asks the sim's `check` of a discard whether a card may move (`handIdle`): when it may not, every plate rests dim and says the sim's reason, no card can be dragged or keyed, and its tip puts the reason second. The 'play a card' hint is a night's. At night a card dragged onto the discard zone is discarded and one dragged onto the field is played through the pay slab.
 
 ## 120. The god in a host: stats, the day as a possessed follower, marks, the fall (OVERHAUL, ov-core; owners o-272172 o-07b7db o-ffdf62 o-406fcc o-a62b94)
 

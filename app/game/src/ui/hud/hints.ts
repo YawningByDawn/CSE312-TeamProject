@@ -1,5 +1,6 @@
 import type { GameEvent, GameState, Intent, ViewModel } from '../../types';
 import { BALANCE } from '../../content/balance';
+import { isDay } from '../../content/clock';
 import { uiText } from '../../content/text';
 import { line } from '../panels/art';
 import { DIM, INK, Words, div, surface } from '../kit';
@@ -30,7 +31,7 @@ const followers = (s: Readonly<GameState>): number => Object.values(s.people).fi
 const HINTS: readonly Hint[] = [
   { id: 'whisper', at: ['c', -W / 2, -390], when: (s, d) => d <= 3 && followers(s) === 0, done: (_, e) => e.kind === 'whisper' || e.kind === 'turned' },
   { id: 'offer', at: ['c', -W / 2, -390], when: (s, d) => d <= 3 && followers(s) > 0, done: (_, e) => e.kind === 'routine' && e.routine === 'offer' },
-  { id: 'hand', at: ['bc', -W / 2, -248 - H], when: (s, d) => d <= 3 && s.god.hand.length > 0 && !s.god.deal, done: (_, e) => e.kind === 'play' },
+  { id: 'hand', at: ['bc', -W / 2, -248 - H], when: (s, d) => d <= 3 && s.god.hand.length > 0 && !s.god.deal && !isDay(s.tick), done: (_, e) => e.kind === 'play' },
   { id: 'goal', at: ['tr', -GOD_W - 16 - W, GOAL_Y], when: (_, d) => d >= 2 && d <= 3, done: () => false },
   { id: 'hunger', at: ['tr', -GOD_W - 16 - W, GOD_Y], when: (s) => s.god.hunger >= BALANCE.starvingAt, done: (_, e) => e.kind === 'eat' },
 ];

@@ -52,7 +52,7 @@ const LAYOUT = () => {
         s.god.hand = ['soothingMurmur', 'devour', 'crystalBloom', 'terrorize'];
         s.god.malice = 65;
       });
-      await shot('day', '.hg-card');
+      await shot('day', '.hg-rest');
       await page.hover('.hg-card:nth-child(2)');
       await shot('hand-hover', '.hg-card:hover', false);
       // its tip: two lines, then its details while Shift is held
@@ -60,32 +60,6 @@ const LAYOUT = () => {
       await page.hover('.hg-card:nth-child(3)');
       await shot('tip-details', '.hg-tip:not([hidden]) .hg-tdim', false);
       await page.keyboard.up('Shift');
-      // a card dragged over the field, then dropped back on the hand: nothing is played
-      const [cx, cy] = await page.$eval('.hg-card:nth-child(2)', (e) => { const r = e.getBoundingClientRect(); return [r.x + r.width / 2, r.y + r.height / 2]; });
-      await page.mouse.move(cx, cy);
-      await page.mouse.down();
-      await page.mouse.move(W * 0.45, H * 0.35, { steps: 8 });
-      await shot('hand-field', null, false);
-      // a drag owns the pointer: no tip over anything while it is held
-      if (await page.$('.hg-tip:not([hidden])')) failed.push(`${W}x${H} hand-field: a tip shows during the drag`);
-      await page.mouse.move(cx, cy, { steps: 8 });
-      await page.mouse.up();
-      await shot('hand-back', '.hg-card:nth-child(4)', false);
-      if (await page.$('.hgp-slab')) failed.push(`${W}x${H} hand-back: a card dropped on the hand was played`);
-      // dragged over the discard zone at the right edge it lights it; the drop there discards it
-      await page.mouse.move(cx, cy);
-      await page.mouse.down();
-      // at the zone's foot, so its word shows over the card (design px from the bottom-right margin, at the ui's scale)
-      const k = Math.min(W / 1600, H / 900);
-      await page.mouse.move(W - 24 - 95 * k, H - 24 - 176 * k, { steps: 8 });
-      await shot('hand-drag', null, false);
-      if (await page.$('.hg-tip:not([hidden])')) failed.push(`${W}x${H} hand-drag: a tip shows during the drag`);
-      await page.mouse.up();
-      await page.waitForFunction(() => window.__hg.state().god.hand.length === 3, null, { timeout: 5000 })
-        .catch(() => failed.push(`${W}x${H} hand-drag: the drop discarded nothing`));
-      await page.mouse.move(W / 2, 40);
-      await ev(() => { const s = window.__hg.state(); s.god.played = 1; s.god.nether = 3; window.__hg.ticks(1); });
-      await shot('hand-fee', '.hg-rest');
       await ev(() => {
         const s = window.__hg.state();
         s.god.played = 0;
@@ -119,6 +93,34 @@ const LAYOUT = () => {
         await page.waitForTimeout(300);
       }
       await shot('night', null);
+      // the hand is the god's at night: by day it rests, so its cards are dragged here
+      // a card dragged over the field, then dropped back on the hand: nothing is played
+      const [cx, cy] = await page.$eval('.hg-card:nth-child(2)', (e) => { const r = e.getBoundingClientRect(); return [r.x + r.width / 2, r.y + r.height / 2]; });
+      await page.mouse.move(cx, cy);
+      await page.mouse.down();
+      await page.mouse.move(W * 0.45, H * 0.35, { steps: 8 });
+      await shot('hand-field', null, false);
+      // a drag owns the pointer: no tip over anything while it is held
+      if (await page.$('.hg-tip:not([hidden])')) failed.push(`${W}x${H} hand-field: a tip shows during the drag`);
+      await page.mouse.move(cx, cy, { steps: 8 });
+      await page.mouse.up();
+      await shot('hand-back', '.hg-card:nth-child(4)', false);
+      if (await page.$('.hgp-slab')) failed.push(`${W}x${H} hand-back: a card dropped on the hand was played`);
+      // dragged over the discard zone at the right edge it lights it; the drop there discards it
+      await page.mouse.move(cx, cy);
+      await page.mouse.down();
+      // at the zone's foot, so its word shows over the card
+      await page.mouse.move(cx, cy - 60, { steps: 4 });
+      const zone = await page.locator('text=Discard').first().boundingBox();
+      await page.mouse.move(zone.x + zone.width / 2, zone.y + zone.height - 20, { steps: 8 });
+      await shot('hand-drag', null, false);
+      if (await page.$('.hg-tip:not([hidden])')) failed.push(`${W}x${H} hand-drag: a tip shows during the drag`);
+      await page.mouse.up();
+      await page.waitForFunction(() => window.__hg.state().god.hand.length === 3, null, { timeout: 5000 })
+        .catch(() => failed.push(`${W}x${H} hand-drag: the drop discarded nothing`));
+      await page.mouse.move(W / 2, 40);
+      await ev(() => { const s = window.__hg.state(); s.god.played = 1; s.god.nether = 3; window.__hg.ticks(1); });
+      await shot('hand-fee', '.hg-rest');
       await ev(() => { const s = window.__hg.state(); s.god.deal = ['veinSight', 'sabotage', 'marrowFeast']; s.god.rerolls = 1; window.__hg.ticks(1); });
       await shot('deal', '.hg-big', false);
       await page.keyboard.press('Escape');
