@@ -1,15 +1,13 @@
 import type { Container } from 'pixi.js';
-import type { Action, CardId, Check, CrystalId, DayPart, EventKind, Facility, GameEvent, GameState, GroupId, Hour, Person, PlaceId, Reason, Seed, StageId, Tick, UnitId, Visibility, Weekday } from './index';
+import type { Action, CardId, Check, CrystalId, DayPart, EventKind, GameEvent, GameState, Hour, PlaceId, Person, Reason, Seed, Tick, UnitId, Visibility, Weekday } from './index';
 
 // The seams of the cross-track contract (index.ts): the sim's interface, the view model, the tracks' interfaces, the save,
 // the atlases, the debug API and the profiler's report.
 
 // ---------- the sim (src/sim implements; deterministic from seed, tick and the action log) ----------
 
-export interface CreateOptions { stage?: StageId }
-
 export interface Sim {
-  create(seed: Seed, opts?: CreateOptions): GameState;
+  create(seed: Seed): GameState;
   /** One tick: advance the clock, run whatever the hour holds. Mutates `s`; returns what happened. */
   step(s: GameState): GameEvent[];
   /** Apply a player action now. Refused actions change nothing and return the reasons. */
@@ -18,7 +16,7 @@ export interface Sim {
   legal(s: Readonly<GameState>): Action[];
 }
 
-/** What a tie is: household, a debt seen from either end, a rivalry, love, or plain friendship. */
+/** What a tie is: kin, a debt seen from either end, a rivalry, love, or plain friendship. */
 export type TieKind = 'kin' | 'owes' | 'owed' | 'rival' | 'lover' | 'friend';
 
 /** The stats menu's numbers. */
@@ -42,8 +40,6 @@ export interface Query {
   tieKind(s: Readonly<GameState>, a: UnitId, b: UnitId): TieKind;
   hour(tick: Tick): Hour;
   day(tick: Tick): number;
-  /** The tick a held day ends on: the next dusk by day, the next dawn by dusk and night. */
-  dayEnd(tick: Tick): Tick;
   weekday(tick: Tick): Weekday;
   part(tick: Tick): DayPart;
   /** The sun's height, -1 at midnight to 1 at noon: the one light curve; daylight is its 0..1 above the horizon. */
@@ -54,9 +50,7 @@ export interface Query {
   stats(s: Readonly<GameState>): GodStats;
   /** The god's urges as their state words (sated / starving...). */
   urge(s: Readonly<GameState>, which: 'hunger' | 'malice'): string;
-  /** Unlocked facilities and why each locked one is locked. */
-  facilities(s: Readonly<GameState>): { facility: Facility; open: boolean; why: Reason[] }[];
-  /** The goal in plain words: what to do next to reach the watershed or the ending. */
+  /** The goal in plain words: what to do next to take the mine. */
   goal(s: Readonly<GameState>): Reason;
   /** What a stone counts for burnt into `card`'s miracle (its own nature half again), and the Hunger eating it takes away. */
   worth(s: Readonly<GameState>, crystal: CrystalId, card?: CardId): { burn: number; hunger: number };
@@ -64,22 +58,34 @@ export interface Query {
   storySlots(s: Readonly<GameState>): Record<string, string | number> | null;
   /** A whisper's odds on a person now, with each term that moves them (`odds.<term>`, `pct` signed points). */
   odds(s: Readonly<GameState>, unit: UnitId): { odds: number; why: Reason[] };
-  /** The groups a person is one of (household, crew, chapel flock, watch): each a `whisperGroup` target. */
-  groups(s: Readonly<GameState>, unit: UnitId): GroupId[];
-  /** The homes whose hearth is yours: each seeds its area's colour at dawn in the town (balance's GIFTS.hearth). */
-  hearths(s: Readonly<GameState>): PlaceId[];
+  /** The dawn's list: who the god may possess today (the living followers, the first miner always). */
+  hosts(s: Readonly<GameState>): UnitId[];
+  /** The people the host could mark from where they stand, nearest first. */
+  near(s: Readonly<GameState>): UnitId[];
+  /** Days a person's mark has left, counting today (0: not marked). */
+  markLeft(s: Readonly<GameState>, unit: UnitId): number;
+  /** The marks made today (`HOST.marksPerDay` at most). */
+  marksToday(s: Readonly<GameState>): number;
+  /** What the work key does the host now: mine the ore (its site index) or deliver at the drop; null: nothing in reach. */
+  workAt(s: Readonly<GameState>): { mine: number } | 'drop' | null;
+  /** The ore site stands (not mined today). */
+  oreStands(s: Readonly<GameState>, site: number): boolean;
+  /** Seconds the ore takes the host. */
+  oreSeconds(s: Readonly<GameState>, site: number): number;
+  /** The HP a person tops out at, from Strength and Endurance. */
+  maxHp(p: Readonly<Person>): number;
+  /** The dawn has come and the player has not yet picked whom to possess: the clock waits. */
+  picking(s: Readonly<GameState>): boolean;
 }
 
 // ---------- the view model (app builds once per frame; view and ui read it) ----------
 
-/** One continuous zoom over the one world: 0 a face close-up ... 1 the mine ... 2 the town ... 3 the valley. */
+/** One continuous zoom over the one world: 0 a face close-up ... 1 the mine. */
 export interface Camera { x: number; y: number; zoom: number }
 
-/** A scripted shot the view plays over the live world (opening, watershed, ending) or a take (a rare find). */
+/** A scripted shot the view plays over the live world (the opening) or a take (a rare find). */
 export type Film =
   | { kind: 'opening'; t: number }
-  | { kind: 'watershed'; t: number }
-  | { kind: 'ending'; t: number }
   | { kind: 'take'; event: GameEvent; t: number };
 
 export type Focus = { unit: UnitId } | { place: PlaceId } | { crystal: CrystalId } | null;
@@ -96,15 +102,19 @@ export interface ViewModel {
   state: Readonly<GameState>;
   /** 0..1 between the last tick and the next: the view interpolates walks with it. */
   alpha: number;
-  /** Render seconds since boot: animation frames are picked from it (frozen while paused). */
+  /** Render seconds since boot: animation frames and the interface's timers are picked from it. */
   time: number;
-  /** Real seconds of the last frame, paused or not: the interface's timers count it. */
+  /** Real seconds of the last frame: the interface's timers count it. */
   dt: number;
   camera: Camera;
+  /**
+   * The host's body as shown (mine units): where the last tick's step and the next lie `alpha` of the way between, how far
+   * it has walked, and whether the last tick moved it. `on` while a standing host has a body; the rest is stale off it.
+   */
+  hostAt: { on: boolean; x: number; y: number; walked: number; moving: boolean };
   focus: Focus;
   hover: Focus;
   film: Film | null;
-  paused: boolean;
   menu: Menu;
   /** Events since the last frame, for effects and notes; app clears it after the frame. */
   fresh: readonly GameEvent[];
@@ -148,9 +158,6 @@ export interface Layer {
 export type Intent =
   | { kind: 'act'; action: Action }
   | { kind: 'focus'; focus: Focus }
-  | { kind: 'pause'; paused: boolean }
-  /** The clock runs at once to `Query.dayEnd`, stopping where anything holds it. */
-  | { kind: 'endDay' }
   | { kind: 'skipFilm' }
   | { kind: 'menu'; menu: Menu }
   | { kind: 'newRun'; seed?: Seed }
@@ -161,8 +168,8 @@ export type Intent =
 
 /** What a key does: each is bound to the keys (`KeyboardEvent.key`, lower case) in `Settings.keys`. */
 export type Bind =
-  | 'up' | 'down' | 'left' | 'right' | 'zoomIn' | 'zoomOut' | 'pause' | 'confirm' | 'back' | 'stats' | 'people' | 'again'
-  | 'details' | 'pick1' | 'pick2' | 'pick3' | 'pick4' | 'pick5' | 'profiler';
+  | 'up' | 'down' | 'left' | 'right' | 'zoomIn' | 'zoomOut' | 'skip' | 'confirm' | 'back' | 'stats' | 'people' | 'again' | 'mark'
+  | 'details' | 'work' | 'pick1' | 'pick2' | 'pick3' | 'pick4' | 'pick5' | 'profiler';
 
 /**
  * Volumes 0..1, the interface's size, whether the hints teach, the hints already taught (kept across runs), and the keys

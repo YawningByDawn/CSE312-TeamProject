@@ -1,14 +1,15 @@
 import { reloadFlipped } from '../content/flags';
 import { bound } from '../content/keys';
+import { centreOn } from '../view/camera';
 import type { Bind, Camera, View } from '../types';
 import type { Pump } from './pump';
 
 // The player's hands: the pointer picks by the view's own hit areas, drag pans 1:1, wheel, pinch and keys zoom toward
-// a goal the camera eases to, and the keys bound to the stats, the characters, back (settings) and pause. The canvas
+// a goal the camera eases to, and the keys bound to the stats, the characters, back (settings) and the film skip. The canvas
 // gets the pointer only where the ui lets it through (#ui is pointer-events: none outside its panels).
 
 const ZOOM_MIN = 0;
-const ZOOM_MAX = 3;
+const ZOOM_MAX = 1.15;
 /** Zoom per wheel notch (100 px of deltaY) and per second of a held zoom key. */
 const ZOOM_NOTCH = 0.25;
 const ZOOM_KEY = 1.2;
@@ -18,7 +19,9 @@ const PAN_KEY = 900;
 const EASE = 0.2;
 /** A press that moves less than this is a click, not a drag. */
 const CLICK_PX = 5;
-/** The pause key held this long skips a film. */
+/** The zoom the camera goes in to on a day's host: a person about 75 px tall. */
+const HOST_ZOOM = 0.1;
+/** The skip key held this long skips a film. */
 const SKIP_HOLD_S = 1;
 
 /** The held binds' pan (x, y) and zoom. */
@@ -37,6 +40,8 @@ export class Input {
   private pinchD = 0;
   private readonly held = new Set<Bind>();
   private spaceHeld = -1;
+  /** Whom the camera has gone in to follow: the zoom is set once as a day's host begins, the player's own after. */
+  private hosted: string | null = null;
   /** A film held the camera at the last update. */
   private filming = false;
   private w = 1;
@@ -54,7 +59,7 @@ export class Input {
     }, { passive: false });
     window.addEventListener('keydown', (e) => this.key(e, true));
     window.addEventListener('keyup', (e) => this.key(e, false));
-    window.addEventListener('blur', () => this.held.clear());
+    window.addEventListener('blur', () => (this.held.clear(), this.steer()));
   }
 
   resize(w: number, h: number): void {
@@ -69,7 +74,7 @@ export class Input {
     this.anchor.on = false;
   }
 
-  /** Each frame before the pump's: held keys, the pause key's hold, the camera easing to its goal. */
+  /** Each frame before the pump's: held keys, the skip key's hold, the camera easing to its goal. */
   update(dt: number): void {
     const vm = this.pump.vm;
     if (this.spaceHeld >= 0 && vm.film && (this.spaceHeld += dt) >= SKIP_HOLD_S) {
@@ -88,6 +93,18 @@ export class Input {
       const [x, y, z] = MOVES[b]!;
       dx += x, dy += y, dz += z;
     }
+    const host = vm.hostAt;
+    if (host.on) {
+      // the host's day: the move keys steer the host (not the camera), which follows them
+      if (this.hosted !== vm.state.host) {
+        this.hosted = vm.state.host;
+        this.goal.zoom = HOST_ZOOM;
+        this.anchor.on = false;
+        this.steer();
+      }
+      centreOn(host.x, host.y, this.goal);
+      dx = dy = 0;
+    } else this.hosted = null;
     const s = this.view.scale(this.goal.zoom);
     this.goal.x += (dx * PAN_KEY * dt) / s;
     this.goal.y += (dy * PAN_KEY * dt) / s;
@@ -107,6 +124,7 @@ export class Input {
     } else {
       cam.x += (this.goal.x - cam.x) * k;
       cam.y += (this.goal.y - cam.y) * k;
+      cam.zoom += (this.goal.zoom - cam.zoom) * k;
     }
   }
 
@@ -149,9 +167,20 @@ export class Input {
 
   private up(e: PointerEvent): void {
     this.pointers.delete(e.pointerId);
-    if (this.press && !this.press.moved) this.pump.send({ kind: 'focus', focus: this.view.pick(e.offsetX, e.offsetY, this.pump.vm) });
+    const vm = this.pump.vm;
+    if (this.press && !this.press.moved) {
+      if (vm.hostAt.on && !vm.film) this.swing(e.offsetX, e.offsetY);
+      else this.pump.send({ kind: 'focus', focus: this.view.pick(e.offsetX, e.offsetY, vm) });
+    }
     this.press = null;
     this.pinchD = 0;
+  }
+
+  /** A click on a day's host's mine: they swing toward it (from their feet on the screen). */
+  private swing(sx: number, sy: number): void {
+    const cam = this.pump.vm.camera, at = { x: 0, y: 0 }, h = this.pump.vm.hostAt, k = this.view.scale(cam.zoom);
+    centreOn(h.x, h.y, at);
+    this.pump.act({ type: 'swing', dx: sx - (this.w / 2 + (at.x - cam.x) * k), dy: sy - (this.h / 2 + (at.y - cam.y) * k) });
   }
 
   private spread(): number {
@@ -164,6 +193,16 @@ export class Input {
     return a && b ? (a[axis] + b[axis]) / 2 : 0;
   }
 
+  /** The held move keys as the host's heading, sent to the sim when it holds another. */
+  private steer(): void {
+    const vm = this.pump.vm, body = vm.state.body;
+    if (!vm.hostAt.on || !body) return;
+    let dx = 0, dy = 0;
+    for (const b of this.held) dx += MOVES[b]![0], dy += MOVES[b]![1];
+    const [hx, hy] = [Math.sign(dx) as -1 | 0 | 1, Math.sign(dy) as -1 | 0 | 1];
+    if (body.dx !== hx || body.dy !== hy) this.pump.act({ type: 'walk', dx: hx, dy: hy });
+  }
+
   private key(e: KeyboardEvent, down: boolean): void {
     if (e.ctrlKey || e.metaKey || e.altKey || (e.target as Element).closest?.('input, textarea, select')) return;
     const vm = this.pump.vm;
@@ -171,11 +210,13 @@ export class Input {
     const moves = MOVE_BINDS.filter(on);
     if (!down) {
       for (const b of moves) this.held.delete(b);
-      if (on('pause')) this.spaceHeld = -1;
+      this.steer();
+      if (on('skip')) this.spaceHeld = -1;
       return;
     }
     if (moves.length > 0) {
       if (!vm.title && !vm.film) for (const b of moves) this.held.add(b);
+      this.steer();
       return;
     }
     if (e.repeat) return;
@@ -185,10 +226,13 @@ export class Input {
       reloadFlipped('prof');
     } else if (on('back')) {
       this.pump.send(vm.film ? { kind: 'skipFilm' } : { kind: 'menu', menu: vm.menu ? null : 'settings' });
-    } else if (on('pause')) {
+    } else if (on('skip') && vm.film) {
       e.preventDefault();
-      if (vm.film) this.spaceHeld = 0;
-      else if (!vm.title) this.pump.send({ kind: 'pause', paused: !vm.paused });
+      this.spaceHeld = 0;
+    } else if (on('mark') && !vm.title && !vm.film) {
+      this.pump.markNearest();
+    } else if (on('work') && !vm.title && !vm.film) {
+      this.pump.act({ type: 'work' });
     } else if ((on('stats') || on('people')) && !vm.title && !vm.film) {
       const menu = on('stats') ? 'stats' : 'people';
       this.pump.send({ kind: 'menu', menu: vm.menu === menu ? null : menu });

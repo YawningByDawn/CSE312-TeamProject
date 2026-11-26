@@ -3,7 +3,6 @@ import type { Layer, PlaceId, Query, ViewModel } from '../types';
 import { DRESS, type MineFlame, type MineLight } from '../content/map';
 import { layerRoot, pit } from './quad';
 import { AREAS } from '../content/world';
-import { below } from './camera';
 import { pool, type Atlas } from './atlas';
 import { StateSeen } from './moved';
 import { hash, hex } from './tables';
@@ -24,7 +23,7 @@ const DYN_K = 0.42, GOD_BASE = 0.45, WARM = new Set(['torch', 'candle', 'ember']
 /** A flame's tongue: TONGUE_FRAMES frames a TONGUE_LOOP s loop; the cell holds a third of its light (three stacked). */
 const TONGUE_FRAMES = 12, TONGUE_LOOP = 1.2, TONGUE_STACK = 3;
 const GRAY = 0xb8bec2, GLINT = 0xeadfff, GLINT_GRAY = 0xc9c4d6;
-const MINE_AREAS = Object.keys(AREAS).filter((a) => AREAS[a]!.region === 'mine');
+const MINE_AREAS = Object.keys(AREAS);
 
 const noise = (t: number, seed: number): number => {
   const i = Math.floor(t), f = t - i, a = hash(i, 7, seed);
@@ -55,7 +54,7 @@ export class Lights implements Layer {
   private readonly eye: [Sprite, Sprite];
   /** each mine area's visibility as 2 active, 1 sensed, 0 void, as last placed */
   private readonly vis = new Map<PlaceId, number>();
-  private shown = { step: -1, below: -1, night: -1, lit: 0 };
+  private shown = { step: -1, night: -1, lit: 0 };
   private readonly mine = pit();
   /** the tongue's frames by tone (0 the Flame's, 1 a fouled shrine's violet) */
   private readonly tongue: Texture[][];
@@ -99,14 +98,7 @@ export class Lights implements Layer {
   }
 
   frame(vm: ViewModel): boolean {
-    const b = below(vm.camera.zoom), sh = this.shown;
-    // on the surface the mine's light is shut: nothing to read
-    if (b === 0) {
-      if (sh.below === 0) return false;
-      sh.below = 0;
-      this.root.visible = false;
-      return true;
-    }
+    const sh = this.shown;
     const step = Math.floor(vm.time * STEP_HZ), night = 1 - this.q.daylight(this.q.hour(vm.state.tick));
     let visMoved = false;
     if (this.seen.moved(vm)) {
@@ -115,14 +107,12 @@ export class Lights implements Layer {
         if (this.vis.get(area) !== n) this.vis.set(area, n), (visMoved = true);
       }
     }
-    if (b === sh.below && step === sh.step && !visMoved && Math.abs(night - sh.night) < 1 / 64) return false;
-    const was = sh.below, lit = sh.lit;
-    Object.assign(sh, { below: b, step, night });
-    this.root.visible = true;
-    this.root.alpha = b;
+    if (step === sh.step && !visMoved && Math.abs(night - sh.night) < 1 / 64) return false;
+    const lit = sh.lit;
+    Object.assign(sh, { step, night });
     // a step where nothing shows, after one where nothing showed, changes nothing on screen
     sh.lit = this.place(step / STEP_HZ, night, vm);
-    return b !== was || sh.lit > 0 || lit > 0;
+    return sh.lit > 0 || lit > 0;
   }
 
   /** Place every sprite for clock `t`; how many show. */

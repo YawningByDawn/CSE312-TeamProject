@@ -1,9 +1,7 @@
 /**
- * Where the one world graph lies (#50): every area, place and home lot a point, every step of a route a line, every
- * place its standing spots. The data is map.json; each region has its own frame. The town is TOWN.w by TOWN.h town
- * units; the mine is MINE.w by MINE.h mine units, nested in the pit head's floor at (MINE.x, MINE.y) at 1/MINE.per.
- * A place's point and spots are in its region's frame. The lift's ride (lift to minehead) has no line: it runs down
- * the shaft from SHAFT.town to SHAFT.mine.
+ * Where the one world graph lies (#50): every area and place a point, every step of a route a line, every place its
+ * standing spots. The data is map.json. The world frame is WORLD.w by WORLD.h units; the mine is MINE.w by MINE.h mine
+ * units, nested in it at (MINE.x, MINE.y) at 1/MINE.per. A place's point and spots are in mine units.
  */
 import raw from './map.json';
 import rawDress from './dress.json';
@@ -15,22 +13,15 @@ export type Line = readonly number[];
 export type SpotList = readonly number[];
 
 interface MapData {
-  town: { w: number; h: number };
   mine: { x: number; y: number; w: number; h: number; per: number };
-  shaft: { mine: [number, number]; town: [number, number] };
-  trees: [number, number][];
   at: Record<PlaceId, [number, number]>;
   ways: Record<string, Line>;
   spots: Record<PlaceId, Partial<Record<Activity | '*', SpotList>>>;
 }
 const MAP = raw as unknown as MapData;
 
-export const TOWN = MAP.town;
 export const MINE_FRAME = MAP.mine;
-export const SHAFT = MAP.shaft;
-/** The town's cap-trees' feet (town units), in the order assets/town bakes them. */
-export const TREES: readonly (readonly [number, number])[] = MAP.trees;
-/** Each area's, place's and home lot's point (a building's doorstep, an area's heart). */
+/** Each area's and place's point (an area's heart). */
 export const AT: Readonly<Record<PlaceId, readonly [number, number]>> = MAP.at;
 
 /** map.json stores each way one way (`a>b`); both directions are read from here. */
@@ -71,10 +62,12 @@ export const DRESS = rawDress as unknown as {
 
 /**
  * Where people stand at a place for what they do: `doing`'s own spots (a face to dig, a cot to sleep) or the place's
- * standing room (`*`). A person's stable spot number wraps over the list. Indoor town places and homes have none:
- * their people are inside.
+ * standing room (`*`). A person's stable spot number wraps over the list.
  */
 export const spotsOf = (place: PlaceId, doing: Activity): SpotList | undefined => {
   const s = MAP.spots[place];
   return s && (s[doing] ?? s['*']);
 };
+
+/** The places with spots of their own to dig at, with those spots. */
+export const digSpots = (): [PlaceId, SpotList][] => Object.entries(MAP.spots).flatMap(([place, s]) => (s.dig ? [[place, s.dig] as [PlaceId, SpotList]] : []));

@@ -1,22 +1,23 @@
 // src/ui/panels, what opens over the rest layout (inventory #1, 5, 7, 47, 94, 115-123): the title, the defeat and the
-// ending (front), what the clock waits on: the starting gift, a blessing, a story's choice, a cut (choice), a building, a person, the grave and the pay slab
+// ending (front), what the clock waits on: the starting gift, a blessing, a story's choice, (choice), a person, the grave and the pay slab
 // (grave), the dusk's ledger; art.ts the baked sheets they show (assets/ui, cardart, crystals, crystalmarks, portraits,
-// interiors, front, title, defeat). Reads the view model, the sim's Query and card helpers, content's tables, rooms
+// front, title, defeat). Reads the view model, the sim's Query and card helpers, content's tables
 // and words, the framework's login; sends intents.
 import type { Account, Action, CardId, Focus, Intent, Query, ViewModel } from '../../types';
 import type { Anchors, MountPanels, Part, Where } from '../index';
 import { div } from '../kit';
 import { panelCss } from './art';
-import { Building } from './building';
 import { Choice, Bonus } from './choice';
 import { Dusk } from './dusk';
 import { Defeat, Ending, Title } from './front';
 import { Grave, Pay } from './grave';
+import { Host } from './host';
 import { Person } from './person';
 
 // Each panel says what it shows now as one key, and is built again only when that key changes; its key carries `ctx.rev`, which moves when the
 // state can have moved (fresh events, a whole action point, the hour) or a panel's own choice moved. The first open panel
-// in the list below owns the keys it answers to; the rest fall through to app's input.
+// in the list below is the only one shown and owns the keys it answers to; the rest wait beneath it and fall through to
+// app's input. A menu and a focus close each other (app's pump), and the dusk card yields to either (dusk.ts).
 
 export interface Ctx {
   send(i: Intent): void;
@@ -60,9 +61,8 @@ export const mountPanels = (account: Account | null): MountPanels => (at, send, 
   const pay = new Pay(ctx);
   // modal first: the first open one owns the keys
   const list: Panel[] = [
-    new Title(ctx), new Defeat(ctx), new Ending(ctx), new Bonus(ctx), new Choice(ctx), pay, new Dusk(ctx),
-    // the person slab before the building: a Move picks a place and the slab takes the pick back before a building opens
-    new Person(ctx), new Grave(ctx), new Building(ctx),
+    new Title(ctx), new Defeat(ctx), new Ending(ctx), new Bonus(ctx), new Choice(ctx), new Host(ctx), pay, new Dusk(ctx),
+    new Person(ctx), new Grave(ctx),
   ];
   // the first in the list stands over the rest, as it owns the keys
   const roots = list.map((_, i) => {
@@ -73,18 +73,25 @@ export const mountPanels = (account: Account | null): MountPanels => (at, send, 
   const keys: (string | null)[] = list.map(() => null);
   let vmNow: ViewModel | null = null;
 
-  /** Each panel's key against `vm` now, built again where it moved; the first open one's index. A sent intent changes
-   * the state at once, so a key syncs before it picks the panel that answers, as a frame does before it ticks. */
+  /** Each panel's key against `vm` now; only the first open one is built, the rest wait (their key is null) until it
+   * closes, so two never overlap. Built again where it moved; the first open one's index. A sent intent changes the state
+   * at once, so a key syncs before it picks the panel that answers, as a frame does before it ticks. */
   const sync = (vm: ViewModel): number => {
+    const now = list.map((p) => p.key(vm));
+    const first = now.findIndex((k) => k !== null);
     list.forEach((p, i) => {
-      const k = p.key(vm);
+      const k = i === first ? now[i]! : null;
       if (k === keys[i]) return;
       keys[i] = k;
       const r = roots[i]!;
-      r.replaceChildren();
-      if (k !== null) p.build(r, vm);
+      if (k === null) return r.replaceChildren();
+      // built aside: a panel that came out as it stands is left alone (no new nodes to lose the hover, a press or an
+      // animation); one with a tick holds on to the nodes it built, so it is always put in
+      const next = document.createElement('div');
+      p.build(next, vm);
+      if (p.tick || next.innerHTML !== r.innerHTML) r.replaceChildren(...next.childNodes);
     });
-    return keys.findIndex((k) => k !== null);
+    return first;
   };
 
   window.addEventListener('keydown', (e) => {

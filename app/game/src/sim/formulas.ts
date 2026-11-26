@@ -2,7 +2,10 @@
  * The spec's formulas, implemented exactly (docs/spec.md, DECISIONS §3).
  * Every function here is pure and unit-tested against the spec's numbers.
  */
-import type { Standing, StageId } from '../types';
+import { COMBAT } from '../content/combat';
+import { MINING, WALK } from '../content/mine';
+import { STATS } from '../content/stats';
+import type { Standing } from '../types';
 
 /** Standing → tier T (Influence/Direct/miracle cost multiplier). */
 export const TIER: Readonly<Record<Standing, number>> = {
@@ -13,29 +16,8 @@ export const TIER: Readonly<Record<Standing, number>> = {
   god: 410,
 };
 
-/** Stage → miracle tier (Whisper 1, Shade 4.5). */
-export const STAGE_TIER: Readonly<Record<StageId, number>> = {
-  whisper: 1,
-  shade: 4.5,
-};
-
-/** Open cards a draw deals in each stage: one more per major rank (DECISIONS §43, fourth amendment). */
-export const STAGE_DRAW: Readonly<Record<StageId, number>> = {
-  whisper: 3,
-  shade: 4,
-};
-
-/** Highest standing each stage may influence. */
-export const STAGE_MAX_STANDING: Readonly<Record<StageId, Standing>> = {
-  whisper: 'mortal',
-  shade: 'elite',
-};
-
-export const STANDING_ORDER: readonly Standing[] = ['mortal', 'elite', 'blessed', 'demigod', 'god'];
-
-export function standingRank(s: Standing): number {
-  return STANDING_ORDER.indexOf(s);
-}
+/** Open cards a draw deals (DECISIONS §43). */
+export const DRAW_SLOTS = 3;
 
 /**
  * Devotion value: V(D) = 5x + 25(x − 0.4)³ + 1.6, x = D/100.
@@ -111,11 +93,6 @@ export function directCost(size: number, tier: number): number {
   return size ** 0.85 * tier;
 }
 
-/** Miracle cost = base (2–6 crystals) × stage tier T, rounded. */
-export function miracleCost(base: number, tier: number): number {
-  return Math.round(base * tier);
-}
-
 /** Miracle power from Faith: 1 + log10(1 + Faith)/2. */
 export function miraclePower(faithValue: number): number {
   return 1 + Math.log10(1 + Math.max(0, faithValue)) / 2;
@@ -182,6 +159,32 @@ export function conversionTerms(i: OddsInputs): {
     bonus: i.bonus,
   };
 }
+
+/** Max HP: a base, Strength and Endurance (content's STATS). */
+export const maxHp = (st: { strength: number; endurance: number }): number => STATS.hpBase + STATS.hpPerStrength * st.strength + STATS.hpPerEndurance * st.endurance;
+
+/** Seconds an ore of `tier` (1..3) takes a body: its table seconds over the speed term, Strength and Dexterity each half of it (10 and 10: the table's). */
+export const miningSeconds = (tier: number, st: { strength: number; dexterity: number }): number =>
+  MINING.seconds[tier - 1]! / ((0.5 * st.strength + 0.5 * st.dexterity) / MINING.norm);
+
+/** Units a second a body walks: the table's at Dexterity 10, a share more or less for each point. */
+export const walkSpeed = (dexterity: number): number => WALK.speed * (1 + WALK.perDexterity * (dexterity - 10));
+
+/** Mining rarity, a person's own value from Devotion: 1 at none, x1.5 at 100. */
+export const miningRarity = (devotion: number): number => 1 + (MINING.rarityPerDevotion * devotion) / 100;
+
+/** The chance of each grade (dull, clear, bright, blazing) from an ore of `tier`: the table's non-dull odds times `rarity`, dull the rest; sums to 1. */
+export function oreOdds(tier: number, rarity: number): number[] {
+  const up = MINING.odds[tier - 1]!.map((p) => (p * rarity) / 100);
+  return [1 - up.reduce((a, b) => a + b, 0), ...up];
+}
+
+/** The host's blow: the table's damage for each point of Strength. */
+export const swingDamage = (strength: number): number => COMBAT.host.perStrength * strength;
+
+/** A skeleton's Hit Points and a blow's damage on `day` (1 from the first dawn): the table's, plus its step for each day since the first. */
+export const mobHp = (day: number): number => COMBAT.skeleton.hp + COMBAT.skeleton.hpPerDay * (day - 1);
+export const mobDamage = (day: number): number => COMBAT.skeleton.damage + COMBAT.skeleton.damagePerDay * (day - 1);
 
 /** Round to one decimal (Nether is displayed and charged at 0.1 precision). */
 export function round1(v: number): number {

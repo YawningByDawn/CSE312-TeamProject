@@ -13,21 +13,19 @@ import { FEED_WORDS } from './words/feed';
 import { GEM_WORDS } from './words/gems';
 import { HUD_WORDS } from './words/hud';
 import { PANEL_WORDS } from './words/panels';
-import { ITEM_WORDS } from './words/items';
 import { NOTE_WORDS } from './words/notes';
 import { PERSON_WORDS } from './words/people';
 import { PLACE_WORDS } from './words/places';
 import { REASON_WORDS } from './words/reasons';
 import { ROLE_WORDS } from './words/roles';
-import { STAGE_WORDS } from './words/stages';
 import { STORY_WORDS } from './words/stories';
 import { THREAT_WORDS } from './words/threats';
 
 export type Slots = Readonly<Record<string, string | number>>;
 
 const WORDS: Readonly<Record<string, string>> = {
-  ...PLACE_WORDS, ...ROLE_WORDS, ...PERSON_WORDS, ...CARD_WORDS, ...ITEM_WORDS, ...GEM_WORDS, ...THREAT_WORDS,
-  ...DISCOVERY_WORDS, ...STAGE_WORDS, ...CALENDAR_WORDS, ...NOTE_WORDS, ...STORY_WORDS, ...EVENT_WORDS, ...AFTERMATH_WORDS, ...FEED_WORDS,
+  ...PLACE_WORDS, ...ROLE_WORDS, ...PERSON_WORDS, ...CARD_WORDS, ...GEM_WORDS, ...THREAT_WORDS,
+  ...DISCOVERY_WORDS, ...CALENDAR_WORDS, ...NOTE_WORDS, ...STORY_WORDS, ...EVENT_WORDS, ...AFTERMATH_WORDS, ...FEED_WORDS,
   ...REASON_WORDS, ...HUD_WORDS, ...PANEL_WORDS,
 };
 

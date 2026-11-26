@@ -2,22 +2,21 @@
  * The cards (spec §15.4, DECISIONS §43; inventory #32): the deal at dusk (and the opening's bonus deal), take one or
  * none, discard, reroll; what every miracle and act of evil does; followers' own acts and Malice breaking loose.
  */
-import { BALANCE, PROFANE, TOWN } from '../content/balance';
+import { BALANCE, PROFANE } from '../content/balance';
 import { uiText } from '../content/text';
 import { CARD, CARDS, type CardArea, type CardDef } from '../content/cards';
 import { AT, DAY_TICKS, dayOf, nextAt } from '../content/clock';
 import { EFFECT } from '../content/crystals';
 import { AREAS } from '../content/world';
 import {
-  addEffect, addHeat, addHunger, addMalice, addNether, area, door, ev, everyone, followers, mint, gainDevotion, gainIchor,
-  flockOf, gainXp, handMax, heatAll, here, loseDevotion, loseIchor, peopleIn, remove, setHold, standingOf, stranger, tearWrit, untilShiftEnd, whereNow, type Ctx, type Flock,
+  addEffect, addHeat, addHunger, addMalice, addNether, area, ev, everyone, followers, gainDevotion, gainIchor,
+  flockOf, gainXp, handMax, heatAll, here, loseDevotion, loseIchor, peopleIn, remove, setHold, standingOf, stranger, untilShiftEnd, whereNow, type Ctx, type Flock,
 } from './core';
 import { bonus } from './bonus';
 import { burnWorth, oddCount } from './crystals';
-import { STAGE_DRAW, STAGE_TIER, STAGE_MAX_STANDING, devotionValue, miracleCost, miraclePower, faith, round1, standingRank } from './formulas';
+import { DRAW_SLOTS, devotionValue, miraclePower, faith, round1 } from './formulas';
 import { hold, inReach, placeInReach, visibility, whisper, whisperOdds } from './influence';
 import { chance, pick, weightedPick } from './rng';
-import { bluntAll } from './threats';
 import type { CardId, CardKind, GameState, Person, PlaceId, Reason, UnitId } from '../types';
 
 const IDS = Object.keys(CARDS) as CardId[];
@@ -27,8 +26,8 @@ const def = (id: CardId): CardDef => CARDS[id]!;
 export const cardFee = (s: Readonly<GameState>): number => s.god.played * BALANCE.cardExtraFee;
 /** An open slot of a deal is an act of evil with this chance: 0.3 at Malice 0, 0.7 at 100. */
 export const evilShare = (s: Readonly<GameState>): number => Math.min(1, Math.max(0, BALANCE.offerEvilBase + BALANCE.offerEvilPerMalice * s.god.malice));
-/** A miracle's price in crystal worth: base × the stage's tier, rounded (spec). */
-export const cardCost = (s: Readonly<GameState>, id: CardId): number => miracleCost(def(id).cost ?? 0, STAGE_TIER[s.stage]);
+/** A miracle's price in crystal worth (spec). */
+export const cardCost = (id: CardId): number => def(id).cost ?? 0;
 
 /** The Malice an act of evil draws its strength from: 1, then 1.15, 1.3, 1.5 as it rises. */
 export function evilBonus(malice: number): number {
@@ -55,14 +54,12 @@ function areaOk(s: Readonly<GameState>, fl: Flock, a: PlaceId, kind: CardArea | 
   if (visibility(s, a) === 'void') return false;
   const d = AREAS[a]!;
   switch (kind) {
-    case 'face': return d.region === 'mine' && d.vein > 0;
+    case 'face': return d.vein > 0;
     case 'seen': return !d.anchored && hold(s, a) < 100;
     case 'followers': return fl.at.has(a);
     case 'people': return placeInReach(s, fl, a) && peopleIn(s, a, stranger).length > 0;
     case 'shrine': return d.flame && !s.places[a]!.desecrated;
     case 'home': return everyone(s).some((p) => here(p) && stranger(p) && area(p.home) === a && AREAS[area(p.work)]!.vein > 0);
-    // A crowd: enough strangers, as the day fills or empties the place (a market, a procession, the rain).
-    case 'groups': return peopleIn(s, a, stranger).length * door(s, 'crowd', a) >= TOWN.crowdAt;
     default: return true;
   }
 }
@@ -73,7 +70,6 @@ function unitOk(s: Readonly<GameState>, fl: Flock, p: Person, id: CardId): boole
   if (d.target === 'follower') return p.follower;
   if (id === 'devour' && p.follower) return true;
   if (p.follower) return false;
-  if (d.elite) return standingOf(p) === 'elite' && standingRank('elite') <= standingRank(STAGE_MAX_STANDING[s.stage]) && placeInReach(s, fl, whereNow(p, s.tick));
   return standingOf(p) === 'mortal' && inReach(s, fl, p);
 }
 
@@ -99,20 +95,17 @@ function playable(s: Readonly<GameState>, fl: Flock, id: CardId): boolean {
   return false;
 }
 
-/** In the pool tonight: rank, stage, a shrine left to foul, an announced move to answer. */
+/** In the pool tonight: rank, a shrine left to foul. */
 export function inPool(s: Readonly<GameState>, id: CardId): boolean {
-  const d = def(id);
-  if (d.minLevel > s.god.level || (d.shadeOnly && s.stage !== 'shade')) return false;
-  if (id === 'desecrate' && !Object.keys(AREAS).some((a) => AREAS[a]!.flame && !s.places[a]!.desecrated)) return false;
-  if (d.answers && !s.threats.some((t) => t.faction === d.answers)) return false;
-  return true;
+  if (def(id).minLevel > s.god.level) return false;
+  return id !== 'desecrate' || Object.keys(AREAS).some((a) => AREAS[a]!.flame && !s.places[a]!.desecrated);
 }
 
 
 /**
- * A deal: the acts that answer an announced move lead; then the sure miracles and acts of evil the set stones and
- * blessings add, and the stage's open slots (evil with `evilShare`). Never a card held, never twice; a card with a
- * target now before one without; on a reroll, not the cards just thrown back while others remain.
+ * A deal: the sure miracles and acts of evil the set stones and blessings add, and the open slots (evil with
+ * `evilShare`). Never a card held, never twice; a card with a target now before one without; on a reroll, not the
+ * cards just thrown back while others remain.
  */
 export function dealCards(s: GameState, thrown: readonly CardId[] = []): CardId[] {
   const g = s.god;
@@ -122,7 +115,6 @@ export function dealCards(s: GameState, thrown: readonly CardId[] = []): CardId[
   // asked once a card a deal: nothing a pick does changes who or what a card could take
   const can = new Map<CardId, boolean>();
   const aimed = (id: CardId): boolean => can.get(id) ?? (can.set(id, playable(s, fl, id)), can.get(id)!);
-  for (const id of IDS) if (def(id).answers && free(id)) out.push(id);
   const pickOf = (kind: CardKind): CardId | undefined => {
     const pool = IDS.filter((id) => def(id).kind === kind && free(id));
     for (const tier of [pool.filter((id) => aimed(id) && !thrown.includes(id)), pool.filter((id) => !thrown.includes(id)), pool]) {
@@ -133,8 +125,7 @@ export function dealCards(s: GameState, thrown: readonly CardId[] = []): CardId[
   const kinds: CardKind[] = [];
   for (let i = 0; i < bonus(s, 'dealMiracles'); i++) kinds.push('miracle');
   for (let i = 0; i < bonus(s, 'dealEvils'); i++) kinds.push('evil');
-  const slots = STAGE_DRAW[s.stage];
-  for (let i = 0; i < slots; i++) kinds.push(chance(s.rng, evilShare(s)) ? 'evil' : 'miracle');
+  for (let i = 0; i < DRAW_SLOTS; i++) kinds.push(chance(s.rng, evilShare(s)) ? 'evil' : 'miracle');
   const size = kinds.length;
   for (const kind of kinds) {
     if (out.length >= size) break;
@@ -189,7 +180,7 @@ export function reroll(c: Ctx): void {
 export function payment(s: Readonly<GameState>, id: CardId, pay: readonly string[]): { worth: number; ichor: number | null } {
   let worth = 0;
   for (const x of pay) worth += burnWorth(s.crystals[x]!, def(id).nature ?? null);
-  const short = cardCost(s, id) - worth;
+  const short = cardCost(id) - worth;
   if (short <= 0) return { worth, ichor: 0 };
   if (oddCount(s, 'bloodPrice') === 0) return { worth, ichor: null };
   const n = Math.ceil(short / EFFECT.bloodPriceValuePerIchor);
@@ -202,7 +193,7 @@ export function playWhy(s: Readonly<GameState>, fl: Flock, id: CardId, pay: read
   if (d.target === 'none' ? target !== undefined : target === undefined || !targetOk(s, fl, id, target)) return [{ key: 'why.target' }];
   if (d.kind === 'evil') return pay.length > 0 ? [{ key: 'why.evilUnpaid' }] : [];
   if (new Set(pay).size !== pay.length || pay.some((x) => !s.crystals[x] || !('pouch' in s.crystals[x]!.at))) return [{ key: 'why.notInPouch' }];
-  return payment(s, id, pay).ichor === null ? [{ key: 'why.cost', slots: { n: cardCost(s, id) } }] : [];
+  return payment(s, id, pay).ichor === null ? [{ key: 'why.cost', slots: { n: cardCost(id) } }] : [];
 }
 
 /** Where a god's card lands, for its event: the person or the area it is aimed at. */
@@ -266,12 +257,10 @@ function miracle(c: Ctx, id: CardId, target: string | undefined): void {
     case 'mend': gainIchor(c, CARD.mendIchor); break;
     case 'theCalling':
       for (const x of peopleIn(s, a!, (q) => stranger(q) && standingOf(q) === 'mortal')) {
-        whisper(c, [x], dayOf(s.tick), Math.max(0.05, Math.min(0.95, whisperOdds(s, flockOf(s), x) * CARD.callingOddsMult)));
+        whisper(c, x, dayOf(s.tick), Math.max(0.05, Math.min(0.95, whisperOdds(s, flockOf(s), x) * CARD.callingOddsMult)));
         if (s.phase !== 'live') break;
       }
       break;
-    case 'sermonOfAsh': for (const x of peopleIn(s, a!, stranger)) resist(x, CARD.sermonResistance * P); break;
-    case 'gildedTongue': addEffect(s, 'gilded', undefined, untilDusk(s)); g.free += 1; break;
   }
 }
 
@@ -315,27 +304,6 @@ export function evil(c: Ctx, id: CardId, target: string | undefined, o: { by?: P
     case 'robTheCart': addEffect(s, 'rob', a, untilShiftEnd(s), o.by?.id, b); break;
     case 'madness': remove(c, p!, 'taken'); addEffect(s, 'noSearch', undefined, untilShiftEnd(s)); break;
     case 'bloodRite': followers(s, (f) => loseDevotion(c, f, CARD.bloodRiteDevotion)); break;
-    case 'burnTheLedgers':
-      bluntAll(c, 'council');
-      tearWrit(c, 1, 'evil');
-      break;
-    case 'riot': {
-      const crowd = peopleIn(s, a!, stranger);
-      const n = crowd.length ? Math.max(1, Math.round(crowd.length * Math.min(1, CARD.riotThin * b))) : 0;
-      for (let i = 0; i < n && s.phase === 'live'; i++) {
-        const v = pick(s.rng, crowd.filter(here));
-        if (v) remove(c, v, 'dead');
-      }
-      addEffect(s, 'noSearch', undefined, untilShiftEnd(s));
-      break;
-    }
-    case 'assassinate': {
-      remove(c, p!, 'burned');
-      mint(c, { luck: CARD.assassinateLuck * b, floor: 2 });
-      break;
-    }
-    default:
-      if (d.answers) bluntAll(c, d.answers);
   }
   if (s.phase !== 'live') return;
   profane(c, a ? area(a) : p ? area(whereNow(p, s.tick)) : 'grave');
@@ -390,7 +358,7 @@ export function followersEvil(c: Ctx): void {
   followers(s, (f) => { if (f.routine !== 'lieLow') pool.push(f); });
   const f = pick(s.rng, pool);
   if (!f) return;
-  const card = pick(s.rng, IDS.filter((id) => def(id).followerAct && (!def(id).shadeOnly || s.stage === 'shade') && ownTarget(s, f, id) !== undefined));
+  const card = pick(s.rng, IDS.filter((id) => def(id).followerAct && ownTarget(s, f, id) !== undefined));
   if (!card) return;
   ev(c, { kind: 'play', card, cardKind: 'evil', by: 'follower', burnt: [], unit: f.id });
   evil(c, card, ownTarget(s, f, card) ?? undefined, { by: f, half: true, quiet: oddCount(s, 'hush') > 0 });
@@ -400,7 +368,7 @@ export function followersEvil(c: Ctx): void {
 export function lashOut(c: Ctx): void {
   const s = c.s;
   const fl = flockOf(s);
-  const card = pick(s.rng, IDS.filter((id) => def(id).kind === 'evil' && !def(id).answers && inPool(s, id) && playable(s, fl, id)));
+  const card = pick(s.rng, IDS.filter((id) => def(id).kind === 'evil' && inPool(s, id) && playable(s, fl, id)));
   if (!card) return;
   const target = def(card).target === 'none' ? undefined : pick(s.rng, cardTargets(s, fl, card));
   ev(c, { kind: 'lashOut' });

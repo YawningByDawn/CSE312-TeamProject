@@ -25,10 +25,10 @@ const TAU = 1.2;
 /** time constants (s): wetting, drying (shorter in wind), flooding, draining, puddles growing and drying */
 const WET_UP = 35, WET_DOWN = 260, FLOOD_UP = 110, FLOOD_DOWN = 620, POOL_UP = 50, POOL_DOWN = 380;
 const ease = (v: number, to: number, dt: number, tau: number): number => v + (to - v) * (1 - Math.exp(-dt / tau));
-/** the way the wind blows (town frame, the state's `wind` each step), and the town's middle and half width along it, which the front crosses */
-export const WIND = { x: 1, y: 0 };
-export const TOWN_C = { x: 3062, y: 1745 }, TOWN_HALF = 2900;
-/** seconds the front takes to cross the town; its soft width (town widths) */
+/** the way the wind blows (world frame, the state's `wind` each step), and the middle and half width along it which the front crosses */
+const WIND = { x: 1, y: 0 };
+const FRONT_C = { x: 3062, y: 1745 }, FRONT_HALF = 2900;
+/** seconds the front takes to cross; its soft width (front widths) */
 const SWEEP_S = 7, BAND = 0.22;
 /** a strike may fall each STRIKE_S s, somewhere in STRIKES (town units) */
 const STRIKE_S = 0.25, STRIKES = [6400, 3600] as const;
@@ -61,7 +61,7 @@ export class Sky {
   /** The rain's band at a town point: the look's rain under the front. */
   rainAt(x: number, y: number): number {
     if (this.look.rain < 0.01) return 0;
-    const u = 0.5 + ((x - TOWN_C.x) * WIND.x + (y - TOWN_C.y) * WIND.y) / (2 * TOWN_HALF);
+    const u = 0.5 + ((x - FRONT_C.x) * WIND.x + (y - FRONT_C.y) * WIND.y) / (2 * FRONT_HALF);
     return this.look.rain * smooth(this.front, this.front - BAND, u) * smooth(this.back - BAND, this.back, u);
   }
 

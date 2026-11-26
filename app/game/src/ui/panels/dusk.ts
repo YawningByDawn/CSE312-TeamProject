@@ -1,29 +1,33 @@
 import type { CrystalId, FactionId, GameState, ViewModel } from '../../types';
 import { uiText } from '../../content/text';
 import { bound } from '../../content/keys';
-import { BLOOD, DIM, PALE, VIOLET, Words, slab, stone, surface, verb } from './art';
+import { BLOOD, DIM, PALE, VIOLET, Words, line, slab, stone, surface, verb } from './art';
 import type { Ctx, Panel } from './index';
 
 // Dusk (inventory #122, 47): each stone brought to the grave revealed in turn, the rarer the longer it is held, then the
-// day's ledger. The clock runs on under them; the confirm key hurries the reveal and moves on, back closes.
+// day's ledger with what the day's notes said happened. The clock stands under them (the night is the player's turn); the confirm key hurries the reveal and moves on, back closes.
 
 const TIER: Record<string, number> = { dull: 0, clear: 1, bright: 2, blazing: 3, royal: 4, impossible: 5 };
 const loud = (oneIn: number): number => (oneIn >= 10000 ? 3 : oneIn >= 1000 ? 2 : oneIn >= 100 ? 1 : 0);
 const FACTIONS: readonly FactionId[] = ['temple', 'council', 'public'];
 const LEDGER_S = 15;
+/** The day's notes the card lists, each given three lines. */
+const NOTES = 5, NOTE_H = 64;
 /** After the last stone shows, the reveal is held this long to read it (more with a best find among several), then moves on. */
 const READ_S = 1.4, BEST_S = 1.0;
 /** The boxes' bottom edge: 64 design px above the screen's (the centre is 450 above it). */
 const BOTTOM = 450 - 64;
 
-/** A stone's way to the grave: offered by yours, brought unasked (tribute), the town's tithe carried home, the grave's seep. */
-type Way = 'offer' | 'tribute' | 'tithe' | 'seep';
+/** A stone's way to the grave: offered by yours, brought unasked (tribute), the grave's seep. */
+type Way = 'offer' | 'tribute' | 'seep';
 interface Brought { id: CrystalId; from: string | null; way: Way }
-const WORDS: Record<Way, string> = { offer: 'dusk.from', tribute: 'dusk.unaskedBy', tithe: 'dusk.titheBy', seep: 'dusk.seep' };
+const WORDS: Record<Way, string> = { offer: 'dusk.from', tribute: 'dusk.unaskedBy', seep: 'dusk.seep' };
 
 export class Dusk implements Panel {
   /** The day's stones so far: offered by yours, or brought unasked (tribute). */
   private brought: Brought[] = [];
+  /** The day's own notes, the latest NOTES of them: what the world did between dawn and dusk. */
+  private notes: string[] = [];
   private stage: 'reveal' | 'ledger' | null = null;
   private start = 0;
   private fast = false;
@@ -39,15 +43,17 @@ export class Dusk implements Panel {
 
   key(vm: ViewModel): string | null {
     for (const e of vm.fresh) {
-      if (e.kind === 'dawn') this.brought = [];
-      else if (e.kind === 'offer' || e.kind === 'tribute' || e.kind === 'tithe' || e.kind === 'seep') this.brought.push({ id: e.crystal, from: e.unit ?? null, way: e.kind });
+      if (e.note && e.kind !== 'weather' && !(e.kind === 'story' && (e.story === 'life' || e.story === 'day'))) this.notes = [...this.notes.slice(1 - NOTES), uiText(e.note.key, e.note.slots)];
+      if (e.kind === 'dawn') { this.brought = []; this.notes = []; this.stage = null; }
+      else if (e.kind === 'offer' || e.kind === 'tribute' || e.kind === 'seep') this.brought.push({ id: e.crystal, from: e.unit ?? null, way: e.kind });
       else if (e.kind === 'dusk') {
         this.stage = 'reveal';
         this.start = vm.time;
         this.fast = false;
       }
     }
-    if (vm.title || vm.state.phase !== 'live') this.stage = null;
+    // a person, the grave or a menu (not settings) opened over the card closes it
+    if (vm.title || vm.state.phase !== 'live' || vm.focus || (vm.menu && vm.menu !== 'settings')) this.stage = null;
     return this.stage ? `${this.stage}|${this.start}|${this.fast}` : null;
   }
 
@@ -115,12 +121,15 @@ export class Dusk implements Panel {
       [uiText('ledger.lost'), String(l.lost), l.lost ? BLOOD : DIM],
       ...FACTIONS.filter((f) => l.suspicion[f] !== 0).map((f): [string, string, string] => [uiText('ledger.heat', { power: uiText(`power.${f}`) }), `${l.suspicion[f] > 0 ? '+' : ''}${l.suspicion[f]}`, '#9fb8d8']),
     ];
-    const h = 80 + rows.length * 32 + 76;
+    const top = 80 + rows.length * 32;
+    const h = top + (this.notes.length ? 36 + this.notes.length * NOTE_H : 0) + 76;
     const { el, say } = slab(root, -260, BOTTOM - h, 520, h, uiText('ledger.title', { n: this.c.q.day(s.tick) }));
     rows.forEach(([k, v, color], i) => {
       new Words(el, 36, 82 + i * 32, 20, PALE).set(k);
       new Words(el, 384, 80 + i * 32, 22, color, 'right', 100).set(v);
     });
+    if (this.notes.length) new Words(el, 36, top + 8, 17, DIM).set(uiText('ledger.happened'));
+    this.notes.forEach((n, i) => line(el, 36, top + 38 + i * NOTE_H, 448, 16, PALE, n));
     el.addEventListener('mouseenter', () => { this.held = true; });
     el.addEventListener('mouseleave', () => { this.held = false; this.start = vm.time; });
     verb(el, 520 - 152, h - 64, 124, 44, uiText('btn.proceed'), '', () => this.next(vm), say);

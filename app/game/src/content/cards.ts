@@ -9,16 +9,13 @@ import type { Affinity, CardId, CardKind, FactionId, TraitId } from '../types';
 /** What a card is aimed at: `follower` one of yours, `unit` someone not yours in reach, `area` an area of the kind. */
 export type CardTarget = 'none' | 'unit' | 'follower' | 'area';
 /** Which areas an area card accepts. */
-export type CardArea = 'face' | 'seen' | 'followers' | 'people' | 'shrine' | 'home' | 'groups';
+export type CardArea = 'face' | 'seen' | 'followers' | 'people' | 'shrine' | 'home';
 
 export interface CardDef {
   kind: CardKind;
   target: CardTarget;
   area?: CardArea;
-  /** Elites only. */
-  elite?: true;
   minLevel: number;
-  shadeOnly?: true;
   weight: number;
   /** Miracle: cost in crystal worth. */
   cost?: number;
@@ -34,8 +31,6 @@ export interface CardDef {
   followerAct?: true;
   /** Evil: its reward grows with Malice (BALANCE.evilBonusSteps). */
   bonus?: true;
-  /** Evil: dealt only while this power has a move announced; it makes every one of them fail. */
-  answers?: FactionId;
 }
 
 /** Card numbers the rules use. */
@@ -56,8 +51,6 @@ export const CARD = {
   quickenAp: 2,
   mendIchor: 2,
   callingOddsMult: 0.5,
-  sermonResistance: -20,
-  gildedOdds: 0.25,
   devourFollowerHunger: 50,
   devourSoulLuck: 30,
   devourFollowerSoulLuck: 60,
@@ -67,8 +60,6 @@ export const CARD = {
   caveInKills: [1, 2] as readonly number[],
   robShare: 0.5,
   bloodRiteDevotion: 4,
-  riotThin: 0.25,
-  assassinateLuck: 200,
 } as const;
 
 const C = CARD;
@@ -97,8 +88,6 @@ export const CARDS: Readonly<Record<CardId, CardDef>> = {
   quickening: miracle(4, 'none', 2, 2, 'blood', []),
   mend: miracle(5, 'none', 3, 1.5, 'blood', []),
   theCalling: miracle(6, 'area', 3, 1.5, 'faith', ['grieving', 'curious'], { area: 'people' }),
-  sermonOfAsh: miracle(4, 'area', 4, 2, 'flame', ['bitter'], { area: 'groups', shadeOnly: true }),
-  gildedTongue: miracle(5, 'none', 4, 2, 'echo', ['ambitious'], { shadeOnly: true }),
 
   devour: evil(12, 35, [heat('public', 6), heat('temple', 3)], 'unit', 1, 3, { bonus: true }),
   terrorize: evil(15, 0, [heat('public', 5)], 'area', 1, 3, { area: 'people', followerAct: true, bonus: true }),
@@ -111,11 +100,6 @@ export const CARDS: Readonly<Record<CardId, CardDef>> = {
   robTheCart: evil(10, 0, [heat('council', 8)], 'area', 1, 2.5, { area: 'face', followerAct: true, bonus: true }),
   madness: evil(18, 0, [heat('council', 5), heat('public', 4)], 'unit', 2, 1.5),
   bloodRite: evil(12, 15, [heat('temple', 3)], 'none', 1, 2, { followerAct: true, bonus: true }),
-  riot: evil(25, 0, [heat('public', 10), heat('council', 4)], 'area', 4, 2, { area: 'groups', shadeOnly: true, bonus: true }),
-  assassinate: evil(35, 0, [heat('council', 15), heat('public', 10)], 'unit', 4, 1.5, { elite: true, shadeOnly: true, bonus: true }),
-  burnTheLedgers: evil(20, 0, [heat('public', 8), heat('temple', 4)], 'none', 4, 3, { shadeOnly: true, answers: 'council' }),
-  silenceThePreacher: evil(22, 0, [heat('public', 8), heat('council', 5)], 'none', 4, 3, { shadeOnly: true, answers: 'temple' }),
-  turnTheMob: evil(18, 0, [heat('council', 10)], 'none', 4, 3, { shadeOnly: true, answers: 'public' }),
 };
 
 const pct = (x: number): number => Math.round(x * 100);
@@ -137,8 +121,6 @@ const SLOTS: Readonly<Record<CardId, Record<string, number>>> = {
   quickening: { n: C.quickenAp },
   mend: { n: C.mendIchor },
   theCalling: { pct: pct(C.callingOddsMult) },
-  sermonOfAsh: { pct: resistPct(C.sermonResistance) },
-  gildedTongue: { pct: pct(C.gildedOdds) },
   devour: { own: C.devourFollowerHunger },
   terrorize: { pct: resistPct(C.terrorizeResistance) },
   frame: { cool: -C.frameCouncil },

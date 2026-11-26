@@ -1,12 +1,11 @@
 /**
- * Telling the stories (DECISIONS §11, §105; content's STORIES): at most one a dawn, with `eventChance`, drawn by
- * weight among those of the stage whose cast can be found and that are not resting (`used` on `story:<id>`). A choice
+ * Telling the stories (DECISIONS §11, §105; content's STORIES): at most one a roll (each dawn, each hour of the night), drawn by
+ * weight among those whose cast can be found and that are not resting (`used` on `story:<id>`). A choice
  * waits as the pending story until the player answers; the rest happen at once. Each says its body, then its outcome.
  * What each story does is `storyRules.ts`.
  */
-import { BALANCE } from '../content/balance';
 import { DAY_TICKS } from '../content/clock';
-import { STAGES } from '../content/stages';
+import { STAGE } from '../content/stages';
 import { STORIES } from '../content/stories';
 import { uiText } from '../content/text';
 import { addEffect, area, ev, has, type Ctx } from './core';
@@ -18,7 +17,7 @@ type Story = Extract<Pending, { kind: 'story' }>;
 const restKey = (id: StoryId): string => `story:${id}`;
 
 function slotsOf(s: Readonly<GameState>, id: StoryId, k: Cast): Record<string, string | number> {
-  const boss = s.people[STAGES[s.stage].crackdownLeader];
+  const boss = s.people[STAGE.crackdownLeader];
   return {
     ...STORIES[id]!.n,
     ...(k.unit ? { name: k.unit.name } : {}),
@@ -47,12 +46,12 @@ function told(c: Ctx, id: StoryId, k: Cast, key: string): void {
 /** The stories the rules tell. */
 export const TOLD: readonly StoryId[] = Object.keys(RULES);
 
-/** Dawn: with `eventChance`, one story of the stage whose cast is found; a choice waits as the pending story. */
-export function storyDawn(c: Ctx): void {
+/** With chance `p`, one story whose cast is found (each dawn and each hour of the night); a choice waits as the pending story. */
+export function storyRoll(c: Ctx, p: number): void {
   const s = c.s;
-  if (s.pending || s.phase !== 'live' || !chance(s.rng, BALANCE.eventChance)) return;
+  if (s.pending || s.phase !== 'live' || !chance(s.rng, p)) return;
   const weight = (id: StoryId): number => RULES[id]!.weight?.(s) ?? STORIES[id]!.weight;
-  const pool = TOLD.filter((id) => STORIES[id]!.stages.includes(s.stage) && !has(s, 'used', restKey(id)) && weight(id) > 0);
+  const pool = TOLD.filter((id) => !has(s, 'used', restKey(id)) && weight(id) > 0);
   for (let tries = 0; tries < 3 && pool.length > 0; tries++) {
     const id = weightedPick(s.rng, pool, weight)!;
     pool.splice(pool.indexOf(id), 1);

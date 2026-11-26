@@ -1,27 +1,21 @@
-import type { GameState, Intent, Query, Reason, ViewModel } from '../../types';
+import type { GameState, Intent, Query, ViewModel } from '../../types';
 import { BALANCE } from '../../content/balance';
 import { uiText } from '../../content/text';
 import { maxIchor } from '../../sim/core';
 import { DIM, INK, PALE, Pic, VIOLET, Words, row, surface } from '../kit';
 
-// The god's corner, top left (inventory #95, docs/style.md §7): the grave crystal filling as Hunger falls, rank as its
-// lit facets; Hunger's word on a hide tab with its value and groove; Malice's word, value and groove; Ichor and Nether
-// with what comes in a night. A click opens the stats menu. Under it the goal in plain words; a click goes there.
+// The god's corner, top right under the cog (inventory #95, docs/style.md §7): the grave crystal filling as Hunger falls,
+// rank as its lit facets; Hunger's word on a hide tab with its value and groove; Malice's word, value and groove; Ichor
+// and Nether with what comes in a night. A click opens the stats menu.
 
 export const GOD_W = 372;
 export const GOD_H = 164;
-const GOAL_H = 42;
+/** Under the cog in the top right corner. */
+export const GOD_Y = 52;
 const FILL_STEPS = 20;
 const FACETS = 5;
 const HUNGER_X = 128, HUNGER_Y = 66, HUNGER_W = 228;
 const MALICE_X = 246, MALICE_Y = 98, MALICE_W = 110;
-
-/** Where a goal's click goes: a place to look at, or the stats menu (a rank is grown, not visited). */
-const GOAL_AT: Record<string, Intent> = {
-  'goal.rootPithead': { kind: 'focus', focus: { place: 'pithead' } },
-  'goal.vault': { kind: 'focus', focus: { place: 'vault' } },
-  'goal.rank': { kind: 'menu', menu: 'stats' },
-};
 
 export class God {
   private readonly box: HTMLDivElement;
@@ -39,9 +33,6 @@ export class God {
   private readonly ichorTop: Words;
   private readonly nether: Words;
   private readonly perNight: Words;
-  private readonly goalBox: HTMLDivElement;
-  private readonly goal: Words;
-  private goalKey = '';
   /** The last scalars shown: the frame compares these and touches nothing when none moved. */
   private hunger = -1;
   private malice = -1;
@@ -50,7 +41,7 @@ export class God {
   private state: Readonly<GameState> | null = null;
 
   constructor(anchor: HTMLElement, send: (i: Intent) => void, private readonly q: Query) {
-    this.box = surface(anchor, 'slab', 0, 0, GOD_W, GOD_H, 'hg-hit');
+    this.box = surface(anchor, 'slab', -GOD_W, GOD_Y, GOD_W, GOD_H, 'hg-hit');
     this.box.addEventListener('click', () => send({ kind: 'menu', menu: 'stats' }));
     const b = this.box;
     this.grave = new Pic(b, 62, 66, 'grave.0');
@@ -79,15 +70,9 @@ export class God {
     const nr = row(b, 178, 122);
     this.nether = new Words(nr, 0, 0, 28, VIOLET).num();
     this.perNight = new Words(nr, 0, 0, 17, DIM);
-    this.goalBox = surface(anchor, 'parch', 0, GOD_H + 12, GOD_W, GOAL_H, 'hg-hit');
-    this.goal = new Words(this.goalBox, 0, 11, 20, INK, 'center', GOD_W);
-    this.goalBox.addEventListener('click', () => {
-      const to = GOAL_AT[this.goalKey];
-      if (to) send(to);
-    });
   }
 
-  /** Each frame: scalars compared; the derived numbers (Nether a night, Ichor's top, the goal) only when the rules moved. */
+  /** Each frame: scalars compared; the derived numbers (Nether a night, Ichor's top) only when the rules moved. */
   frame(vm: ViewModel): void {
     const s = vm.state, g = s.god;
     if (g.hunger !== this.hunger) {
@@ -120,12 +105,6 @@ export class God {
       this.ichor.set(String(Math.round(g.ichor)));
       this.ichorTop.set(uiText('hud.outOf', { n: maxIchor(s) }));
       this.perNight.set(uiText('hud.netherNight', { n: Math.round(this.q.stats(s).nether) }));
-      this.showGoal(this.q.goal(s));
     }
-  }
-
-  private showGoal(r: Reason): void {
-    this.goalKey = r.key;
-    this.goal.set(uiText(r.key, r.slots));
   }
 }

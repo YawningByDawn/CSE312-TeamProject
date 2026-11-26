@@ -1,7 +1,6 @@
 import { Container, UniformGroup, type Renderer } from 'pixi.js';
 import type { Layer, Query, ViewModel } from '../types';
 import { MINE_FRAME } from '../content/map';
-import { below } from './camera';
 import { decode, decodeData, upload } from './pictures';
 import { pit, quad } from './quad';
 import { quant } from './tables';
@@ -46,7 +45,7 @@ export class Sheen implements Layer {
   frame(vm: ViewModel): boolean {
     const sky = this.sky, night = 1 - this.q.daylight(this.q.hour(vm.state.tick));
     // wet amounts this close count as one: the sky moves the sheen in steps no eye tells apart
-    const wet = quant(Math.min(1, Math.max(sky.wetness * 0.8, sky.flood)) * 0.55 * (1 - 0.45 * night) * below(vm.camera.zoom), 32);
+    const wet = quant(Math.min(1, Math.max(sky.wetness * 0.8, sky.flood)) * 0.55 * (1 - 0.45 * night), 32);
     if (wet === this.shown) return false;
     this.shown = wet;
     this.root.visible = wet > 0;

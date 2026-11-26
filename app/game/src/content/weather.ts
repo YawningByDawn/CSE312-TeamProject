@@ -47,8 +47,7 @@ export const WEATHER_RULES: Readonly<Record<Weather, WeatherRule>> = {
       { kind: 'strike', target: 'sump', full: 0.6 },
       { kind: 'crew', target: 'sump', full: 0.75 },
       { kind: 'notice', target: 'public', full: 0.85 },
-      { kind: 'crowd', target: 'market', full: 0.45 },
-      { kind: 'crowd', target: 'slagrows', full: 1.3 },
+      { kind: 'crowd', target: 'bunks', full: 1.3 },
     ],
   },
   storm: {
@@ -59,7 +58,7 @@ export const WEATHER_RULES: Readonly<Record<Weather, WeatherRule>> = {
       { kind: 'crew', target: 'sump', full: 0.6 },
       { kind: 'notice', target: 'public', full: 0.7 },
       { kind: 'notice', target: 'temple', full: 0.85 },
-      { kind: 'crowd', target: 'market', full: 0.2 },
+      { kind: 'crowd', target: 'bunks', full: 1.5 },
     ],
   },
   fog: {
@@ -77,5 +76,5 @@ export const WEATHER_RULES: Readonly<Record<Weather, WeatherRule>> = {
       { kind: 'notice', target: 'public', full: 1.15 },
     ],
   },
-  cold: { indoors: 0.2, effects: [{ kind: 'whisperZone', target: 'slagrows', full: 0.03 }] },
+  cold: { indoors: 0.2, effects: [{ kind: 'whisperZone', target: 'overseer', full: 0.03 }] },
 };

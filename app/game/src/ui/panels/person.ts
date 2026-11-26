@@ -1,8 +1,10 @@
 import type { Action, Person as P, PlaceId, Routine, ViewModel } from '../../types';
+import { isDay } from '../../content/clock';
 import { hasText, uiText } from '../../content/text';
 import { bound, keyName } from '../../content/keys';
+import { HOST } from '../../content/stats';
 import { PLACES } from '../../content/world';
-import { BLOOD, DIM, INK, PALE, VIOLET, Words, attr, backed, cell, itemText, line, portrait, slab, surface, verb } from './art';
+import { BLOOD, DIM, INK, PALE, VIOLET, Words, attr, backed, cell, line, portrait, slab, surface, verb } from './art';
 import { why1 } from './grave';
 import type { Ctx, Panel } from './index';
 
@@ -11,7 +13,8 @@ import type { Ctx, Panel } from './index';
 // the world is where they go, and the slab comes back.
 
 const W = 340;
-const ROUTINES: readonly Routine[] = ['pray', 'offer', 'lieLow', 'delve', 'skim', 'preach', 'standWatch'];
+const ROUTINES: readonly Routine[] = ['pray', 'offer', 'lieLow', 'delve', 'skim'];
+const STATS = ['strength', 'dexterity', 'intelligence', 'endurance', 'hp', 'devotion', 'resistance'] as const;
 const ICON: Partial<Record<string, string>> = { move: 'icon.move', pray: 'icon.pray', offer: 'icon.offer', lieLow: 'icon.low', whisper: 'icon.whisper' };
 /** Reasons that mean a routine is not theirs to have yet: its button is not shown. */
 const NOT_YET = new Set(['why.rank', 'why.shade', 'why.notDigger', 'why.notHauler', 'why.deepOpen']);
@@ -30,9 +33,6 @@ function oddsWord(odds: number): string {
   const word = odds < 0.35 ? 'unlikely' : odds < 0.6 ? 'even' : odds < 0.85 ? 'likely' : 'certain';
   return uiText('odds.text', { word: uiText(`odds.${word}`), pct: Math.round(odds * 100) });
 }
-
-/** Reasons that mean a group whisper is not to be offered here: its plate is not shown. */
-const NO_GROUP = new Set(['why.shade', 'why.already', 'why.noOne']);
 
 export class Person implements Panel {
   /** Moving this follower: the focus key when Move was pressed. */
@@ -63,7 +63,7 @@ export class Person implements Panel {
       return;
     }
     const p = s.people[(vm.focus as { unit: string }).unit]!;
-    const { el, fit } = backed(root, 400, -232, W, 10);
+    const { el, fit } = backed(root, -388, -360, W, 10);
     const status = new Words(el, 16, 0, 16, BLOOD);
     const say = (why: string): void => status.set(why);
     portrait(el, s, p, 64, 78, 100);
@@ -76,13 +76,22 @@ export class Person implements Panel {
       line(el, 132, y, W - 144, size, color, t);
       y += Math.ceil(t.length / 22) * size * 1.25;
     };
-    text(p.follower && p.routine ? `${uiText(`routine.${p.routine}`)} · ${doing(p)}` : doing(p));
+    text(p.gone ? uiText('person.fallen') : p.follower && p.routine ? `${uiText(`routine.${p.routine}`)} · ${doing(p)}` : doing(p));
+    const left = q.markLeft(s, p.id);
+    if (left > 0) text(uiText('person.marked', { n: left }), VIOLET);
     y = Math.max(y, 140);
     if (hasText(`person.${p.id}.bio`)) {
       const bio = uiText(`person.${p.id}.bio`);
       line(el, 16, y, W - 32, 16, DIM, bio).style.fontStyle = 'italic';
       y += Math.ceil(bio.length / 38) * 20 + 8;
     }
+    STATS.forEach((k, i) => {
+      const x = 16 + (i % 2) * 160, ny = y + Math.floor(i / 2) * 24;
+      const v = k === 'resistance' ? p.resistance : p.stats[k];
+      new Words(el, x, ny, 16, DIM).set(uiText(`person.stat.${k}`));
+      new Words(el, x, ny, 18, PALE, 'right', 140).num().set(k === 'hp' ? `${Math.round(v)} / ${Math.round(q.maxHp(p))}` : String(Math.round(v)));
+    });
+    y += Math.ceil(STATS.length / 2) * 24 + 8;
     const work = verb(el, 100, y, W - 116, 34, placeName(p.work), '', () => this.c.focus({ place: p.work }), say);
     attr(work, 'title', uiText('person.open', { name: placeName(p.work) }));
     new Words(el, 16, y + 8, 16, DIM).set(uiText('person.worksAt'));
@@ -97,11 +106,36 @@ export class Person implements Panel {
       y += 22;
     }
 
-    // the acts: Whisper for anyone else; Move and the routines for a follower
+    // by day the only act is the swap: the host's list of others to wear, or this one when they are on it
     y += 8;
-    const acts: { id: string; label: string; a: Action | null; lit?: boolean }[] = [];
-    if (!p.follower) acts.push({ id: 'whisper', label: uiText('btn.whisper'), a: { type: 'whisper', target: p.id } });
-    else {
+    const day = isDay(s.tick);
+    const others = day ? q.hosts(s).filter((id) => id !== s.host && (p.id === s.host || id === p.id)) : [];
+    if (others.length > 0) {
+      if (p.id === s.host) new Words(el, 16, y, 16, DIM).set(uiText('host.swap'));
+      others.forEach((id, i) => {
+        const o = s.people[id]!;
+        const sub = `${uiText('host.hp', { hp: Math.round(o.stats.hp), max: Math.round(q.maxHp(o)) })} · ${uiText(`role.${o.role}.name`)}`;
+        verb(el, 14, y + (p.id === s.host ? 26 : 0) + i * 60, W - 28, 52, uiText(p.id === s.host ? 'host.swapTo' : 'host.wear', { name: o.name }), '', () => {
+          this.c.act({ type: 'possess', unit: id });
+          this.c.focus({ unit: id });
+        }, say, sub);
+      });
+      y += (p.id === s.host ? 26 : 0) + others.length * 60;
+    }
+
+    // the acts: Whisper for anyone else; Move and the routines for a follower
+    const acts: { id: string; label: string; a: Action | null; lit?: boolean; cap?: string }[] = [];
+    if (p.gone) {
+      if (p.gone === 'dead' && p.stats.devotion > 0) {
+        text(uiText('btn.reviveCost', { n: HOST.reviveStones }), VIOLET, 16);
+        acts.push({ id: 'revive', label: uiText('btn.revive'), a: { type: 'revive', unit: p.id } });
+      }
+    } else if (!p.follower) {
+      // by day the mark (its key on the plate), by night the whisper it opens
+      const marked = p.marked === q.day(s.tick);
+      if (day) acts.push({ id: 'mark', label: uiText(marked ? 'btn.marked' : 'btn.mark'), a: { type: 'mark', target: p.id }, lit: marked, cap: keyName(vm.settings.keys.mark[0] ?? '') });
+      else acts.push({ id: 'whisper', label: uiText('btn.whisper'), a: { type: 'whisper', target: p.id } });
+    } else if (!day) {
       acts.push({ id: 'move', label: uiText('btn.move'), a: null });
       for (const r of ROUTINES) {
         const a: Action = { type: 'setRoutine', unit: p.id, routine: r };
@@ -115,7 +149,7 @@ export class Person implements Panel {
       const why = x.lit ? '' : ch ? why1(ch) : '';
       const b = surface(el, x.lit ? 'violet' : why ? 'violetDim' : 'parchDark', bx, by, 74, 76, `hg-hit${why ? ' hgp-off' : ''}`);
       if (ICON[x.id]) cell(b, 'ui', ICON[x.id]!, 37, 40, 0.5);
-      else new Words(b, 0, 28, 22, PALE, 'center', 74).set(x.label.charAt(0));
+      else new Words(b, 0, 28, 22, PALE, 'center', 74).set(x.cap ?? x.label.charAt(0));
       new Words(el, bx, by + 84, 16, x.lit ? VIOLET : PALE, 'center', 74).set(x.lit ? `${x.label} ·` : x.label);
       if (why) {
         attr(b, 'title', why);
@@ -141,36 +175,6 @@ export class Person implements Panel {
     });
     y += Math.ceil(acts.length / 4) * 128;
 
-    // the groups they are one of, each whispered to as one when gathered (the town)
-    for (const g of q.groups(s, p.id)) {
-      const a: Action = { type: 'whisperGroup', group: g };
-      const ch = q.check(s, a);
-      if (ch.why[0] && NO_GROUP.has(ch.why[0].key)) continue;
-      // not gathered, it has no price yet: the plate says why
-      const sub = ch.odds !== undefined ? `${oddsWord(ch.odds)} · ${uiText('grave.nether', { n: ch.nether })}` : why1(ch);
-      verb(el, 14, y, W - 28, 50, uiText('person.whisperGroup', { group: uiText(`group.${g.split(':')[0]}`) }), why1(ch), () => this.c.act(a), say, sub);
-      y += 58;
-    }
-
-    // things: give what is at hand, take back what they wear
-    const hand = Object.values(s.items).filter((it) => it.wearer === null);
-    const worn = Object.values(s.items).filter((it) => it.wearer === p.id);
-    const thing = (label: string, a: Action, sub: string, color: string): void => {
-      verb(el, 14, y, W - 28, 50, label, why1(q.check(s, a)), () => this.c.act(a), say, sub, color);
-      y += 58;
-    };
-    for (const it of hand.slice(0, 3)) {
-      const name = itemText(s, it, 'name');
-      thing(uiText('btn.give', { name }), { type: 'give', item: it.id, unit: p.id }, itemText(s, it, p.follower ? 'line' : 'gift'), p.follower ? VIOLET : BLOOD);
-    }
-    if (hand.length > 3) {
-      new Words(el, 16, y, 16, DIM).set(uiText('person.moreInGrave', { n: hand.length - 3 }));
-      y += 26;
-    }
-    for (const it of worn.slice(0, 2)) {
-      const name = itemText(s, it, 'name');
-      thing(uiText('person.takeBack', { name }), { type: 'takeBack', item: it.id }, '', PALE);
-    }
     status.el.style.top = `${y + 4}px`;
     fit(y + 30);
   }

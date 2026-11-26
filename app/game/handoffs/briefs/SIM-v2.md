@@ -1,0 +1,29 @@
+# Brief — SIM-v2: rewrite the gameplay loop in the simulation (top priority)
+
+Handoff/log: `handoffs/P4.md` (add a "v2" section at the top; keep the "API for the UI" list exact — the UI builder works from it in parallel). Scratch `/tmp/simv2/`. Headless; no port.
+Read: `docs/spec.md`; `DECISIONS.md` **§14 (binding — the owner ordered a rewrite of the whole loop; read every line)**, §13.1–13.3, §13.7, §13.10 C–F, §13.11; `handoffs/P4.md`; `handoffs/P1-critic-r2.md`.
+The owner played the current game and found it dead and incomprehensible: colour did not spread, followers did nothing, gray areas could not be explored, nobody went to the surface. **Rewrite the loop; do not patch the old one.** Keep what is sound (spec formulas and their unit tests, the PRNG, content ids, names, the world graph of 12 mine areas + 13 town blocks with `lift`–`minehead`, bonuses, miracles, events where they still fit) and rebuild the rules around §14. Delete rules §14 replaces (follower-presence visibility, devotion-weighted Control, claims/slipping, per-night orders, the 16-order menu).
+
+## Rules to implement (§14)
+1. **Hold per area (0–100):** dawn update = grave seep into areas around it + followers who spent time there that day (spec V(D), numbers) + spreading the word / miracles + seepage from more-soaked neighbours − pushback (shrine ward until desecrated; guards, overseer, priests present; purges). Tuning targets in §14.2. Hold 100 = rooted (bonus, XP, what the place offers). Receding is gradual and visible.
+2. **Visibility:** coloured share = Hold; seen = next to coloured ground or ever explored; unknown otherwise. **Reach:** anyone on coloured ground, next to it, or beside a follower. **Presence** = Σ Hold / 100.
+3. **Lives:** every person has `home`, `work`, `shift`; a turn is Night (player acts; night shift at work, others asleep at home — bunks or a town block) then Day (resolution). People commute through the lift; followers stain where they are at night and by day. Sleepers are easier to turn. Town people exist from turn 1; the surface is reached by followers' own feet.
+4. **Verbs:** `whisper {target}`; `send {unit, zone}` — intent derived from the place (explore / spread the word / bring crystals / go up / later darker options), paid once (spec `Direct = S^0.85·T`), walks 1–2 areas a day, persists until changed; `recall {unit}` (back to their own life: live, pray, stain); `lieLow {unit, on}`; `castMiracle`; `eat`; evil acts when Malice presses; `chooseBonus`; `endNight`. Unsent followers pray (Faith → Nether by the spec formulas) and are never idle. New options unlock one at a time with a `unlocked` event and a one-line introduction.
+5. **Exploration:** every area has a hidden discovery (cache, seam, easy loner, shortcut = new edge, relic = miracle, danger); a hint when seen, revealed when a follower explores it.
+6. **Threat that walks:** guards/overseer patrol (positions per phase), notice heavily stained ground, push Hold back where they stand; an inquisitor comes down the lift when the Temple is alarmed. Keep the three heat tracks and the responders that fit.
+7. **Watershed:** Divinity IV and `minehead` Hold 100 → `stageAdvanced` (merge rule kept). Shade stays lean (§13.7): groups and Elites become targets, Hold works the same in town blocks, win = the ending beat (`citygate` soaked + level) → `won`.
+8. **Texts:** two layers from the same constants (`short` ≤ 2 short plain lines, `details` full numbers), odds as word + percent, no jargon (§13.10 D).
+
+## API contract with the UI (fix these names early; put the exact shapes in `handoffs/P4.md` before tuning)
+- State: `zones[i].hold`, `.explored`, `.discovery` (`{ kind, hint, revealed }`), `.rooted`; `units[i].home`, `.work`, `.shift`, `.at` (where they are at night), `.dayAt`, `.asleep`, `.task` (`{ kind: 'life' | 'explore' | 'spread' | 'gather' | 'goUp' | 'lieLow', zone?, since }`), `.route`.
+- Selectors: `visibilityOf(state, zone)`, `holdSources(state, zone)` (neighbour ids and unit ids that feed it — the renderer grows colour from them), `canWhisper(state, unit) → { ok, why }`, `sendPreview(state, unit, zone) → { ok, intent, line, cost, days, why }`, `goal(state)` (mine percent, pit-head Hold, level progress, next step area), `areaPanel(state, zone)`, `statBar(state)` (what to show now, §13.10 C), `dayPlan(state)` (who will move where tomorrow).
+- `endNight(state)` returns ordered **day events** with a time 0–1 for the replay: `bell`, `moved { unit, from, to, via }`, `liftRide { units, dir }`, `taskResult { unit, kind, text, amount }`, `holdChanged { zone, from, to, sources }`, `rooted`, `receded`, `discovered { zone, kind, text }`, `heat { track, from, to, why }`, `enemyMoved`, plus the existing ones that survive.
+- Everything deterministic and JSON-serialisable; `legalActions` stays cheap (bots).
+
+## Proof
+- Unit tests: every spec formula (keep), Hold update cases (seep, followers, seepage, pushback, rooting, receding), reach, shifts/commute, send intents, discoveries, watershed, win, determinism, JSON round trip, invariants under fuzz.
+- Bots (`src/sim/bots/`: greedy, cautious, random + a plain "sensible" one) on 500+ seeds: decent play reaches Shade in ~15–25 turns; most of the mine coloured by ~turn 15–20; no dead turn (every night offers an affordable meaningful action; every day changes Hold somewhere); cautious usually survives, random usually loses; late game only has to run (§13.7). Print a per-turn trace for one seed showing Hold per area over 20 days — paste the first 12 days into the handoff so the UI builder and the orchestrator can see the stain grow.
+- `npx vitest run tests/sim` green; `npx tsc --noEmit` clean for `src/sim/**`, `tests/sim/**`.
+
+## Ownership
+Yours only: `src/sim/**`, `tests/sim/**`, `scripts/sim-*.ts`, `handoffs/P4.md`. Append `### SIM-v2 — Gameplay loop v2` at the end of `DECISIONS.md` (rules as implemented, numbers).

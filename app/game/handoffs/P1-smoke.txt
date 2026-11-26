@@ -1,0 +1,163 @@
+
+=== rush — 200 seeds ===
+reach 93%  lost 7%  stalled 0%  | turns p10 18 med 21 p90 25  | loss turn med 26  | near-miss (won with Ichor ≤ 3): 5%
+band              t1-7   t8-14  t15-21  t22+
+income            12.7   33.0   63.7   59.5
+unspent Nether     18%    11%    17%    34%
+crystals held      6.1   12.4    8.1    5.2
+spend: influence 37% of income, direct 50%  | whisper cost med 10.0, share of income p25/med/p75 19%/25%/40%
+urges: hunger avg 32.6, malice avg 45.5  | ravenous/run 0.0, outbursts/run 0.2, gorges/run 0.8
+suspicion peak avg cul 55.0, gov 73.8, pub 79.6  | crossed 25/50/75/100: cul 98%/61%/17%/1%  gov 100%/100%/52%/1%  pub 100%/100%/76%/17%
+Ichor lost/run: followerLost 4.8, zoneLost 0.7
+followers lost/run by cause: burned 0.2, conscripted 0.5, died 1.5, lapsed 1.2, taken 2.4
+XP/run: devotion 64, eat 16, event 4, evil 45, follower 131, miracle 68, zone 85
+conversions/run 18.7, followers at end 12.8, evil acts 3.8, dead turns 0, idle nights 0
+per bonus (win/med turns): lingeringThrone 95%/22.0  hoardOfTheGrave 89%/21.0  patientHunger 88%/22.0  sweetVoice 95%/21.0  oldScars 94%/23.0  cruelDelight 96%/20.0  deepRoots 100%/22.0  quietRot 95%/21.0  firstDreamer 85%/20.0
+
+=== cautious — 200 seeds ===
+reach 96%  lost 4%  stalled 0%  | turns p10 16 med 20 p90 25  | loss turn med 26  | near-miss (won with Ichor ≤ 3): 4%
+band              t1-7   t8-14  t15-21  t22+
+income            12.7   39.2   78.9   73.7
+unspent Nether     23%    11%    20%    45%
+crystals held      5.5    9.6    5.2    3.5
+spend: influence 32% of income, direct 53%  | whisper cost med 9.7, share of income p25/med/p75 14%/19%/30%
+urges: hunger avg 35.7, malice avg 35.9  | ravenous/run 0.0, outbursts/run 0.1, gorges/run 0.4
+suspicion peak avg cul 45.2, gov 60.0, pub 74.5  | crossed 25/50/75/100: cul 95%/36%/7%/1%  gov 100%/85%/14%/0%  pub 100%/98%/55%/11%
+Ichor lost/run: followerLost 3.0, zoneLost 0.5
+followers lost/run by cause: burned 0.1, conscripted 0.5, died 0.9, lapsed 0.8, taken 1.0
+XP/run: devotion 103, eat 12, event 3, evil 44, follower 121, miracle 56, zone 75
+conversions/run 17.3, followers at end 14.0, evil acts 4.0, dead turns 0, idle nights 0
+per bonus (win/med turns): lingeringThrone 100%/21.0  hoardOfTheGrave 96%/19.0  patientHunger 92%/22.0  sweetVoice 90%/20.0  oldScars 88%/23.0  cruelDelight 100%/20.0  deepRoots 100%/19.0  quietRot 100%/19.0  firstDreamer 95%/20.0
+
+=== devotion — 200 seeds ===
+reach 97%  lost 3%  stalled 0%  | turns p10 16 med 20 p90 25  | loss turn med 26  | near-miss (won with Ichor ≤ 3): 4%
+band              t1-7   t8-14  t15-21  t22+
+income            12.7   39.9   80.4   80.7
+unspent Nether     23%     9%    25%    50%
+crystals held      5.6   10.7    6.4    4.4
+spend: influence 28% of income, direct 55%  | whisper cost med 9.4, share of income p25/med/p75 13%/17%/30%
+urges: hunger avg 35.8, malice avg 40.4  | ravenous/run 0.0, outbursts/run 0.1, gorges/run 0.5
+suspicion peak avg cul 45.0, gov 65.2, pub 72.2  | crossed 25/50/75/100: cul 93%/35%/7%/0%  gov 100%/99%/23%/0%  pub 100%/94%/54%/8%
+Ichor lost/run: followerLost 3.5, zoneLost 0.4
+followers lost/run by cause: burned 0.1, conscripted 0.5, died 0.9, lapsed 0.8, taken 1.4
+XP/run: devotion 104, eat 12, event 3, evil 42, follower 120, miracle 59, zone 74
+conversions/run 17.1, followers at end 13.3, evil acts 3.8, dead turns 0, idle nights 0
+per bonus (win/med turns): lingeringThrone 95%/20.0  hoardOfTheGrave 93%/20.0  patientHunger 96%/22.0  sweetVoice 100%/20.0  oldScars 100%/22.0  cruelDelight 96%/20.0  deepRoots 100%/19.0  quietRot 100%/19.0  firstDreamer 95%/20.0
+
+=== evil — 200 seeds ===
+reach 95%  lost 6%  stalled 0%  | turns p10 18 med 22 p90 25  | loss turn med 27  | near-miss (won with Ichor ≤ 3): 5%
+band              t1-7   t8-14  t15-21  t22+
+income            12.4   31.9   62.9   70.9
+unspent Nether     26%    16%    17%    34%
+crystals held      5.7   10.6    7.2    4.3
+spend: influence 34% of income, direct 52%  | whisper cost med 9.2, share of income p25/med/p75 17%/23%/36%
+urges: hunger avg 36.8, malice avg 22.7  | ravenous/run 0.0, outbursts/run 0.0, gorges/run 0.5
+suspicion peak avg cul 53.6, gov 69.2, pub 80.2  | crossed 25/50/75/100: cul 98%/59%/13%/0%  gov 100%/100%/34%/0%  pub 100%/98%/74%/16%
+Ichor lost/run: followerLost 4.0, zoneLost 0.7
+followers lost/run by cause: burned 0.2, conscripted 0.5, died 1.1, lapsed 1.2, taken 1.7
+XP/run: desecration 0, devotion 68, eat 14, event 4, evil 61, follower 125, miracle 65, zone 79
+conversions/run 17.8, followers at end 13.0, evil acts 6.2, dead turns 0, idle nights 0
+per bonus (win/med turns): lingeringThrone 82%/24.0  hoardOfTheGrave 93%/22.0  patientHunger 100%/22.0  sweetVoice 95%/22.0  oldScars 94%/23.0  cruelDelight 96%/20.0  deepRoots 100%/22.0  quietRot 95%/21.0  firstDreamer 95%/21.0
+
+=== clean — 200 seeds ===
+reach 94%  lost 6%  stalled 0%  | turns p10 17 med 21 p90 26  | loss turn med 26  | near-miss (won with Ichor ≤ 3): 5%
+band              t1-7   t8-14  t15-21  t22+
+income            12.8   39.1   79.3   70.8
+unspent Nether     20%     8%    32%    62%
+crystals held      5.7   10.3    5.1    4.3
+spend: influence 26% of income, direct 51%  | whisper cost med 9.7, share of income p25/med/p75 16%/22%/37%
+urges: hunger avg 38.0, malice avg 45.5  | ravenous/run 0.0, outbursts/run 0.3, gorges/run 0.5
+suspicion peak avg cul 49.0, gov 61.9, pub 75.4  | crossed 25/50/75/100: cul 96%/47%/13%/0%  gov 100%/87%/19%/0%  pub 100%/99%/65%/5%
+Ichor lost/run: followerLost 3.7, zoneLost 0.7
+followers lost/run by cause: burned 0.1, conscripted 0.7, died 1.4, lapsed 1.2, taken 1.1
+XP/run: devotion 105, eat 12, event 4, evil 39, follower 119, miracle 59, zone 74
+conversions/run 17.0, followers at end 12.5, evil acts 3.3, dead turns 0, idle nights 0
+per bonus (win/med turns): lingeringThrone 91%/22.0  hoardOfTheGrave 93%/21.0  patientHunger 96%/22.0  sweetVoice 95%/23.0  oldScars 94%/23.0  cruelDelight 100%/20.0  deepRoots 96%/21.0  quietRot 100%/21.0  firstDreamer 80%/22.0
+
+=== reckless — 200 seeds ===
+reach 32%  lost 69%  stalled 0%  | turns p10 19 med 22 p90 30  | loss turn med 22  | near-miss (won with Ichor ≤ 3): 52%
+band              t1-7   t8-14  t15-21  t22+
+income            12.6   25.7   27.4   14.8
+unspent Nether     18%    12%    13%    26%
+crystals held      6.3   14.9   18.3   13.0
+spend: influence 50% of income, direct 43%  | whisper cost med 8.2, share of income p25/med/p75 27%/35%/52%
+urges: hunger avg 46.1, malice avg 21.9  | ravenous/run 0.0, outbursts/run 0.1, gorges/run 0.0
+suspicion peak avg cul 72.3, gov 94.9, pub 87.7  | crossed 25/50/75/100: cul 100%/92%/61%/8%  gov 100%/100%/100%/59%  pub 100%/100%/91%/36%
+Ichor lost/run: followerLost 11.3, zoneLost 1.6
+followers lost/run by cause: burned 0.8, conscripted 0.7, died 1.6, lapsed 2.9, taken 8.9
+XP/run: devotion 22, eat 5, event 3, evil 74, follower 126, miracle 77, zone 69
+conversions/run 18.0, followers at end 3.2, evil acts 8.7, dead turns 0, idle nights 16
+per bonus (win/med turns): lingeringThrone 9%/29.0  hoardOfTheGrave 30%/23.0  patientHunger 19%/22.0  sweetVoice 24%/19.0  oldScars 53%/25.0  cruelDelight 52%/21.0  deepRoots 38%/24.0  quietRot 30%/25.0  firstDreamer 35%/20.0
+
+=== neverEat — 200 seeds ===
+reach 5%  lost 96%  stalled 0%  | turns p10 20 med 29 p90 44  | loss turn med 26  | near-miss (won with Ichor ≤ 3): 78%
+band              t1-7   t8-14  t15-21  t22+
+income            12.9   17.9   16.9   10.8
+unspent Nether     26%    19%    17%    25%
+crystals held      6.9   17.3   17.8   11.2
+spend: influence 24% of income, direct 65%  | whisper cost med 7.4, share of income p25/med/p75 40%/50%/63%
+urges: hunger avg 71.6, malice avg 44.7  | ravenous/run 3.9, outbursts/run 0.2, gorges/run 0.0
+suspicion peak avg cul 60.3, gov 65.8, pub 71.3  | crossed 25/50/75/100: cul 100%/81%/21%/1%  gov 100%/99%/16%/1%  pub 100%/94%/53%/2%
+Ichor lost/run: followerLost 8.2, zoneLost 2.0
+followers lost/run by cause: burned 0.2, conscripted 0.7, devoured 3.8, died 0.5, lapsed 5.4, taken 1.5
+XP/run: devotion 24, event 4, evil 57, follower 104, miracle 81, zone 58
+conversions/run 14.9, followers at end 2.9, evil acts 4.4, dead turns 0, idle nights 4
+per bonus (win/med turns): lingeringThrone 0%/—  hoardOfTheGrave 0%/—  patientHunger 8%/27.0  sweetVoice 0%/—  oldScars 18%/42.0  cruelDelight 17%/29.0  deepRoots 0%/—  quietRot 0%/—  firstDreamer 0%/—
+
+=== neverVent — 200 seeds ===
+reach 60%  lost 40%  stalled 0%  | turns p10 18 med 23 p90 28  | loss turn med 26  | near-miss (won with Ichor ≤ 3): 24%
+band              t1-7   t8-14  t15-21  t22+
+income            12.5   34.0   57.1   50.3
+unspent Nether     26%    16%    23%    39%
+crystals held      6.0   12.9    9.6    5.5
+spend: influence 32% of income, direct 51%  | whisper cost med 9.2, share of income p25/med/p75 18%/25%/37%
+urges: hunger avg 31.4, malice avg 55.6  | ravenous/run 0.0, outbursts/run 1.7, gorges/run 1.0
+suspicion peak avg cul 67.7, gov 78.0, pub 86.1  | crossed 25/50/75/100: cul 100%/90%/49%/3%  gov 100%/100%/86%/4%  pub 100%/100%/90%/27%
+Ichor lost/run: followerLost 9.4, zoneLost 1.3
+followers lost/run by cause: burned 0.6, conscripted 0.6, died 4.8, lapsed 1.9, taken 3.3
+XP/run: devotion 85, eat 18, event 4, evil 0, follower 132, miracle 73, zone 82
+conversions/run 18.9, followers at end 7.7, evil acts 1.7, dead turns 0, idle nights 1
+per bonus (win/med turns): lingeringThrone 55%/25.0  hoardOfTheGrave 59%/22.0  patientHunger 50%/26.0  sweetVoice 62%/23.0  oldScars 59%/23.0  cruelDelight 43%/24.0  deepRoots 54%/21.0  quietRot 90%/23.0  firstDreamer 75%/22.0
+
+=== massLieLow — 200 seeds ===
+reach 65%  lost 35%  stalled 0%  | turns p10 23 med 26 p90 31  | loss turn med 29  | near-miss (won with Ichor ≤ 3): 28%
+band              t1-7   t8-14  t15-21  t22+
+income            12.5   31.8   65.2   62.6
+unspent Nether     26%    15%    28%    50%
+crystals held      5.8    9.0    4.2    4.0
+spend: influence 30% of income, direct 46%  | whisper cost med 9.8, share of income p25/med/p75 18%/23%/34%
+urges: hunger avg 44.0, malice avg 51.4  | ravenous/run 0.0, outbursts/run 1.0, gorges/run 0.3
+suspicion peak avg cul 67.8, gov 69.2, pub 91.8  | crossed 25/50/75/100: cul 100%/89%/51%/1%  gov 100%/94%/50%/1%  pub 100%/100%/95%/60%
+Ichor lost/run: followerLost 7.8, zoneLost 1.1
+followers lost/run by cause: burned 0.7, conscripted 0.8, died 4.5, lapsed 1.9, taken 1.6
+XP/run: devotion 64, eat 16, event 4, evil 36, follower 132, miracle 62, zone 86
+conversions/run 18.9, followers at end 9.5, evil acts 4.0, dead turns 0, idle nights 0
+per bonus (win/med turns): lingeringThrone 50%/26.0  hoardOfTheGrave 67%/26.0  patientHunger 65%/26.0  sweetVoice 62%/26.0  oldScars 53%/28.0  cruelDelight 74%/25.0  deepRoots 75%/26.0  quietRot 80%/28.0  firstDreamer 55%/27.0
+
+=== random — 200 seeds ===
+reach 9%  lost 91%  stalled 0%  | turns p10 25 med 28 p90 51  | loss turn med 28  | near-miss (won with Ichor ≤ 3): 56%
+band              t1-7   t8-14  t15-21  t22+
+income            11.3   20.4   32.8   26.5
+unspent Nether     30%    20%    14%    22%
+crystals held      4.1    3.3    3.3    3.5
+spend: influence 53% of income, direct 37%  | whisper cost med 10.1, share of income p25/med/p75 30%/42%/63%
+urges: hunger avg 40.7, malice avg 25.3  | ravenous/run 0.5, outbursts/run 0.1, gorges/run 0.1
+suspicion peak avg cul 73.3, gov 80.4, pub 94.5  | crossed 25/50/75/100: cul 100%/95%/63%/7%  gov 100%/99%/86%/9%  pub 100%/100%/99%/60%
+Ichor lost/run: followerLost 8.3, zoneLost 2.1
+followers lost/run by cause: burned 0.8, conscripted 0.5, devoured 0.4, died 2.3, lapsed 2.5, taken 4.5
+XP/run: devotion 26, eat 16, event 8, evil 87, follower 94, miracle 47, zone 71
+conversions/run 13.5, followers at end 2.5, evil acts 11.2, dead turns 0, idle nights 188
+per bonus (win/med turns): lingeringThrone 5%/53.0  hoardOfTheGrave 4%/26.0  patientHunger 8%/29.0  sweetVoice 10%/31.0  oldScars 12%/51.0  cruelDelight 26%/29.0  deepRoots 8%/31.0  quietRot 0%/—  firstDreamer 10%/28.0
+
+=== summary ===
+bot          reach   lost   p10  med  p90
+rush           93%     7%    18   21   25
+cautious       96%     4%    16   20   25
+devotion       97%     3%    16   20   25
+evil           95%     6%    18   22   25
+clean          94%     6%    17   21   26
+reckless       32%    69%    19   22   30
+neverEat        5%    96%    20   29   44
+neverVent      60%    40%    18   23   28
+massLieLow     65%    35%    23   26   31
+random          9%    91%    25   28   51

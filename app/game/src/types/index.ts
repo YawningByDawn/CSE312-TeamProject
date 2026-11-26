@@ -6,11 +6,11 @@
 
 // ---------- time (the live clock, LIVE row) ----------
 
-/** Sim ticks since the run began. The sim steps at content's TICK_HZ (10); one day is DAY_TICKS (1200 = 120 s). */
+/** Sim ticks since the run began (at the dusk); one day is DAY_TICKS (1200). */
 export type Tick = number;
 /** Hour of the day, 0..24, derived from the tick by the sim (`Query.hour`). One clock for day, light and animation. */
 export type Hour = number;
-export type Weekday = 'work' | 'payday' | 'market' | 'flame' | 'rest';
+export type Weekday = 'work' | 'payday' | 'cart' | 'flame' | 'rest';
 export type Weather = 'clear' | 'overcast' | 'drizzle' | 'rain' | 'storm' | 'fog' | 'wind' | 'cold';
 /** The part of the day the clock is in; dusk carries the offering, the ledger and the deal. */
 export type DayPart = 'night' | 'dawn' | 'shift' | 'dusk';
@@ -23,7 +23,6 @@ export type UnitId = string;
 /** A place in the one world graph: mine areas and faces, the pit head, every town building, home and street node. */
 export type PlaceId = string;
 export type CrystalId = string;
-export type ItemId = string;
 export type CardId = string;
 export type BlessingId = string;
 export type RoleId = string;
@@ -34,56 +33,46 @@ export type OddEffectId = string;
 export type ThreatId = string;
 /** A world event's id (wedding, brawl, inspector...) from content's event table. */
 export type StoryId = string;
-/** A real set of named people who gather: a household, a crew, a congregation, a watch (docs/town.md §2). */
-export type GroupId = string;
-
-/** The two halves of the one world: under the pit head and above it. */
-export type Region = 'mine' | 'town';
-export type StageId = 'whisper' | 'shade';
-/** bonus: the opening's last frame, pick 1 of 3. live: the clock runs. won: the ending beat. lost: Ichor 0 or rooted out. */
+/** bonus: the opening's last frame, pick 1 of 3. live: the clock runs. won: the mine is taken. lost: Ichor 0 or rooted out. */
 export type Phase = 'bonus' | 'live' | 'won' | 'lost';
 export type Standing = 'mortal' | 'elite' | 'blessed' | 'demigod' | 'god';
 export type FactionId = 'temple' | 'council' | 'public';
 export type Grade = 'dull' | 'clear' | 'bright' | 'blazing' | 'royal' | 'impossible';
 export type Affinity = 'hunger' | 'malice' | 'faith' | 'fear' | 'blood' | 'shadow' | 'stone' | 'echo' | 'flame';
-export type Routine = 'pray' | 'offer' | 'lieLow' | 'delve' | 'skim' | 'preach' | 'standWatch';
+export type Routine = 'pray' | 'offer' | 'lieLow' | 'delve' | 'skim';
 export type Visibility = 'active' | 'sensed' | 'void';
-export type Facility = 'faceting' | 'jewelry' | 'falseWeights' | 'profaning' | 'draughts' | 'lamps' | 'clothing' | 'brew';
-/** What a building gives once it is yours, used as an action (content's PLACES `gift`; its numbers balance's GIFTS). */
-export type Gift = 'rumour' | 'debt' | 'food' | 'records' | 'guards';
-export type JewelForm = 'ring' | 'amulet' | 'circlet';
-export type ItemKind = 'jewel' | 'weights' | 'relic' | 'draught' | 'lamp' | 'clothing' | 'brew';
 export type CardKind = 'miracle' | 'evil';
 /** The opposition's moves, by power: council, temple, public (content's THREATS). */
 export type ThreatKind =
-  | 'inspection' | 'crackdown' | 'lockdown' | 'writ' | 'levy'
-  | 'vigil' | 'inquisitor' | 'purge' | 'ward' | 'crusade'
-  | 'bolted' | 'mob' | 'riot' | 'burning';
-/** What blunts a move: an item, an Elite's favour, an act of evil, lying low, cooling the power, turning the one sent, standing watch. */
-export type Answer = 'weights' | 'relic' | 'draught' | 'favour' | 'evil' | 'hide' | 'cool' | 'agent' | 'watch';
+  | 'inspection' | 'crackdown' | 'lockdown'
+  | 'vigil' | 'inquisitor' | 'purge' | 'crusade'
+  | 'bolted' | 'mob' | 'riot';
+/** What blunts a move: an act of evil, lying low, cooling the power, turning the one sent. */
+export type Answer = 'evil' | 'hide' | 'cool' | 'agent';
 /** What an area hides until a follower explores it (content's DISCOVERIES). */
 export type DiscoveryKind = 'cache' | 'seam' | 'loner' | 'shortcut' | 'relic' | 'danger' | 'none';
-/** How a person left: eaten by you, taken or burned by the powers, dead by any other hand, marched off, or gone from the town. */
-export type GoneReason = 'devoured' | 'taken' | 'burned' | 'dead' | 'conscripted' | 'left';
+/** How a person left: eaten by you, taken or burned by the powers, dead by any other hand, or marched off. */
+export type GoneReason = 'devoured' | 'taken' | 'burned' | 'dead' | 'conscripted';
 /**
  * What a person is doing, as the rules say. The view picks the people parts' pose and the life atlas's
  * props from it; nothing else decides a pose.
  */
 export type Activity =
-  | 'sleep' | 'walk' | 'ride' | 'dig' | 'haul' | 'sort' | 'work' | 'eat' | 'drink' | 'talk'
-  | 'pray' | 'preach' | 'guard' | 'search' | 'trade' | 'wash' | 'play' | 'idle' | 'offer' | 'mourn';
+  | 'sleep' | 'walk' | 'dig' | 'haul' | 'sort' | 'work' | 'eat' | 'drink' | 'talk'
+  | 'pray' | 'guard' | 'search' | 'idle' | 'offer' | 'mourn';
 
 // ---------- state (owned by sim; plain JSON, the save is this) ----------
 
 /** mulberry32's one uint32 (sim/rng.ts): a save resumes the exact stream. */
 export interface RngState { s: number }
 
-export interface Stats { devotion: number; strength: number; intelligence: number; cunning: number; health: number }
+/** Devotion 0..100; the body's four 1..20; HP now (its top is `maxHp` in sim/host.ts). Resistance 0..100 is `Person.resistance`. */
+export interface Stats { devotion: number; dexterity: number; intelligence: number; strength: number; endurance: number; hp: number }
 
 /** Where a person is this tick. A walk names its route on the world graph; the view interpolates the content coords. */
 export type Whereabouts =
   | { place: PlaceId; spot: number; doing: Activity }
-  | { route: PlaceId[]; from: Tick; to: Tick; doing: 'walk' | 'ride' };
+  | { route: PlaceId[]; from: Tick; to: Tick; doing: 'walk' };
 
 export interface Person {
   id: UnitId;
@@ -93,19 +82,16 @@ export interface Person {
   standing: Standing;
   stats: Stats;
   resistance: number;
+  /** Where they sleep: the bunks (a loner found in hiding, the place they hide). */
   home: PlaceId;
-  household: string;
   work: PlaceId;
   /** People they are tied to; what each tie is, read the same from both ends, is `Query.tieKind`. */
   ties: UnitId[];
-  /** The buildings this person is master of. */
-  masterOf: PlaceId[];
   at: Whereabouts;
   follower: boolean;
   routine: Routine | null;
   /** Crystals pocketed on their person. */
   pocket: CrystalId[];
-  worn: ItemId[];
   /** Searches that caught them; at content's limit they are taken. */
   caught: number;
   gone: GoneReason | null;
@@ -113,6 +99,8 @@ export interface Person {
   goneDay?: number;
   /** The day they were last whispered to (one whisper a person a day). */
   whispered?: number;
+  /** The day the host last marked them: a whisper may reach them for `HOST.markDays` days from it. */
+  marked?: number;
   /** The highest Devotion milestone (25/50/75/100) already paid out as XP. */
   mark?: number;
 }
@@ -122,12 +110,16 @@ export interface PlaceState {
   /** 0..100: the share of the place in your colour. Influence is the sum. */
   hold: number;
   explored: boolean;
+  /** In colour: the acts done here crossed the colour threshold (sim/colour.ts), or the grave and its ring at the start; never lost. */
+  coloured: boolean;
+  /** Acts done here that count toward the threshold, the days they were done on, and the last such day (-1: none). */
+  acts: number;
+  actDays: number;
+  lastAct: number;
   /** What it hides (content's DISCOVERIES) was found: sticky, once a run. */
   found: boolean;
   /** Hold reached 100; lost again below content's `rootLostBelow` (and an Ichor with it). */
   rooted: boolean;
-  /** A building whose master is yours and more than half its workers are. */
-  yours: boolean;
   /** Rich seams found here: each adds content's `seamBonus` to the face's strikes. */
   seam?: number;
   /** A Flame source fouled for good: its light no longer pushes colour back. */
@@ -135,21 +127,18 @@ export interface PlaceState {
 }
 
 /**
- * Everything that lasts a while, in one list: a ward or a lockdown on a place, a card's "tomorrow", a blessed or
+ * Everything that lasts a while, in one list: a lockdown on a place, a card's "tomorrow", a blessed or
  * sick person, a faction looking away. It holds until `until`; `on` is the place, person or faction it is on.
  */
 export interface Effect {
-  kind: 'ward' | 'lockdown' | 'snuffed' | 'veinSight' | 'bloom' | 'divert' | 'rob' | 'sabotage' | 'blindEye' | 'noSearch'
-    | 'blessed' | 'sick' | 'dream' | 'sure' | 'gilded' | 'blind' | 'used'
-    /** A building's gifts: food laid for an area's dawn (`value` 1 blessed, −1 poisoned), the watch looking away from an area. */
-    | 'food' | 'lookAway'
+  kind: 'lockdown' | 'snuffed' | 'veinSight' | 'bloom' | 'divert' | 'rob' | 'sabotage' | 'blindEye' | 'noSearch'
+    | 'blessed' | 'sick' | 'dream' | 'sure' | 'used'
     /**
      * On a faction, a power's own state: resting after a move (`rest`), the crusade's burning (`kindling`). The rest
      * are a world event's doors (content's worldEvents): a rule number at a place, an area, a faction or a person.
      */
     | 'rest' | 'kindling'
-    | 'crew' | 'strike' | 'search' | 'guards' | 'notice' | 'whisper' | 'whisperZone' | 'countTolerance' | 'crowd' | 'reach'
-    | 'liftStop';
+    | 'crew' | 'strike' | 'search' | 'guards' | 'notice' | 'whisper' | 'whisperZone' | 'countTolerance' | 'crowd' | 'reach';
   on?: string;
   until: Tick;
   /** Who did it (a follower robbing a cart keeps the share). */
@@ -173,26 +162,13 @@ export interface Crystal {
   slots: number;
   /** The depth it was struck at (1..3): enchanting draws from that vein level's pool. */
   depth: number;
-  /** A Flame stone profaned at a chapel you hold: no price, no quarrel. */
+  /** A Flame stone profaned by an act of evil: no price, no quarrel. */
   profaned?: boolean;
-  /** The set of cuts the gem workshop last offered for it: the next re-cut offers another. */
-  lastCuts?: string;
   /** The real odds of this roll: 1 in `oneIn`. The reveal, sound and effect scale with it. */
   oneIn: number;
   name: string;
-  /** Where it is: the grave pouch, a socket, a person's pocket, a cart, the tally house, the vault. */
-  at: { pouch: true } | { socket: number } | { pocket: UnitId } | { cart: PlaceId } | { tally: true } | { vault: true } | { item: ItemId };
-}
-
-/** A made thing: the crystal folded into it, and who wears it (null: at hand). */
-export interface Item {
-  id: ItemId;
-  kind: ItemKind;
-  form?: JewelForm;
-  crystal: CrystalId;
-  wearer: UnitId | null;
-  /** A worn draught or brew is used up at this tick. */
-  until?: Tick;
+  /** Where it is: the grave pouch, a socket, a person's pocket, a cart. */
+  at: { pouch: true } | { socket: number } | { pocket: UnitId } | { cart: PlaceId };
 }
 
 /** A power's heat, its level, and the highest level whose move it has called (falls back with the level). */
@@ -234,44 +210,66 @@ export interface God {
   boost: number;
 }
 
-/** A choice the player owes before the clock moves on: a blessing pick, a facet, a world event's door. */
+/** A choice the player owes before the clock moves on: a blessing pick, a world event's door. */
 export type Pending =
   | { kind: 'blessing'; offers: BlessingId[] }
-  | { kind: 'facet'; crystal: CrystalId; cuts: Mod[][] }
   | { kind: 'story'; story: StoryId; options: number; unit?: UnitId; unit2?: UnitId; place?: PlaceId; count?: number };
+
+/**
+ * The possessed host's body in the mine (mine units, sim/walk.ts): where it stands and faces, its heading (0 0 at rest), the
+ * distance walked, the ore it works (an index of content's `ORE_SITES`) with the seconds worked on it, and the day's tallies:
+ * stones dug, stones delivered to the drop.
+ */
+export interface Body {
+  x: number; y: number; face: 1 | -1; dx: number; dy: number; walked: number; ore: number | null; work: number; dug: number; delivered: number;
+  /** The pick swing: seconds into it (-1 at rest) and the unit vector it aims along (OVERHAUL, ov-combat). */
+  swing: number; ax: number; ay: number;
+}
+
+/**
+ * A skeleton out of the mine's dark (OVERHAUL, ov-combat): only Hit Points and a blow (content's COMBAT), walking the host's ground.
+ * `lx, ly` are where it stood a tick ago (the view shows it moving from there); `swing` the seconds into its blow (-1 at rest);
+ * `down` the seconds since it was slain (-1 standing), `stuck` the seconds it has been walking and getting nowhere.
+ */
+export interface Mob { id: UnitId; x: number; y: number; lx: number; ly: number; face: 1 | -1; dx: number; dy: number; walked: number; hp: number; swing: number; down: number; stuck: number }
 
 export interface GameState {
   /** The state's shape: a save of another is dropped. */
-  v: 2;
+  v: 7;
   seed: Seed;
   rng: RngState;
   tick: Tick;
+  /** The tick the clock runs to: it stands there (the player's turn, the night) until an action moves it on or the day sets it. */
+  until: Tick;
   phase: Phase;
-  stage: StageId;
   weather: Weather;
-  /** The way the wind blows, radians in the town frame (0 east, a quarter turn south), set with the weather by the hour. */
+  /** The way the wind blows, radians in the world frame (0 east, a quarter turn south), set with the weather by the hour. */
   wind: number;
   god: God;
   people: Record<UnitId, Person>;
   places: Record<PlaceId, PlaceState>;
   crystals: Record<CrystalId, Crystal>;
-  items: Record<ItemId, Item>;
   factions: Record<FactionId, Faction>;
   threats: Threat[];
   pending: Pending | null;
+  /** Who the god possesses: set at a dawn, null at the dusk and the host's fall, and at a dawn until the player picks. */
+  host: UnitId | null;
+  /** The host's body in the mine while they stand by day; null otherwise. */
+  body: Body | null;
+  /** The skeletons about the host, by day while a host stands; none otherwise. */
+  mobs: Mob[];
+  /** The day each ore site was last mined (-1: never): it stands again from the next day. */
+  ores: number[];
   effects: Effect[];
-  /** The next id for a crystal or an item. */
+  /** The next id for a crystal or a threat. */
   next: number;
   /**
    * The mine's day: each face's cart (grades) and what the Council expects of the day's swings, until the count;
    * short counts in a row; follower-days dug toward the Deep.
    */
   mine: { carts: Record<PlaceId, number[]>; expected: number; shortDays: number; delve: number };
-  /**
-   * The Deep is open; the vault is open; the pit head took root; the seals on the Council's writ against the pit
-   * head; the day Shade began (0 before). Sticky facts the rules gate on.
-   */
-  flags: { deepOpen: boolean; vaultOpen: boolean; surfaceRooted: boolean; seals: number; shadeDay: number };
+  /** The Deep is open; the lift (the way up) took root. Sticky facts the rules gate on. */
+  flags: { deepOpen: boolean; liftRooted: boolean };
   /** The day's running ledger, cleared at dawn: what the day gave and cost. */
   ledger: { crystals: number; nether: number; turned: number; lost: number; suspicion: Record<FactionId, number> };
   /**
@@ -286,8 +284,6 @@ export interface GameState {
 export type Action =
   | { type: 'pickBlessing'; blessing: BlessingId }
   | { type: 'whisper'; target: UnitId }
-  /** Lands only while the group's members are together (their shift, meal, service): Query.check says when. */
-  | { type: 'whisperGroup'; group: GroupId }
   | { type: 'setRoutine'; unit: UnitId; routine: Routine }
   | { type: 'move'; unit: UnitId; to: PlaceId }
   | { type: 'take'; card: CardId | null }
@@ -299,21 +295,23 @@ export type Action =
   | { type: 'unset'; crystal: CrystalId }
   | { type: 'enchant'; crystal: CrystalId; reroll?: number }
   | { type: 'recombine'; a: CrystalId; b: CrystalId }
-  | { type: 'facet'; crystal: CrystalId }
-  | { type: 'chooseCut'; index: number }
-  | { type: 'forge'; crystal: CrystalId; form: JewelForm }
-  | { type: 'craft'; facility: Exclude<Facility, 'faceting' | 'jewelry'>; crystal: CrystalId }
-  | { type: 'give'; item: ItemId; unit: UnitId; by?: UnitId }
-  | { type: 'takeBack'; item: ItemId }
-  | { type: 'answer'; threat: ThreatId; with: ItemId | 'favour' | 'hide' }
+  /** Lay every follower exposed to the move low: the one answer that is an action. */
+  | { type: 'answer'; threat: ThreatId }
   | { type: 'story'; option: number }
-  | { type: 'openVault' }
-  /**
-   * A gift of a building of yours, then it rests: a rumour cools `target`, a power; a debt is called in on `target`, one
-   * who owes; food, poisoned or blessed (`mode`), waits for `target`, a town area, `day` days ahead; the guards look away
-   * from `target`, a town area, tomorrow; the records lose a seal of the writ.
-   */
-  | { type: 'useGift'; gift: Gift; target?: FactionId | UnitId | PlaceId; mode?: 'poison' | 'bless'; day?: number };
+  /** By day: the host marks someone near them, whom a whisper may then reach. */
+  | { type: 'mark'; target: UnitId }
+  /** By day: the host's heading (each -1, 0 or 1), held until the next; the body walks it each tick. */
+  | { type: 'walk'; dx: -1 | 0 | 1; dy: -1 | 0 | 1 }
+  /** By day: the host swings the pick toward (dx, dy), the click's direction, once the swing before it is done. */
+  | { type: 'swing'; dx: number; dy: number }
+  /** By day: the work key, at an ore mine it (again: stop), at the drop deliver the lowest stone pocketed. */
+  | { type: 'work' }
+  /** At the dawn: pick the follower (or the first miner) to possess for the day. */
+  | { type: 'possess'; unit: UnitId }
+  /** At night: burn stones to bring a fallen follower back at full HP. */
+  | { type: 'revive'; unit: UnitId }
+  /** Skip the rest of the night to dawn. */
+  | { type: 'sleep' };
 
 /** Why an action is refused, or why its odds are what they are: a content word key plus slots. */
 export interface Reason { key: string; slots?: Record<string, string | number> }
@@ -332,7 +330,7 @@ export interface Check {
 // ---------- events (the sim's output each step; view, ui and audio react, never the sim) ----------
 
 interface At { tick: Tick; place?: PlaceId; unit?: UnitId }
-/** A line for the day's feed and the note shown where it happened. */
+/** A line for the day's feed, the note under the host's plate (a click looks at where it happened). */
 export interface Note { key: string; slots?: Record<string, string | number> }
 
 export type GameEvent = At & (
@@ -340,16 +338,11 @@ export type GameEvent = At & (
   | { kind: 'weather'; weather: Weather }
   /** A strike: a follower's stone is a crystal in their pocket; anyone else's is a grade in the face's cart. */
   | { kind: 'strike'; crystal: CrystalId | null; grade: Grade; oneIn: number }
-  /**
-   * A stone's way: a pocket, a cart, a follower's tribute or offering at dusk, the town's tithe carried home at shift
-   * end, or the grave's own seep (`place` grave).
-   */
-  | { kind: 'pocket' | 'cart' | 'tribute' | 'offer' | 'tithe' | 'seep'; crystal: CrystalId }
+  /** A stone's way: a pocket, a cart, a follower's tribute or offering at dusk, or the grave's own seep (`place` grave). */
+  | { kind: 'pocket' | 'cart' | 'tribute' | 'offer' | 'seep'; crystal: CrystalId }
   | { kind: 'count'; short: number; forgiven: boolean }
-  | { kind: 'search'; found: CrystalId[]; item?: ItemId }
-  | { kind: 'exposed'; item: ItemId }
-  /** `unit` the one whispered to, or the first of a gathered `group`. */
-  | { kind: 'whisper'; ok: boolean; odds: number; group?: GroupId }
+  | { kind: 'search'; found: CrystalId[] }
+  | { kind: 'whisper'; ok: boolean; odds: number }
   /** `lost`: a follower lapses or leaves the world; `gone`: anyone else leaves it (burned, taken, dead). */
   | { kind: 'turned' | 'lost' | 'gone' }
   | { kind: 'routine'; routine: Routine }
@@ -357,21 +350,22 @@ export type GameEvent = At & (
   | { kind: 'deal'; cards: CardId[] }
   | { kind: 'took' | 'discarded'; card: CardId | null }
   | { kind: 'play'; card: CardId; cardKind: CardKind; by: 'god' | 'follower'; burnt: CrystalId[] }
-  | { kind: 'eat' | 'set' | 'unset' | 'enchant' | 'curse' | 'facet' | 'recombine'; crystal: CrystalId }
-  | { kind: 'item'; item: ItemId; how: 'made' | 'given' | 'takenBack' }
+  | { kind: 'eat' | 'set' | 'unset' | 'enchant' | 'curse' | 'recombine'; crystal: CrystalId }
   | { kind: 'devour' }
+  /** The god takes a host (`unit`) at the dawn and lets go at the dusk or the host's fall; a mark and a revival name their person. */
+  | { kind: 'possess' | 'release' | 'marked' | 'revived' | 'coloured' }
+  /** A blow lands on `unit` (the host or a skeleton) for `amount`; a skeleton slain (`unit`) may leave Nether. */
+  | { kind: 'hit'; amount: number }
+  | { kind: 'slain'; nether: number }
   | { kind: 'hold'; hold: number; was: number }
   | { kind: 'suspicion'; faction: FactionId; level: number; was: number }
   | { kind: 'threat'; threat: ThreatId; how: 'announced' | 'landed' | 'answered' }
-  | { kind: 'building'; yours: boolean }
   | { kind: 'ichor' | 'hunger' | 'malice' | 'nether' | 'xp'; delta: number }
   | { kind: 'starve' | 'lashOut' }
   | { kind: 'rank'; level: number }
-  | { kind: 'deepOpen' | 'vaultOpen' }
+  | { kind: 'deepOpen' }
   /** What an area hid is found (`place`; `unit` the follower who found it). */
   | { kind: 'found'; discovery: DiscoveryKind }
-  /** The watershed: the stage became Shade. The view plays the pull-back while app holds the clock. */
-  | { kind: 'stage'; stage: StageId }
   | { kind: 'story'; story: StoryId }
   | { kind: 'end'; won: boolean; why: Reason }
 ) & { note?: Note };

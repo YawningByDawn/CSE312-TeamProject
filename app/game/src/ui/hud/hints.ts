@@ -4,8 +4,8 @@ import { uiText } from '../../content/text';
 import { line } from '../panels/art';
 import { DIM, INK, Words, div, surface } from '../kit';
 import type { Anchors, Corner } from '../index';
-import { CLOCK_H, CLOCK_W } from './clock';
-import { GOD_W } from './god';
+import { GOD_W, GOD_Y } from './god';
+import { GOAL_Y } from './goal';
 
 // Hints (inventory #106): each teaches one thing and sits by it, one at a time, while hints are on in Settings. It goes
 // when the player does the thing, after a while, or on a click; a hint gone does not come back, in this run or the
@@ -29,11 +29,10 @@ const followers = (s: Readonly<GameState>): number => Object.values(s.people).fi
 
 const HINTS: readonly Hint[] = [
   { id: 'whisper', at: ['c', -W / 2, -390], when: (s, d) => d <= 3 && followers(s) === 0, done: (_, e) => e.kind === 'whisper' || e.kind === 'turned' },
-  { id: 'ap', at: ['br', -CLOCK_W, -CLOCK_H - 12 - H], when: (s, d) => d <= 3 && s.god.ap < s.god.apMax, done: () => false },
   { id: 'offer', at: ['c', -W / 2, -390], when: (s, d) => d <= 3 && followers(s) > 0, done: (_, e) => e.kind === 'routine' && e.routine === 'offer' },
   { id: 'hand', at: ['bc', -W / 2, -248 - H], when: (s, d) => d <= 3 && s.god.hand.length > 0 && !s.god.deal, done: (_, e) => e.kind === 'play' },
-  { id: 'goal', at: ['tl', GOD_W + 16, 0], when: (_, d) => d >= 2 && d <= 3, done: () => false },
-  { id: 'hunger', at: ['tl', GOD_W + 16, 0], when: (s) => s.god.hunger >= BALANCE.starvingAt, done: (_, e) => e.kind === 'eat' },
+  { id: 'goal', at: ['tr', -GOD_W - 16 - W, GOAL_Y], when: (_, d) => d >= 2 && d <= 3, done: () => false },
+  { id: 'hunger', at: ['tr', -GOD_W - 16 - W, GOD_Y], when: (s) => s.god.hunger >= BALANCE.starvingAt, done: (_, e) => e.kind === 'eat' },
 ];
 
 export class Hints {

@@ -3,12 +3,11 @@
  * effect × curse) from a vein level, as src/sim/crystals.ts rolled it; `oneIn` is the real rarity of the roll.
  * Set stones act through their modifier families (`lineTotal`) and fields (`fieldTotal`).
  */
-import { CRYSTAL, EFFECT, GRADES, GRADE_VALUE, ODD_EFFECT_IDS } from '../content/crystals';
+import { CRYSTAL, EFFECT, GRADES, GRADE_VALUE, ODD_EFFECT_IDS, SET_POWER, SET_SIZE, type SetEffect } from '../content/crystals';
 import {
   AFFINITY_IDS, BASES, BASE_BELOW, BASE_IDS, CURSE_IDS, GRADE, MINE_TIER, MINE_TIERS, MODS, MOD_IDS, MOD_RARE_AT,
   type MineTierId, type ModField, type StatLineId,
 } from '../content/gems';
-import { SET_POWER, SET_SIZE, type SetEffect } from '../content/items';
 import { chance, nextU32, rand } from './rng';
 import { uiText } from '../content/text';
 import type { Affinity, BaseId, Crystal, GameState, Grade, Mod, ModId, OddEffectId, RngState } from '../types';

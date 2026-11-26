@@ -9,7 +9,7 @@ export type At = typeof FEET | typeof CROWN | typeof GRAVE | typeof RIDE | typeo
 /**
  * One part: cell (`@gem` the event's stone, a name ending `-` steps through its frames), tint (-1 the grade's ink),
  * where, start s, length s, radius from and to, peak alpha, count, spread, rise (negative: falls from that height), how,
- * turn (rad/s). How: g lies on the ground, b bursts outward from the spread, i draws in to the centre, n blends normally,
+ * turn (rad/s). How: c stands at the chest, g lies on the ground, b bursts outward from the spread, i draws in to the centre, n blends normally,
  * o stands round a ring at the spread, r stands in a row across it, x drifts across it, s staggers its count over its
  * length, l is a line from the centre (riding: from where it set out) to its point, a alternates its tint with the deep
  * violet, p shares its points with the clip's other p parts.
@@ -214,32 +214,20 @@ export const CLIPS: Record<string, readonly Part[]> = {
   pocket: [['@gem', -1, FEET, 0, 0.6, 0.22, 0.1, 1, 1, 0, 0.4], SPARK(PALE, FEET, 0.4, 4, 0.3)],
   cart: [['@gem', -1, FEET, 0, 0.6, 0.2, 0.15, 1, 1, 0, -0.2], PUFF(DUST, FEET, 0.4, 4, 0.3)],
   tribute: [['@gem', -1, BACK, 0, 1.4, 0.2, 0.2, 1, 1], RING(LIGHT, GRAVE, 1.3, 0.8, 0.4, 1.4)],
-  // a stone of the town's tithe carried home: a glint from the tither to the grave, a burst and a ring as it lands
-  tithe: [
-    ['glow-0.3', -1, BACK, 0, 1.2, 0.12, 0.12, 1, 1], SPARK(-1, GRAVE, 1.2, 6, 0.6, 0.06), SPARK(PALE, GRAVE, 1.25, 4, 0.5, 0.05),
-    ['glow-0.3', -1, GRAVE, 1.2, 0.6, 1.1, 1.1, 0.55], RING(-1, GRAVE, 1.2, 0.55, 0.4, 1.2, 1, 'ring-2-1.1'),
-  ],
   offer: [MOTES(LIGHT, BACK, 0, 8, 0, 1.6), RING(LIGHT, GRAVE, 1.4, 1, 0.4, 1.6), ['@gem', -1, GRAVE, 1.4, 1.8, 0.26, 0.26, 1, 1, 0, 0.3], ['ray', -1, GRAVE, 1.7, 1.4, 0.5, 1, 0.5, 6, 0, 0, 'o']],
   count: [RING(BONE, FEET, 0, 1.4, 0.4, 1.6, 0.7, 'ring-2-1.1'), ['glyph-dot-1.7', BONE, FEET, 0.1, 1.6, 0.25, 0.25, 0.9, 5, 0.8, 0.3, 'o']],
   short: [RING(BLOOD, FEET, 0, 1.6, 0.4, 2, 0.8, 'ring-4-1.1'), ['glyph-low-2.4', BLOOD, CROWN, 0.1, 1.8, 0.4, 0.4, 1, 1, 0, 0.4]],
   search: [RING(STEEL, FEET, 0, 0.55, 1.4, 0.65, 1, 'ring-8-1.8'), RING(STEEL, FEET, 0.15, 0.55, 1.4, 0.65, 0.8, 'ring-8-1.8')],
   seized: [RING(STEEL, FEET, 0, 0.55, 1.4, 0.65, 1, 'ring-8-1.8'), SPARK(GOLD, FEET, 0.7, 12, 1), ['glyph-evil-2.4', BLOOD, CROWN, 0.7, 1.6, 0.4, 0.4, 1, 1, 0, 0.4]],
-  exposed: [['glyph-evil-3.4', BLOOD, CROWN, 0, 1.9, 0.5, 0.5, 1, 1, 0, 0.5], RING(BLOOD, FEET, 0.7, 1, 0.5, 2.6, 0.9, 'ring-8-1.8'), SPARK(STEEL, FEET, 0.7, 10, 1)],
   enchant: [SPARK(VIOLET, GRAVE, 0, 14, 1), ['glyph-diamond-1.7', PALE, GRAVE, 0.1, 1.4, 0.25, 0.25, 1, 6, 1.4, 0.2, 'o'], RING(VIOLET, GRAVE, 0.2, 1, 0.3, 1.6)],
   curse: [['puff-2', SMOKE, GRAVE, 0, 1.6, 0.4, 1, 0.7, 4, 0.4, 1, 'n'], SPARK(BLOOD, GRAVE, 0.2, 12, 1.2), RING(BLOOD, GRAVE, 0.2, 1, 0.3, 1.6)],
-  facet: [['star4', -1, GRAVE, 0, 0.3, 0.4, 0.1, 1, 4, 0.3, 0, 's'], ['ray', -1, GRAVE, 0.3, 1, 0.4, 0.8, 0.7, 6, 0, 0, 'o'], SPARK(PALE, GRAVE, 0.3, 10, 0.8)],
   recombine: [['@gem', -1, GRAVE, 0, 0.8, 0.22, 0.22, 1, 2, 1.4, 0, 'o'], ['glow-0.3', -1, GRAVE, 0.75, 0.8, 0.2, 1.2, 1], RING(-1, GRAVE, 0.8, 1, 0.4, 2)],
-  made: [SPARK(GOLD, GRAVE, 0, 14, 1), ['glow-0.3', GOLD, GRAVE, 0, 1.2, 0.6, 0.2, 0.8], RING(GOLD, GRAVE, 0.2, 1, 0.3, 1.4)],
-  given: [['glow-0.3', GOLD, RIDE, 0, 1.2, 0.15, 0.15, 1, 1], SPARK(GOLD, FEET, 1.1, 8, 0.6), ['glyph-diamond-1.7', GOLD, CROWN, 1.2, 1.2, 0.25, 0.25, 1, 1, 0, 0.4]],
-  takenBack: [['glow-0.3', GOLD, BACK, 0, 1.2, 0.15, 0.15, 1, 1], RING(GOLD, FEET, 0, 0.8, 0.8, 0.3)],
   hold: [RING(VIOLET, FEET, 0, 2, 0.6, 4, 0.6, 'ring-16-1.8'), MOTES(VIOLET, FEET, 0.2, 10, 1.5, 1.8)],
   announced: BELL,
   council: [['ring-16-1.8', STEEL, FEET, 0, 0.8, 1.4, 0.65, 1, 2, 0, 0, 'gs'], SPARK(STEEL, FEET, 0.3, 10, 1), ['glyph-scout-2.4', STEEL, CROWN, 0, 2, 0.4, 0.4, 1, 1, 0, 0.3]],
   temple: [['tongue-0-', FIRE, FEET, 0, 1.1, 0.8, 0.8, 1, 16, 3, 0, 's'], MOTES(FIRE, FEET, 0, 20, 2.5, 2.4)],
   public: [['puff-1', DUST, FEET, 0, 1.6, 0.4, 1, 0.5, 12, 1.5, 0.6, 'bn'], SPARK(FIRE, FEET, 0.2, 14, 1.6)],
   answered: [RING(GOLD, FEET, 0, 2.6, 0.4, 2.4, 0.9, 'ring-4-1.8'), ['glyph-pray-1.7', GOLD, FEET, 0, 2.4, 0.25, 0.25, 1, 8, 2.4, 0, 'o'], SPARK(GOLD, FEET, 0.35, 18, 2), ['soft-3', GRAY, FEET, 0.35, 1.2, 0.06, 0.03, 0.6, 10, 1.5, 0.5, 'b']],
-  yours: [RING(VIOLET, FEET, 0, 2, 0.5, 3, 0.8, 'ring-8-1.8'), MOTES(VIOLET, FEET, 0, 14, 2, 1.8)],
-  theirs: [RING(GRAY, FEET, 0, 1.6, 0.5, 2.4, 0.6, 'ring-8-1.8')],
   hunger: [SHADOW(GRAVE, 0, 2, 3, 0.8, INK), RING(VIOLET, GRAVE, 0, 1.3, 2.2, 1, 0.8), ['claw-1-', INK, GRAVE, 0, 0.8, 1.5, 1.5, 0.9, 1, 0, 0, 'n']],
   rank: [MOTES(PALE, GRAVE, 0.5, 18, 2.5, 1.3), ['glyph-pray-2.4', VIOLET, GRAVE, 0.3, 2, 0.3, 0.3, 1, 8, 2.4, 0.2, 'o'], RING(PALE, GRAVE, 0.85, 1.2, 0.4, 4, 1, 'ring-8-2.8'), ['beam', VIOLET, GRAVE, 0.4, 2, 1.2, 1.2, 0.6, 6, 0.3, 0, 's']],
   ichor: [['disc', BLOOD, GRAVE, 0, 1.6, 0.1, 0.06, 1, 3, 0.4, 1.6, 's'], RING(BLOOD, GRAVE, 0, 1.2, 0.55, 0.55, 0.6)],
@@ -264,6 +252,10 @@ export const CLIPS: Record<string, readonly Part[]> = {
     ['ring-8-1.1', TEAL_DEEP, GRAVE, 0, 2.8, 8, 3.2, 0.45, 1, 0, 0, 'gn'],
   ],
   mark: [RING(VIOLET, FEET, 0, 2.2, 0.36, 0.36, 0.8, 'ring-2-0.7')],
+  /** a blow lands (the struck body's flash and chips, hit-0..5: its cell is 0.8 of a figure across and the burst in it a third of that, at the chest: how `c`) */
+  hit: [['hit-', BONE, FEET, 0, 0.32, 0.4, 0.4, 1, 1, 0, 0, 'nc']],
+  /** a slain skeleton leaves Nether: a violet pool and motes lifting from the bones */
+  drop: [POOL(VIOLET, FEET, 0, 1.6, 0.7, 0.5), SPARK(VIOLET, FEET, 0, 10, 0.8), MOTES(PALE, FEET, 0.1, 9, 1.4, 1.5, 0.35)],
 };
 
 /** The dawn's bell-wave (world.ts dawn): it runs up through the mine and the shaft to the pit head over WAVE_S. */
@@ -276,20 +268,20 @@ export function clipOf(e: GameEvent, s: ViewModel['state']): string | null {
     case 'routine': return e.routine === 'lieLow' || e.routine === 'pray' ? e.routine : 'heard';
     case 'moved': return e.ok ? 'arrive' : 'balked';
     case 'count': return e.short > 0 && !e.forgiven ? 'short' : 'count';
-    case 'search': return e.found.length || e.item ? 'seized' : 'search';
+    case 'search': return e.found.length ? 'seized' : 'search';
     case 'play': return e.by === 'follower' ? 'follower' : e.card === 'devour' ? null : `card:${e.card}`;
-    case 'item': return e.how;
     case 'threat': return e.how === 'landed' ? (s.threats.find((x) => x.id === e.threat)?.faction ?? 'council') : e.how;
-    case 'building': return e.yours ? 'yours' : 'theirs';
     case 'starve': return 'hunger';
     case 'lashOut': return null;
     case 'gone': return 'lost';
     case 'ichor': return e.delta < 0 ? 'ichor' : null;
-    case 'deepOpen': case 'vaultOpen': return 'cache';
+    case 'hit': return 'hit';
+    case 'slain': return e.nether > 0 ? 'drop' : null;
+    case 'deepOpen': return 'cache';
     case 'found': return e.discovery;
     case 'strike': return `strike:${GRADES.indexOf(e.grade)}`;
     case 'turned': case 'lost': case 'devour': case 'eat': case 'set': case 'unset': case 'pocket': case 'cart':
-    case 'tribute': case 'offer': case 'tithe': case 'exposed': case 'enchant': case 'curse': case 'facet': case 'recombine': case 'hold':
+    case 'tribute': case 'offer': case 'enchant': case 'curse': case 'recombine': case 'hold':
     case 'rank': case 'dawn': case 'dusk':
       return e.kind;
     default: return e.note ? 'mark' : null;

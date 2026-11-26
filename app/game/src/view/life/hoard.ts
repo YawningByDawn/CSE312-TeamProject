@@ -24,21 +24,19 @@ interface Seat { pool: Sprite; heart: Sprite; motes: Sprite[]; x: number; y: num
 export class Hoard {
   readonly root = new Container();
   private seats: Seat[] = [];
-  private shown = { key: '', step: -1, fade: -1 };
+  private shown = { key: '', step: -1 };
 
   constructor(private readonly life: Atlas, private readonly gx: number, private readonly gy: number) {}
 
   /** Place the hoard; true when what it shows changed. */
-  frame(vm: ViewModel, fade: number): boolean {
+  frame(vm: ViewModel): boolean {
     const s = vm.state, sh = this.shown;
     const set = s.god.sockets.map((id) => (id ? s.crystals[id] : undefined));
     const key = set.map((c) => c?.id ?? '-').join() + '|' + Object.values(s.crystals).filter((c) => 'pouch' in c.at).length;
     const step = Math.floor(vm.time * STEP_HZ);
-    if (key === sh.key && (step === sh.step || this.seats.length === 0) && fade === sh.fade) return false;
+    if (key === sh.key && (step === sh.step || this.seats.length === 0)) return false;
     if (key !== sh.key) this.build(set, Object.values(s.crystals).filter((c) => 'pouch' in c.at));
-    sh.key = key; sh.step = step; sh.fade = fade;
-    this.root.visible = fade > 0;
-    this.root.alpha = fade;
+    sh.key = key; sh.step = step;
     const t = step / STEP_HZ;
     for (const seat of this.seats) {
       const p = 0.85 + 0.15 * Math.sin((t / PULSE) * Math.PI * 2 + seat.x);

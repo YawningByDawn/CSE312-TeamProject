@@ -4,8 +4,8 @@ import { hasText, uiText } from './text';
 
 export const KEYS: Readonly<Record<Bind, readonly string[]>> = {
   up: ['w', 'arrowup'], down: ['s', 'arrowdown'], left: ['a', 'arrowleft'], right: ['d', 'arrowright'],
-  zoomIn: ['=', '+'], zoomOut: ['-', '_'], pause: [' '], confirm: ['enter', ' '], back: ['escape'], stats: ['i'], people: ['p'],
-  again: ['r'], details: ['shift'], pick1: ['1'], pick2: ['2'], pick3: ['3'], pick4: ['4'], pick5: ['5'], profiler: ['f3'],
+  zoomIn: ['=', '+'], zoomOut: ['-', '_'], skip: [' '], confirm: ['enter', ' '], back: ['escape'], stats: ['i'], people: ['p'],
+  again: ['r'], mark: ['e'], work: ['f'], details: ['shift'], pick1: ['1'], pick2: ['2'], pick3: ['3'], pick4: ['4'], pick5: ['5'], profiler: ['f3'],
 };
 
 export const BINDS = Object.keys(KEYS) as Bind[];

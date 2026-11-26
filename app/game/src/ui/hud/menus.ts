@@ -1,15 +1,17 @@
-import type { Bind, FactionId, GameState, Intent, Menu, Person, Query, Settings, ViewModel } from '../../types';
+import type { Action, Bind, FactionId, GameState, Intent, Menu, Person, Query, Settings, ViewModel } from '../../types';
 import { BINDS, keyName } from '../../content/keys';
 import { hasText, uiText } from '../../content/text';
+import { HOST } from '../../content/stats';
+import { why1 } from '../panels/grave';
 import { area, maxIchor, whereNow } from '../../sim/core';
 import { portrait, verb, slab } from '../panels/art';
 import { BLOOD, DIM, PALE, Pic, VIOLET, Words, attr, div, row, surface } from '../kit';
 import type { Anchors } from '../index';
-import { GOD_H } from './god';
-import { POWERS_W } from './powers';
+import { GOD_W, GOD_Y } from './god';
+import { roster } from './people';
 
 // The menus (inventory #107, 109, 110): what app's `vm.menu` holds open, one at a time over the rest layout. The stats
-// menu (I, or the god's corner) hangs under the god's corner: each night's urges and stores, your people, your rank,
+// menu (I, or the god's corner) stands left of the god's corner: each night's urges and stores, your people, your rank,
 // the powers, a label and a number a row, its line on hover. The characters menu (P): yours, then those walking against
 // you, a face, a name, a trade, where they are and what they do; a click looks at them. Settings (back, or the cog), in
 // two tabs: General, the volumes, the interface's size, the hints and, in a run, Main menu (the save kept); Keys, each
@@ -34,15 +36,16 @@ export class Menus {
   private set: Readonly<Settings> | null = null;
   private hour = -1;
   private root: HTMLDivElement | null = null;
+  private fade = false;
   private tab: (typeof TABS)[number] = 'general';
   /** The key plate waiting for a key: its bind and which of its two keys. */
   private listen: [Bind, number] | null = null;
 
   constructor(private readonly at: Anchors, cogAt: HTMLElement, private readonly send: (i: Intent) => void, private readonly q: Query) {
-    this.cog = surface(cogAt, 'slab', -POWERS_W - 56, 0, 44, 44, 'hg-hit');
+    // the cog stands in the top right corner itself
+    this.cog = surface(cogAt, 'slab', -44, 0, 44, 44, 'hg-hit');
     new Pic(this.cog, 22, 22, 'icon.cog');
-    // the cog stands left of the powers, where nothing else is
-    this.cog.addEventListener('click', () => this.send({ kind: 'menu', menu: 'settings' }));
+    this.cog.addEventListener('click', () => this.send({ kind: 'menu', menu: this.menu === 'settings' ? null : 'settings' }));
     // a plate waiting for a key takes the next one before anything else reads it
     window.addEventListener('keydown', (e) => {
       const set = this.set;
@@ -61,9 +64,12 @@ export class Menus {
     const s = vm.state, m = vm.menu, hour = Math.floor(this.q.hour(s.tick));
     // stats and people move with the state and the hour; settings with the settings (a new object on each change)
     if (m === this.menu && vm.settings === this.set && (m === 'settings' || (vm.fresh.length === 0 && hour === this.hour))) return;
+    // the pane fades in once, when it opens; built again on a change it stands still
+    this.fade = m !== this.menu;
     this.menu = m;
     this.set = vm.settings;
     this.hour = hour;
+    const top = this.scroller()?.scrollTop ?? 0;
     this.root?.remove();
     this.root = null;
     if (m !== 'settings') this.listen = null;
@@ -71,7 +77,12 @@ export class Menus {
     if (m === 'stats') this.stats(s);
     else if (m === 'people') this.people(s);
     else this.settings(vm.settings, vm.title);
+    // built again on a change, a list stays where it was read
+    const list = this.scroller();
+    if (list && !this.fade) list.scrollTop = top;
   }
+
+  private scroller = (): Element | null => this.root?.querySelector('.hg-scroll') ?? null;
 
   /** Settings built again on the next frame (a tab, a plate waiting). */
   private redo = (): void => { this.set = null; };
@@ -80,7 +91,7 @@ export class Menus {
 
   /** A slab with its title tab and a Close plate, in `anchor` at (x, y). */
   private pane(anchor: HTMLElement, x: number, y: number, w: number, h: number, title: string): HTMLDivElement {
-    this.root = div(anchor, 'hg-b hgp-in');
+    this.root = div(anchor, this.fade ? 'hg-b hgp-in' : 'hg-b');
     const { el, say } = slab(this.root, x, y, w, h, title);
     verb(el, w - 120, 16, 100, 40, uiText('btn.close'), '', this.close, say);
     return el;
@@ -110,7 +121,7 @@ export class Menus {
       ]],
     ];
     const h = 84 + groups.reduce((a, [, rows]) => a + 38 + rows.length * 30, 0) + 16;
-    const el = this.pane(this.at.tl, 0, GOD_H + 12, STATS_W, h, uiText('menu.stats'));
+    const el = this.pane(this.at.tr, -GOD_W - 12 - STATS_W, GOD_Y, STATS_W, h, uiText('menu.stats'));
     let y = 80;
     for (const [head, rows] of groups) {
       new Words(el, 28, y + 8, 17, DIM).set(head);
@@ -126,15 +137,9 @@ export class Menus {
   }
 
   private people(s: Readonly<GameState>): void {
-    const live = Object.values(s.people).filter((p) => !p.gone);
-    const walkers = new Set(s.threats.flatMap((t) => t.walkers));
-    const against = live.filter((p) => !p.follower && walkers.has(p.id));
-    const groups: [string, Person[]][] = [
-      [uiText('people.yours'), live.filter((p) => p.follower)],
-      [uiText('people.against'), against],
-      // the masters of the buildings and the Elites: who is worth turning
-      [uiText('people.known'), live.filter((p) => !p.follower && !against.includes(p) && (p.masterOf.length > 0 || p.standing === 'elite'))],
-    ];
+    const { yours, against, fallen } = roster(s);
+    const groups: [string, Person[]][] = [[uiText('people.yours'), yours], [uiText('people.against'), against]];
+    if (fallen.length > 0) groups.push([uiText('people.fallen'), fallen]);
     const rows = groups.reduce((a, [, ps]) => a + 32 + (ps.length ? ps.length * ROW_H : NONE_H), 0);
     const h = Math.min(PEOPLE_H, 96 + rows);
     const el = this.pane(this.at.c, -PEOPLE_W / 2, -h / 2, PEOPLE_W, h, uiText('menu.people'));
@@ -153,8 +158,12 @@ export class Menus {
         const r = div(list, 'hg-b hg-hit', 0, y, PEOPLE_W - 60, ROW_H - 6);
         portrait(r, s, p, 32, 32, 58);
         new Words(r, 72, 8, 20, p.follower ? VIOLET : PALE).set(p.name);
-        new Words(r, 72, 36, 16, DIM).set(this.line(s, p));
+        new Words(r, 72, 36, 16, DIM).set(p.gone ? uiText('people.fell', { role: uiText(`role.${p.role}.name`), n: Math.round(p.stats.devotion) }) : this.line(s, p));
         if (p.follower) new Words(r, PEOPLE_W - 76, 10, 20, PALE, 'right', 0).num().set(String(Math.round(p.stats.devotion)));
+        else if (p.gone) {
+          const a: Action = { type: 'revive', unit: p.id };
+          verb(r, PEOPLE_W - 60 - 170, 4, 160, ROW_H - 14, uiText('btn.revive'), why1(this.q.check(s, a)), () => this.send({ kind: 'act', action: a }), () => {}, uiText('btn.reviveCost', { n: HOST.reviveStones }));
+        }
         r.addEventListener('click', () => {
           this.send({ kind: 'focus', focus: { unit: p.id } });
           this.close();

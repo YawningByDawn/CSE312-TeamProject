@@ -69,8 +69,7 @@ export class Tip {
   }
 
   frame(vm: ViewModel): void {
-    // real time: a tip shows over a paused game too
-    this.now += vm.dt;
+    this.now = vm.time;
     // a panel built again under a resting pointer: its part there now
     if (this.over && !this.over.isConnected) this.at(document.elementFromPoint(this.x, this.y));
     if (vm.hover !== this.hoverAt) {

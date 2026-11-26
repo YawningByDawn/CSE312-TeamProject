@@ -6,28 +6,25 @@ import { BALANCE } from '../content/balance';
 import { AT, DAY_TICKS, dayOf, tod } from '../content/clock';
 import { EFFECT, GRADE_VALUE, GRADES } from '../content/crystals';
 import { CARD } from '../content/cards';
-import { ITEM } from '../content/items';
 import { ROLES } from '../content/roles';
-import { STAGES } from '../content/stages';
+import { STAGE } from '../content/stages';
 import { DEEP } from '../content/world';
 import {
-  addEffect, addHeat, area, areaDef, asleep, cash, digs, door, ev, everyone, followers, gainCrystal, has, here, inMine, mint, nbrs, pocketTo, remove,
+  addEffect, addHeat, area, areaDef, asleep, cash, digs, door, ev, everyone, followers, gainCrystal, has, here, mint, nbrs, pocketTo, remove,
   untilShiftEnd, whereNow, type Ctx,
 } from './core';
 import { bonus } from './bonus';
 import { newCrystal, oddCount, rollGrade, tierOf } from './crystals';
 import { round1 } from './formulas';
-import { worn } from './items';
 import { chance, rand } from './rng';
-import { evidence } from './town';
-import { calendarOf, liftRuns } from './world';
+import { calendarOf } from './world';
 import { idKey } from './world/draw';
 import type { GameState, Person, PlaceId } from '../types';
 
 /** A face's depth for the roll: the Deep counts as the lower workings until it is opened. */
 export function workDepth(s: Readonly<GameState>, at: PlaceId): number {
   const d = areaDef(at).depth || 1;
-  return area(at) === DEEP && s.stage === 'whisper' && !s.flags.deepOpen ? BALANCE.sealedDepth : d;
+  return area(at) === DEEP && !s.flags.deepOpen ? BALANCE.sealedDepth : d;
 }
 
 const sick = (s: Readonly<GameState>, p: Readonly<Person>): boolean => !!has(s, 'sick', p.id);
@@ -37,9 +34,9 @@ const face = (s: Readonly<GameState>, at: PlaceId): number => 1 + (s.places[area
 
 /** One swing's chance to free a stone. */
 export function strikeChance(s: Readonly<GameState>, p: Readonly<Person>): number {
-  let q = BALANCE.strikeChance * face(s, p.work) * (1 + (p.stats.strength - 50) / BALANCE.strengthSpan) * door(s, 'strike', p.work);
+  let q = BALANCE.strikeChance * face(s, p.work) * (1 + (p.stats.strength - 10) / BALANCE.strengthSpan) * door(s, 'strike', p.work);
   if (p.follower) {
-    q *= BALANCE.followerStrike * (1 + bonus(s, 'strikeRate') + worn(s, p, 'strikeRate') / 100);
+    q *= BALANCE.followerStrike * (1 + bonus(s, 'strikeRate'));
     if (has(s, 'blessed', p.id)) q *= 1 + CARD.blessStrike;
     if (has(s, 'dream', p.id)) q *= 2;
   }
@@ -52,7 +49,7 @@ export function shiftTick(c: Ctx): void {
   const k = tod(s.tick) - AT.shift;
   const span = AT.shiftEnd - AT.shift;
   for (const p of everyone(s)) {
-    if (!here(p) || !digs(p) || sick(s, p) || p.routine === 'delve' || whereNow(p, s.tick) !== p.work) continue;
+    if (!here(p) || !digs(p) || p.id === s.host || sick(s, p) || p.routine === 'delve' || whereNow(p, s.tick) !== p.work) continue;
     const rolls = BALANCE.strikeRolls + (has(s, 'bloom', p.work) ? CARD.bloomRolls : 0);
     const h = idKey(p.id) / 4294967296;
     for (let r = 0; r < rolls; r++) if (Math.floor(((r + h) / rolls) * span) === k) swing(c, p);
@@ -65,7 +62,7 @@ function swing(c: Ctx, p: Person): void {
   if (!chance(s.rng, strikeChance(s, p))) return;
   const depth = workDepth(s, p.work);
   if (p.follower && p.routine !== 'lieLow') {
-    const luck = bonus(s, 'strikeLuck') + worn(s, p, 'strikeLuck') + (has(s, 'veinSight', p.work) ? CARD.veinSightLuck : 0);
+    const luck = bonus(s, 'strikeLuck') +(has(s, 'veinSight', p.work) ? CARD.veinSightLuck : 0);
     let floor = 0;
     if (oddCount(s, 'lodestone') > 0 && !has(s, 'used', 'lodestone')) {
       floor = EFFECT.lodestoneTier;
@@ -93,12 +90,8 @@ export function shiftEnd(c: Ctx): void {
   handIn(c);
   skim(c);
   carts(c);
-  // The count and the searches are at the lift while the god is in the mine (in the town they are the tithe's): a
-  // stopped lift (a storm, lightning on the gear) brings nobody up to them.
-  if (c.s.stage === 'whisper' && liftRuns(c.s)) {
-    count(c);
-    searches(c);
-  }
+  count(c);
+  searches(c);
   clearCarts(c);
 }
 
@@ -127,7 +120,7 @@ function delve(c: Ctx): void {
 function handIn(c: Ctx): void {
   const s = c.s;
   followers(s, (p) => {
-    if (p.routine !== 'lieLow' || !inMine(p.work) || p.pocket.length === 0) return;
+    if (p.routine !== 'lieLow' || p.pocket.length === 0) return;
     const cart = (s.mine.carts[area(p.work)] ??= []);
     for (const id of p.pocket) {
       cart.push(tierOf(s.crystals[id]!.grade));
@@ -144,7 +137,7 @@ function skim(c: Ctx): void {
   const q = BALANCE.skimChance * (oddCount(s, 'magpie') > 0 ? EFFECT.magpieMult : 1);
   followers(s, (p) => {
     const at = area(p.work);
-    if (p.routine !== 'skim' || (taken.get(at) ?? 0) >= STAGES[s.stage].skimCap || !chance(s.rng, q)) return;
+    if (p.routine !== 'skim' || (taken.get(at) ?? 0) >= STAGE.skimCap || !chance(s.rng, q)) return;
     const from = s.mine.carts[at]?.length ? at : Object.keys(s.mine.carts).sort().find((z) => s.mine.carts[z]!.length > 0);
     if (!from) return;
     const g = s.mine.carts[from]!.shift()!;
@@ -184,10 +177,8 @@ function carts(c: Ctx): void {
  * overseer at the lift, the tally house in the town), Heavy Heart and every false weight a follower wears.
  */
 export function tolerance(s: Readonly<GameState>, expected: number, kept: boolean, at: PlaceId): number {
-  let weights = 0;
-  followers(s, (p) => { weights += worn(s, p, 'falseWeights'); });
   const base = (BALANCE.tallyTolerance * expected + BALANCE.tallyFloor) * (kept ? BALANCE.overseerTolerance : 1);
-  return round1((base + bonus(s, 'tolerance') + weights) * door(s, 'countTolerance', at));
+  return round1((base + bonus(s, 'tolerance')) * door(s, 'countTolerance', at));
 }
 
 /** The count at the lift: what came up against what the Council expects. */
@@ -220,12 +211,11 @@ export function searchDayChance(s: Readonly<GameState>): number {
 
 /**
  * One carrier's chance to be searched where the search is (`on`, and `also` for its doors): none lying low, carrying
- * nothing, or where the guards look away; half with a guard of yours there; less for the cunning and the guard-blind.
+ * nothing, or where the guards look away; half with a guard of yours there; less for the clever and the guard-blind.
  */
 export function searchEachChance(s: Readonly<GameState>, p: Readonly<Person>, guard: boolean, on: PlaceId, also: PlaceId = on): number {
-  if (p.routine === 'lieLow' || (p.pocket.length === 0 && p.worn.length === 0) || has(s, 'lookAway', area(on))) return 0;
-  const blind = 1 - Math.min(ITEM.blindMax, worn(s, p, 'guardBlind') / 100);
-  return Math.min(0.95, BALANCE.searchEach * bonus(s, 'searchMult') * (guard ? 0.5 : 1) * blind * (1 - p.stats.cunning / 300) * door(s, 'search', on, also));
+  if (p.routine === 'lieLow' || p.pocket.length === 0) return 0;
+  return Math.min(0.95, BALANCE.searchEach * bonus(s, 'searchMult') * (guard ? 0.5 : 1) *(1 - p.stats.intelligence / BALANCE.searchWit) * door(s, 'search', on, also));
 }
 
 /** Searches at the lift: a stash found is lost and the follower marked; caught twice, they are taken. */
@@ -235,8 +225,8 @@ function searches(c: Ctx): void {
   const met: Person[] = [];
   let guard = false;
   followers(s, (p) => {
-    if (inMine(p.work)) met.push(p);
-    if (councilEye(p) && inMine(p.work) && areaDef(p.work).watched) guard = true;
+    met.push(p);
+    if (councilEye(p) && areaDef(p.work).watched) guard = true;
   });
   for (const p of met) if (chance(s.rng, searchEachChance(s, p, guard, 'lift', p.work))) searchOne(c, p);
 }
@@ -245,14 +235,13 @@ export function searchOne(c: Ctx, p: Person): void {
   const s = c.s;
   let value = 0;
   // a second, hidden pocket: the search finds only half
-  const found = p.pocket.splice(0, worn(s, p, 'secondPocket') > 0 ? Math.ceil(p.pocket.length / 2) : p.pocket.length);
+  const found = p.pocket.splice(0);
   for (const id of found) value += GRADE_VALUE[s.crystals[id]!.grade];
   for (const id of found) delete s.crystals[id];
   p.caught += 1;
   ev(c, { kind: 'search', unit: p.id, place: whereNow(p, s.tick), found });
   if (value > 0) addHeat(c, 'council', round1(value * BALANCE.searchHeatPerValue), 'caughtWithStones');
-  if (p.worn.length > 0) evidence(c, p);
-  else if (p.caught >= BALANCE.caughtTaken) remove(c, p, 'taken');
+  if (p.caught >= BALANCE.caughtTaken) remove(c, p, 'taken');
 }
 
 // ---------- dusk: tribute, offering, the grave's seep ----------
@@ -285,6 +274,6 @@ function spotted(c: Ctx, p: Person): void {
   const on = new Set<PlaceId>([at, ...nbrs(s, at)]);
   for (const w of everyone(s)) {
     if (!here(w) || w.follower || asleep(w) || !councilEye(w) || !on.has(area(whereNow(w, s.tick)))) continue;
-    if (rand(s.rng) < BALANCE.offerSpot * (1 - p.stats.cunning / 200)) return addHeat(c, 'council', BALANCE.offerSpotHeat, 'offeringSeen');
+    if (rand(s.rng) < BALANCE.offerSpot * (1 - p.stats.intelligence / BALANCE.offerWit)) return addHeat(c, 'council', BALANCE.offerSpotHeat, 'offeringSeen');
   }
 }

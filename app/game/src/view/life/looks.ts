@@ -1,7 +1,7 @@
 import { Container, Rectangle, Sprite, Texture, type Renderer } from 'pixi.js';
 import type { Activity, PlaceId, RoleId, UnitId } from '../../types';
 import { MINE_FRAME } from '../../content/map';
-import { AREAS, PLACES } from '../../content/world';
+import { PLACES } from '../../content/world';
 import { ROLES } from '../../content/roles';
 import { decode, upload } from '../pictures';
 import { Body, type Kit, type LookBody, type Rest, type Series } from './rig';
@@ -12,7 +12,6 @@ const FILES = import.meta.glob('../../../assets/people/*.hi.webp', { query: '?ur
 export const PAGES = import.meta.glob('../../../assets/poses/lo*.webp', { query: '?url', import: 'default', eager: true }) as Record<string, string>;
 /** a mine person's rig unit in mine units; a townsperson's in town units (24 tall) */
 export const MINE_RIG = 0.9;
-export const TOWN_RIG = 0.6;
 /** below this many device px per rig unit a figure shows its low-detail atlas */
 export const LOW_DETAIL_PX = 1.6;
 /** seconds a follower's paint takes to come in; a fall before a body goes */
@@ -23,8 +22,8 @@ export const SMALL_PX = 28;
 export const FALL = 4;
 /** what a look's pose role shows for an Activity (a clip of assets/poses; `work` the role's own) */
 export const CLIP: Record<Activity, string> = {
-  sleep: 'sleep', walk: 'idle', ride: 'ride', dig: 'dig', haul: 'fill', sort: 'sort', work: '', eat: 'eat', drink: 'drink', talk: 'talk',
-  pray: 'pray', preach: 'preach', guard: 'watch', search: 'patdown', trade: 'talk', wash: 'wash', play: 'talk', idle: 'idle', offer: 'offerSet', mourn: 'sit',
+  sleep: 'sleep', walk: 'idle', dig: 'dig', haul: 'fill', sort: 'sort', work: '', eat: 'eat', drink: 'drink', talk: 'talk',
+  pray: 'pray', guard: 'watch', search: 'patdown', idle: 'idle', offer: 'offerSet', mourn: 'sit',
 };
 /** what a person does when an event lands on them: the reaction's clip and whether it takes the whole body */
 export const REACT: Partial<Record<string, readonly [string, boolean]>> = {
@@ -114,6 +113,8 @@ export interface Shown {
   beam: Sprite;
   /** the picked ring's four ticks: east, south, west, north */
   ticks: Sprite[];
+  /** the host's mark: a diamond over the head for each day it has left (at most `HOST.markDays`) */
+  pips: Sprite[];
   body: Body;
   /** a stable 0..1 of the person: phases and fidgets */
   v: number;
@@ -142,18 +143,20 @@ export const hash = (s: string): number => {
 const AREA_OF = new Map<PlaceId, PlaceId>();
 export const areaOf = (p: PlaceId): PlaceId => {
   let a = AREA_OF.get(p);
-  if (a === undefined) AREA_OF.set(p, (a = PLACES[p]?.area ?? (p.startsWith('home:') ? p.split(':')[1]! : p)));
+  if (a === undefined) AREA_OF.set(p, (a = PLACES[p]?.area ?? p));
   return a;
 };
-export const inMine = (p: PlaceId): boolean => AREAS[areaOf(p)]?.region === 'mine';
-/** a mine point (mine units) in town units */
+/** a mine point (mine units) in world units */
 export const mx = (x: number): number => MINE_FRAME.x + x / MINE_FRAME.per;
 export const my = (y: number): number => MINE_FRAME.y + y / MINE_FRAME.per;
 
-/** The look family a trade is drawn from: a town trade its own look, a mine trade one of the mine's six families. */
+/** The mine's six look families, and the skeleton's (no trade draws it: a skeleton is shown as it is, `MOB_FAMILY`). */
+export const FAMILIES: readonly string[] = ['digger', 'hauler', 'sorter', 'keeper', 'overseer', 'guard', 'skeleton'];
+export const MOB_FAMILY = 'skeleton';
+
+/** The look family a trade is drawn from. */
 export function familyOf(role: RoleId, id: UnitId): string {
   const r = ROLES[role]!;
-  if (r.side === 'town') return role;
   if (r.labour === 'dig') return 'digger';
   if (r.labour === 'haul') return 'hauler';
   if (r.labour === 'sort') return 'sorter';

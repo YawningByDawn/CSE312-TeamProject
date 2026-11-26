@@ -2,7 +2,26 @@
  * The crystal numbers (DECISIONS §15.5, §15.10; spec §7): grades and their worth, crafting prices, resonance,
  * the odd effects and their numbers. Data only; the words are content's ui text, keyed by these ids.
  */
-import type { Grade, OddEffectId } from '../types';
+import type { Affinity, Grade, OddEffectId } from '../types';
+
+/** What a set power adds to the god's sums. */
+export type SetEffect =
+  | 'hungerSlow' | 'maliceSlow' | 'devotion' | 'whisperOdds' | 'calm' | 'ichorMax'
+  | 'searchCut' | 'strikeLuck' | 'freeWhispers' | 'miraclePower';
+
+/** Set powers (DECISIONS §15.12): `SET_SIZE` set stones of one affinity wake its power. */
+export const SET_SIZE = 3;
+export const SET_POWER: Readonly<Record<Affinity, Readonly<Partial<Record<SetEffect, number>>>>> = {
+  hunger: { hungerSlow: 2 },
+  malice: { maliceSlow: 2 },
+  faith: { devotion: 1, whisperOdds: 0.05 },
+  fear: { calm: 0.1 },
+  blood: { ichorMax: 2 },
+  shadow: { searchCut: 0.25 },
+  stone: { strikeLuck: 10 },
+  echo: { freeWhispers: 1 },
+  flame: { miraclePower: 0.2 },
+};
 
 /** The grades in order (index = the grade's tier 0..5) and what each is worth eaten or burnt. */
 export const GRADES: readonly Grade[] = ['dull', 'clear', 'bright', 'blazing', 'royal', 'impossible'];
@@ -18,7 +37,6 @@ export const CRYSTAL = {
   /** Chance a recombination steps the grade up (Grafter: 25 %). */
   gradeUp: 0.1,
   /** Nether to facet, by grade (gem workshop). */
-  facetCost: [3, 4, 6, 9, 13, 18] as readonly number[],
   /** Two set stones of one affinity: their modifiers ×1.25; three wake the set power. */
   resonance2: 1.25,
   /** Flame beside anything quarrels: the other set stones' modifiers ×0.8. */

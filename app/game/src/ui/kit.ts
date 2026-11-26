@@ -42,7 +42,6 @@ export function installCss(sheets: readonly Sheet[]): void {
     '.hg-row > .hg-t { position: static; }',
     '.hg-n { font-family: "Bitstream Charter", Georgia, serif; font-weight: 600; }',
     `.hg-ink { color: ${INK}; text-shadow: none; }`,
-    `.hg-veil { position: absolute; inset: 0; background: rgba(8, 6, 12, 0.55); pointer-events: none; }`,
     // the cards: a hand card rests small and rises from its foot on hover, and a touch drags it rather than pans; the
     // deal's cards come in, the kept one flies to the hand and the rest fall away
     '.hg-card { transform: scale(var(--k)); transform-origin: 50% 100%; transition: transform 0.16s ease-out; touch-action: none; }',
@@ -128,18 +127,29 @@ export class Pic {
   }
 }
 
+/** A recipe's baked sizes, [w, h] by cell name: a surface is painted at its size, so its grit and bands are never stretched far. */
+const SIZES = uiManifest.sizes as unknown as Record<string, [number, number]>;
+const NAMES = Object.keys(SIZES).reduce<Record<string, string[]>>((m, n) => ((m[n.split('.')[1]!] ??= []).push(n), m), {});
+
+/** The baked surface of `recipe` whose middle needs the least stretch (or squeeze) to fill a w x h box. */
+export function nearest(recipe: string, w: number, h: number): string {
+  const edge = (a: number, ref: number): number => Math.abs(Math.log(Math.max(a - 60, 8) / Math.max(ref - 60, 8)));
+  return NAMES[recipe]!.reduce((best, n) => (edge(w, SIZES[n]![0]) + edge(h, SIZES[n]![1]) < edge(w, SIZES[best]![0]) + edge(h, SIZES[best]![1]) ? n : best));
+}
+
 /**
- * A surface (`surf.<recipe>`) stretched over the box (x, y, w, h) as a nine-slice of the baked picture: its corners keep
- * their size, its edges and middle stretch. Children go in `el` over it.
+ * A surface (`surf.<recipe>`, the baked size nearest the box) stretched over the box (x, y, w, h) as a nine-slice of the
+ * baked picture: its corners keep their size, its edges and middle stretch. Children go in `el` over it.
  */
 export function surface(parent: HTMLElement, recipe: string, x: number, y: number, w: number, h: number, cls = ''): HTMLDivElement {
   const box = div(parent, `hg-b ${cls}`, x, y, w, h);
-  const name = `surf.${recipe}`;
+  const name = nearest(recipe, w, h);
   const c = cellOf(UI, name), kk = c[4];
   const [t, r, b, l] = UI.slices[name]!;
-  // the picture around the 160x96 box it was painted for: the same margins around this box
+  // the picture around the box it was painted for: the same margins around this box
+  const [rw, rh] = SIZES[name]!;
   const cw = c[2] / kk, ch = c[3] / kk, ox = -c[5] / kk, oy = -c[6] / kk;
-  const pw = w + cw - 160, ph = h + ch - 96;
+  const pw = w + cw - rw, ph = h + ch - rh;
   const xs = [0, l, pw - r, pw], ys = [0, t, ph - b, ph];
   const sx = [0, l, cw - r, cw], sy = [0, t, ch - b, ch];
   for (let j = 0; j < 3; j++) for (let i = 0; i < 3; i++) {

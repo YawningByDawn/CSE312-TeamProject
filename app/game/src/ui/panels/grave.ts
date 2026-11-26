@@ -3,7 +3,7 @@ import { CARDS } from '../../content/cards';
 import { MODS } from '../../content/gems';
 import { uiText } from '../../content/text';
 import { bound } from '../../content/keys';
-import { BLOOD, DIM, PALE, TILE_H, TILE_W, VIOLET, Words, itemText, line, slab, stone, stoneTile, surface, verb } from './art';
+import { BLOOD, DIM, PALE, TILE_H, TILE_W, VIOLET, Words, line, slab, stone, stoneTile, surface, verb } from './art';
 import type { Ctx, Panel } from './index';
 
 // The grave (inventory #116, 118): its sockets, the stones carried, the things made; the picked stone's card with what it
@@ -65,9 +65,8 @@ export class Grave implements Panel {
   build(root: HTMLElement, vm: ViewModel): void {
     const s = vm.state, g = s.god;
     const pouch = pouchOf(s);
-    const items = Object.values(s.items);
-    if (this.sel && !s.crystals[this.sel] && !s.items[this.sel]) this.sel = null;
-    this.sel ??= g.sockets.find((x) => x !== null) ?? pouch[0]?.id ?? items[0]?.id ?? null;
+    if (this.sel && !s.crystals[this.sel]) this.sel = null;
+    this.sel ??= g.sockets.find((x) => x !== null) ?? pouch[0]?.id ?? null;
     const hx = 24 + COLS * STEP - 10 + 40, hw = 384;
     const { el, say, fit } = slab(root, -776, -330, hx + hw + 24, 640, uiText('grave.title'));
     verb(el, hx + hw - 106, 16, 106, 44, uiText('btn.close'), '', () => this.c.focus(null), say);
@@ -89,12 +88,6 @@ export class Grave implements Panel {
       stoneTile(el, x, ty, c, uiText(`grade.${c.grade}`), c.id === this.sel, () => this.pick(c.id));
     });
     if (pouch.length === 0) new Words(el, 24, y - TILE_H - 8, 17, DIM).set(uiText('grave.nothingCarried'));
-    if (items.length > 0) {
-      row(uiText('grave.things'), items.length, (i, x, ty) => {
-        const it = items[i]!;
-        stoneTile(el, x, ty, s.crystals[it.crystal], uiText(it.wearer ? 'grave.worn' : 'grave.kept'), it.id === this.sel, () => this.pick(it.id));
-      });
-    }
     fit(Math.max(y, this.side(el, s, hx, hw, pouch, say)) + 18);
   }
 
@@ -104,16 +97,6 @@ export class Grave implements Panel {
     if (!sel) {
       line(el, hx, 80, hw, 19, DIM, uiText('grave.bare'));
       return 120;
-    }
-    const it = s.items[sel];
-    if (it) {
-      new Words(el, hx, 80, 28, PALE).set(itemText(s, it, 'name'));
-      line(el, hx, 120, hw, 17, PALE, itemText(s, it, 'line'));
-      line(el, hx, 170, hw, 17, it.wearer ? VIOLET : DIM, it.wearer ? uiText('grave.wornBy', { name: s.people[it.wearer]!.name }) : uiText('grave.openPerson'));
-      if (!it.wearer) return 210;
-      const a: Action = { type: 'takeBack', item: it.id };
-      verb(el, hx, 230, 220, 60, uiText('btn.takeItBack'), why1(q.check(s, a)), () => this.c.act(a), say);
-      return 290;
     }
     const c = s.crystals[sel]!;
     if (this.first && sel !== this.first) {

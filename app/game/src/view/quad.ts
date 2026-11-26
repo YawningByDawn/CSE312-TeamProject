@@ -24,7 +24,7 @@ export function quad(name: string, frag: string, rect: readonly [number, number,
   return layerRoot(new Mesh({ geometry, shader: Shader.from({ gl: { vertex: VERT, fragment: HEAD + frag, name }, resources: resources as never }) }));
 }
 
-export type Uniforms = UniformGroup & { uniforms: Record<string, number | Float32Array> };
+type Uniforms = UniformGroup & { uniforms: Record<string, number | Float32Array> };
 /** A shader's uniforms from their first values: a number an f32, an array a vec of its length. */
 export function uniforms(v: Record<string, number | readonly number[]>): Uniforms {
   const u: Record<string, { value: number | Float32Array; type: string }> = {};

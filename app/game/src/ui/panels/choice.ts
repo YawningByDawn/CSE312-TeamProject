@@ -1,12 +1,11 @@
 import type { Action, Pending, Settings, ViewModel } from '../../types';
 import { uiText } from '../../content/text';
 import { PICKS, bound, keyName, pickOf } from '../../content/keys';
-import { BLOOD, CARD_H, CARD_W, DIM, PALE, Words, card, div, line, slab, stone, verb } from './art';
-import { modLine } from './grave';
+import { CARD_H, CARD_W, DIM, PALE, Words, card, div, line, slab, verb } from './art';
 import type { Ctx, Panel } from './index';
 
 // What the clock waits on (inventory #5, 29, 120, 121): the opening's first deal (the starting gift: take one of the
-// cards on the opening's last frame), a blessing at a new rank, a story's choice, a faceted stone's cut. The pick keys pick.
+// cards on the opening's last frame), a blessing at a new rank, a story's choice. The pick keys pick.
 
 const GAP = 34;
 
@@ -66,7 +65,6 @@ export class Choice implements Panel {
 
   private actions(p: Pending): Action[] {
     if (p.kind === 'blessing') return p.offers.map((blessing) => ({ type: 'pickBlessing', blessing }));
-    if (p.kind === 'facet') return p.cuts.map((_, index) => ({ type: 'chooseCut', index }));
     return Array.from({ length: p.options }, (_, i) => ({ type: 'story', option: i + 1 }));
   }
 
@@ -75,15 +73,6 @@ export class Choice implements Panel {
     const acts = this.actions(p);
     if (p.kind === 'blessing') {
       picks(root, uiText('blessing.choose'), footOf(vm.settings, acts.length), acts.length, CARD_W, CARD_H, (box, i) => card(box, s, p.offers[i]!, 0, 0, true), (i) => this.c.act(acts[i]!));
-      return;
-    }
-    if (p.kind === 'facet') {
-      const c = s.crystals[p.crystal]!;
-      picks(root, uiText('facet.choose'), footOf(vm.settings, acts.length), acts.length, 220, 280, (box, i) => {
-        const b = slab(box, 0, 0, 220, 280, uiText(`facet.cut.${i}`)).el;
-        stone(b, c, 110, 164, 90);
-        p.cuts[i]!.forEach((m, j) => line(b, 14, 178 + j * 22, 192, 15, m.curse ? BLOOD : PALE, modLine(m)));
-      }, (i) => this.c.act(acts[i]!));
       return;
     }
     const slots = this.c.q.storySlots(s)!;

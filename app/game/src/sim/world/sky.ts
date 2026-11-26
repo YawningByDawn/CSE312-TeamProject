@@ -2,8 +2,8 @@
 import { WEEK, type DayDef } from '../../content/calendar';
 import { dayOf, sinceDawn } from '../../content/clock';
 import { COLD_FOR, WEATHER_DAY } from '../../content/day';
-import { COLD_DAWN_CHANCE, MARKOV, REGIMES, WEATHER_RULES, WIND, type Regime } from '../../content/weather';
-import type { GameState, Tick, Weather } from '../../types';
+import { COLD_DAWN_CHANCE, MARKOV, REGIMES, WIND, type Regime } from '../../content/weather';
+import type { Tick, Weather } from '../../types';
 import { K, keyed } from './draw';
 
 /** The day of the week: the opening night and the first day are the week's first work day. */
@@ -70,8 +70,3 @@ export function windAt(seed: number, t: Tick): number {
   // from the west (compass 270) is blowing east (0)
   return ((WIND.from - 270 + (u - 0.5) * WIND.wander + turn) * Math.PI) / 180;
 }
-
-/** Share of people out of doors who shelter in this weather. */
-export const indoorsAt = (w: Weather): number => WEATHER_RULES[w].indoors;
-/** The lift stops in a storm, and for the day once lightning strikes the winding gear. */
-export const liftRuns = (s: Readonly<GameState>): boolean => s.weather !== 'storm' && !s.effects.some((e) => e.kind === 'liftStop' && e.until > s.tick);

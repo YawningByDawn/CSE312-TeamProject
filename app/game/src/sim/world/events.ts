@@ -9,13 +9,13 @@ import { WEEK } from '../../content/calendar';
 import { AT, DAY_TICKS, TPH, dayOf } from '../../content/clock';
 import { DIGGER_FACES } from '../../content/day';
 import { hasText, uiText } from '../../content/text';
-import { CHAIN_WAIT, EVENT_DAY, FEED, GATHER_KIN, LIFE_NOTES, WORLD_EVENTS, type CastSlot, type Gather, type WorldEventDef } from '../../content/worldEvents';
+import { CHAIN_WAIT, EVENT_DAY, FEED, LIFE_NOTES, WORLD_EVENTS, type CastSlot, type Gather, type WorldEventDef } from '../../content/worldEvents';
 import type { Activity, FactionId, GameEvent, GameState, Person, PlaceId, RoleId, StoryId, Tick, UnitId, Weather } from '../../types';
 import { addHeat, remove, type Ctx } from '../core';
-import { area, inMine } from './area';
+import { area } from './area';
 import { K, idKey, keyed, keyedInt } from './draw';
-import { grown, makeName, roster, tieKind } from './society';
-import { dayWeathers, indoorsAt, weatherAt } from './sky';
+import { makeName, roster, tieKind } from './society';
+import { dayWeathers, weatherAt } from './sky';
 
 const N = WORLD_EVENTS.length;
 const INDEX = new Map(WORLD_EVENTS.map((e, i) => [e.id, i]));
@@ -27,7 +27,7 @@ interface Happening { e: number; tick: Tick; od: number; oe: number; who?: UnitI
 const FOLLOWS = WORLD_EVENTS.flatMap((e, i) => (e.follows ? [i] : []));
 
 /** The tick day `d` dawns on. */
-export const dawnOf = (d: number): Tick => d * DAY_TICKS - AT.night + AT.dawn;
+export const dawnOf = (d: number): Tick => d * DAY_TICKS - AT.dusk + AT.dawn;
 const draw = (seed: number, d: number, e: number, use: number): number => keyed(seed, K.event, d, e * 8 + use);
 
 function eligible(def: WorldEventDef, d: number, ws: readonly Weather[]): boolean {
@@ -65,7 +65,7 @@ export function eventsOf(seed: number, day: number): Happening[] {
     };
     steps();
     const kind = WEEK[(d - 1) % WEEK.length]!.kind;
-    const limit = EVENT_DAY.base + (kind === 'payday' || kind === 'market' || kind === 'flame' ? EVENT_DAY.busy : 0) + (keyed(seed, K.event, d, -1) < 0.5 ? EVENT_DAY.coin : 0);
+    const limit = EVENT_DAY.base + (kind === 'payday' || kind === 'cart' || kind === 'flame' ? EVENT_DAY.busy : 0) + (keyed(seed, K.event, d, -1) < 0.5 ? EVENT_DAY.coin : 0);
     // the open events, the sure first, each by its draw
     const open: number[] = [];
     for (let i = 0; i < N; i++) {
@@ -152,7 +152,7 @@ function today(s: Readonly<GameState>): typeof memo {
     const g = def.gather;
     if (!g || spared(def, cast)) continue;
     const at: Gathering = { story: def.id, from: h.tick - Math.round(g.at[0] * TPH), to: h.tick + Math.round(g.at[1] * TPH), place: placeOf(s, def, h, cast, null), doing: g.doing };
-    for (const p of comers(s, g, cast)) (memo.gather.get(p.id) ?? memo.gather.set(p.id, []).get(p.id)!).push(at);
+    for (const p of comers(g, cast)) (memo.gather.get(p.id) ?? memo.gather.set(p.id, []).get(p.id)!).push(at);
   }
   for (const gs of memo.gather.values()) gs.sort((a, b) => a.from - b.from);
   const n = Math.max(0, Math.min(FEED.max - fixed, Math.max(0, FEED.min - fixed) + keyedInt(s.seed, K.note, FEED.extra + 1, day, -1)));
@@ -169,12 +169,9 @@ function pick(s: Readonly<GameState>, slot: CastSlot, cast: readonly Person[], k
   if (Array.isArray(slot)) return at((slot as RoleId[]).flatMap((x) => r.role.get(x) ?? []));
   const first = cast[0];
   switch (slot) {
-    case 'grown': return at(r.grown);
-    case 'old': return at(r.role.get('elder') ?? []);
-    case 'child': return at(r.role.get('child') ?? []);
+    case 'grown': return at(r.all);
     case 'follower': return at(r.all.filter((p) => p.follower && !p.gone));
     case 'them': return them;
-    case 'kin': return first && at(r.house.get(first.household)!.filter((p) => p !== first && grown(p)));
     case 'mate': return first && at(r.role.get(first.role)!.filter((p) => p !== first));
     default: return first && at(first.ties.map((id) => s.people[id]!).filter((p) => tieKind(s, first, p) === slot));
   }
@@ -200,7 +197,7 @@ function castOf(s: Readonly<GameState>, h: Happening, them: Person | undefined, 
       // a first member must have the tie the second is cast by
       const q = pick(s, slot, out, key, j * 8 + t, them);
       const next = def.cast[j + 1];
-      p = j === 0 && typeof next === 'string' && next !== 'grown' && next !== 'old' && next !== 'child' && next !== 'follower' && next !== 'them' && q && !pick(s, next, [q], key, 1, them) ? undefined : q;
+      p = j === 0 && typeof next === 'string' && next !== 'grown' && next !== 'follower' && next !== 'them' && q && !pick(s, next, [q], key, 1, them) ? undefined : q;
     }
     if (!p || (p.gone && slot !== 'them' && !((typeof slot === 'number' || past) && took(p, typeof slot === 'number' ? slot : j)))) return null;
     out.push(p);
@@ -220,15 +217,12 @@ export function variants(key: string): number {
 }
 const noteKey = (s: Readonly<GameState>, key: string, a: number, b: number): string => `${key}.${keyedInt(s.seed, K.note, variants(key), a, b)}`;
 
-function targets(t: string, cast: readonly Person[], place: PlaceId, s: Readonly<GameState>): string[] {
-  const m = /^@(kin|home|work)?(\d)$/.exec(t);
+function targets(t: string, cast: readonly Person[], place: PlaceId): string[] {
+  const m = /^@(work)?(\d)$/.exec(t);
   if (m) {
     const p = cast[Number(m[2])];
     if (!p) return [];
-    if (m[1] === 'home') return [area(p.home)];
-    if (m[1] === 'work') return [area(p.work)];
-    if (m[1] === 'kin') return [...new Set([...roster(s).house.get(p.household)!.filter((q) => q !== p).map((q) => q.id), ...p.ties])].slice(0, 6);
-    return [p.id];
+    return [m[1] === 'work' ? area(p.work) : p.id];
   }
   switch (t) {
     case '@all': return cast.map((p) => p.id);
@@ -242,27 +236,21 @@ function targets(t: string, cast: readonly Person[], place: PlaceId, s: Readonly
 /** An event that would take a follower of yours by chance does not happen. */
 const spared = (def: WorldEventDef, cast: readonly Person[]): boolean => !!def.gone && cast.slice(def.gone[1]).some((p) => p.follower);
 
-/** Where `h` happens: its place, one of its places by the day, a cast member's home or work, or the echo's place. */
+/** Where `h` happens: its place, one of its places by the day, a cast member's work, or the echo's place. */
 function placeOf(s: Readonly<GameState>, def: WorldEventDef, h: Happening, cast: readonly Person[], echo: GameEvent | null): PlaceId {
   const pl = def.place;
   if (typeof pl !== 'string') return pl[keyedInt(s.seed, K.event, pl.length, h.od, idKey(def.id))]!;
   if (pl === '@them') {
     const them = echo?.unit ? s.people[echo.unit] : undefined;
-    return echo?.place ?? (them && 'place' in them.at ? them.at.place : 'rows');
+    return echo?.place ?? (them && 'place' in them.at ? them.at.place : 'bunks');
   }
-  return pl.startsWith('@') ? (cast[Number(pl.slice(5) || 0)]?.[pl.startsWith('@home') ? 'home' : 'work'] ?? 'rows') : pl;
+  return pl.startsWith('@') ? (cast[Number(pl.slice(5) || 0)]?.work ?? 'bunks') : pl;
 }
 
-/** Who comes to an event's gathering: the cast it names, the grown of the households and the kin of those it names. */
-function comers(s: Readonly<GameState>, g: Gather, cast: readonly Person[]): Person[] {
-  const house = roster(s).house;
+/** Who comes to an event's gathering: the cast it names. */
+function comers(g: Gather, cast: readonly Person[]): Person[] {
   const out = new Set<Person>();
   for (const i of g.cast ?? cast.keys()) if (cast[i]) out.add(cast[i]!);
-  for (const i of g.house ?? []) for (const q of house.get(cast[i]!.household)!) if (grown(q)) out.add(q);
-  let kin = 0;
-  for (const i of g.kin ?? [])
-    for (const q of [...house.get(cast[i]!.household)!, ...cast[i]!.ties.map((id) => s.people[id]!)])
-      if (kin < GATHER_KIN && !q.gone && !out.has(q)) { out.add(q); kin++; }
   return [...out].filter((p) => !p.gone);
 }
 
@@ -280,13 +268,13 @@ function happen(s: GameState, out: GameEvent[], h: Happening, echo: GameEvent | 
   const first = cast[0];
   const place = placeOf(s, def, h, cast, echo);
   const v = def.variant?.[0];
-  const holds = v === 'mine' ? inMine(place) : v === 'fog' ? today(s).ws.includes('fog') : v === 'rain' ? today(s).ws.some((x) => x === 'rain' || x === 'storm')
+  const holds = v === 'fog' ? today(s).ws.includes('fog') : v === 'rain' ? today(s).ws.some((x) => x === 'rain' || x === 'storm')
     : v === 'bad' ? s.mine.shortDays > 0 : v === 'unpaid' ? keyed(s.seed, K.event, h.od, k) < 0.5 : v === 'follower' ? !!cast[1]?.follower : false;
   const effects = (holds ? def.variant![1] : undefined) ?? def.effects ?? [];
   const c: Ctx = { s, out };
   const until = dawnOf(dayOf(s.tick));
   for (const [kind, target, value, days] of effects) {
-    for (const on of targets(target, cast, place, s)) {
+    for (const on of targets(target, cast, place)) {
       if (kind === 'suspicion') addHeat(c, on as FactionId, value, 'event');
       else s.effects.push({ kind, on, until: until + (days + 1) * DAY_TICKS, value });
     }
@@ -315,7 +303,7 @@ function echoKeys(s: Readonly<GameState>, e: GameEvent): string[] {
     case 'threat': return e.how === 'landed' ? [`threat:${s.threats.find((t) => t.id === e.threat)?.kind ?? ''}`] : [];
     case 'play': return [`play:${e.card}`, `play:${e.cardKind}`];
     case 'count': return e.short > 0 ? ['count:short'] : [];
-    case 'search': case 'devour': case 'exposed': return [e.kind];
+    case 'search': case 'devour': return [e.kind];
     default: return [];
   }
 }
@@ -325,16 +313,14 @@ function echoing(s: Readonly<GameState>, def: WorldEventDef, echo: GameEvent): b
   const e = def.effects?.find((x) => x[3] > 0 && x[0] !== 'suspicion');
   if (!e) return false;
   const them = echo.unit ? s.people[echo.unit] : undefined;
-  const on = targets(e[1], them ? [them] : [], echo.place ?? '', s);
+  const on = targets(e[1], them ? [them] : [], echo.place ?? '');
   return s.effects.some((x) => x.kind === e[0] && x.until > s.tick && on.includes(x.on ?? ''));
 }
 
 /** Who is doing what where, as a life note's words. */
-function lifePool(s: Readonly<GameState>, p: Readonly<Person>): string | null {
+function lifePool(p: Readonly<Person>): string | null {
   const a = p.at;
-  if ('route' in a) return a.doing === 'ride' ? (inMine(a.route[a.route.length - 1]!) ? 'liftDown' : 'liftUp') : null;
-  if (a.doing === 'sleep' || a.doing === 'offer') return null;
-  if (a.doing === 'idle' && indoorsAt(s.weather) > 0 && a.place !== p.work) return 'shelter';
+  if ('route' in a || a.doing === 'sleep' || a.doing === 'offer') return null;
   return LIFE_NOTES.role[p.role] ?? LIFE_NOTES.at[a.place] ?? LIFE_NOTES.doing[a.doing] ?? null;
 }
 
@@ -366,14 +352,10 @@ export function stepEvents(s: GameState, out: GameEvent[]): void {
   echoes(s, out, 0, ruled);
   for (let i = 0; i < m.life.length; i++) {
     if (m.life[i] !== s.tick) continue;
-    for (let t = 0; t < 8; t++) {
-      const all = roster(s).all;
-      const p = all[keyedInt(s.seed, K.note, all.length, day, i * 8 + t)]!;
-      const pool = p.gone ? null : lifePool(s, p);
-      if (!pool || !variants(`life.${pool}`)) continue;
-      const place = 'place' in p.at ? p.at.place : p.at.route[p.at.route.length - 1]!;
-      out.push({ tick: s.tick, kind: 'story', story: 'life', unit: p.id, place, note: { key: noteKey(s, `life.${pool}`, day, 100 + i), slots: { name: p.name, place: placeWord(place) } } });
-      break;
-    }
+    const doing = roster(s).all.filter((p) => !p.gone && lifePool(p));
+    if (doing.length === 0) continue;
+    const p = doing[keyedInt(s.seed, K.note, doing.length, day, i)]!;
+    const place = 'place' in p.at ? p.at.place : p.at.route[p.at.route.length - 1]!;
+    out.push({ tick: s.tick, kind: 'story', story: 'life', unit: p.id, place, note: { key: noteKey(s, `life.${lifePool(p)}`, day, 100 + i), slots: { name: p.name, place: placeWord(place) } } });
   }
 }

@@ -11,7 +11,6 @@ import { bonus } from './bonus';
 import { addHeat, addHunger, addNether, ev, everyone, gainIchor, gainXp, here, maxIchor, type Ctx } from './core';
 import { crackDown, crystalName, makeMod, modPool, oddCount, rollModTier, tierOf, veinLevel, worth, eatWorth } from './crystals';
 import { active } from './influence';
-import { benchWhy } from './town';
 import { chance, pick, rand, weightedPick } from './rng';
 import type { Crystal, GameState, Mod, ModId, Reason } from '../types';
 
@@ -124,92 +123,6 @@ export function recombine(c: Ctx, a: string, b: string): void {
   delete s.crystals[b];
   ev(c, { kind: 'recombine', crystal: id });
 }
-
-// ---------- the gem workshop's re-cut (DECISIONS §72) ----------
-
-/** A line whose number a re-cut can reshape (fields and action points stay as they are). */
-const reshapes = (m: Mod): boolean => !!MODS[m.id] && !MODS[m.id]!.field && MODS[m.id]!.family !== 'actionPoint';
-/** The values a gentle or bold cut can give a line: round(v × 0.8 … 1.4), never below 1. */
-const cutRange = (v: number): [number, number] => [Math.max(1, Math.round(v * 0.8)), Math.max(1, Math.round(v * 1.4 - 1e-9))];
-const cutSig = (ms: readonly Mod[]): string => ms.map((m) => `${m.id}:${m.value}${m.curse ? '!' : ''}`).join(',');
-const setSig = (cuts: readonly Mod[][]): string => cuts.map(cutSig).sort().join('|');
-/** The third cut drops line `k`; the rest grow half again. */
-const dropCut = (x: Crystal, k: number): Mod[] => x.mods.filter((_, j) => j !== k).map((m) => ({ ...m, value: reshapes(m) ? Math.round(m.value * 1.5) : m.value }));
-
-export const facetCost = (s: Readonly<GameState>, x: Crystal): number =>
-  Math.max(1, Math.round(CRYSTAL.facetCost[tierOf(x.grade)]! * (gemcutter(s) ? BLESSING.cutCostMult : 1)));
-
-/** Can a re-cut ever offer anything but what the stone is: a number that can move, or two lines whose dropping differs. */
-export function canFacet(x: Crystal): boolean {
-  if (x.mods.some((m) => reshapes(m) && cutRange(m.value)[0] < cutRange(m.value)[1])) return true;
-  return x.mods.length > 1 && new Set(x.mods.map((_, k) => cutSig(x.mods.filter((_, j) => j !== k)))).size > 1;
-}
-
-export function facetWhy(s: Readonly<GameState>, id: string): Reason[] {
-  const r = benchWhy(s, 'faceting', id);
-  if (r.length > 0) return r;
-  return canFacet(s.crystals[id]!) ? [] : [{ key: 'why.cutAsIs' }];
-}
-
-/** One roll of the three cuts: a gentle and a bold one reshape each line ×0.8–1.4; the third drops one for strength. */
-function rollCuts(s: GameState, x: Crystal): Mod[][] {
-  const out: Mod[][] = [];
-  for (let i = 0; i < 3; i++) {
-    if (i === 2 && x.mods.length > 1) out.push(dropCut(x, Math.floor(rand(s.rng) * x.mods.length)));
-    else out.push(x.mods.map((m) => ({ ...m, value: reshapes(m) ? Math.max(1, Math.round(m.value * (0.8 + 0.6 * rand(s.rng)))) : m.value })));
-  }
-  return out;
-}
-
-/**
- * A paid re-cut always changes something: the set differs from the stone's last offered set and one cut differs from
- * the stone. It rolls again from the seeded rng until both hold; past 24 tries one cut takes the first other value or
- * line the stone allows, so it always ends.
- */
-function cutsFor(s: GameState, x: Crystal): Mod[][] {
-  const ok = (o: Mod[][]): boolean => setSig(o) !== x.lastCuts && o.some((m) => cutSig(m) !== cutSig(x.mods));
-  let out = rollCuts(s, x);
-  for (let t = 0; !ok(out) && t < 24; t++) out = rollCuts(s, x);
-  if (ok(out)) return out;
-  for (let i = 0; i < out.length; i++) {
-    const tries = i === 2 && x.mods.length > 1
-      ? x.mods.map((_, k) => dropCut(x, k))
-      : x.mods.flatMap((m, k) => {
-        if (!reshapes(m)) return [];
-        const [lo, hi] = cutRange(m.value);
-        return Array.from({ length: hi - lo + 1 }, (_, v) => out[i]!.map((y, j) => (j === k ? { ...y, value: lo + v } : y)));
-      });
-    for (const t of tries) {
-      const next = out.map((o, j) => (j === i ? t : o));
-      if (ok(next)) return next;
-    }
-  }
-  return out;
-}
-
-/** Pay the re-cut and offer its three cuts; the clock waits for the choice. */
-export function facet(c: Ctx, id: string): void {
-  const s = c.s;
-  const x = s.crystals[id]!;
-  const cuts = cutsFor(s, x);
-  x.lastCuts = setSig(cuts);
-  s.pending = { kind: 'facet', crystal: id, cuts };
-}
-
-export const chooseCutWhy = (s: Readonly<GameState>, index: number): Reason[] =>
-  s.pending?.kind !== 'facet' ? [{ key: 'why.closed' }] : s.pending.cuts[index] ? [] : [{ key: 'why.pickOne' }];
-
-/** The chosen cut becomes the stone: its lines, a new face (seed) and name. */
-export function chooseCut(c: Ctx, index: number): void {
-  const p = c.s.pending as Extract<GameState['pending'], { kind: 'facet' }>;
-  const x = c.s.crystals[p.crystal]!;
-  c.s.pending = null;
-  x.mods = p.cuts[index]!.map((m) => ({ ...m }));
-  x.seed = (x.seed * 1664525 + 1013904223) >>> 0;
-  x.name = crystalName(x.base, x.mods);
-  ev(c, { kind: 'facet', crystal: x.id });
-}
-
 
 export function graveDawn(c: Ctx): void {
   const s = c.s;

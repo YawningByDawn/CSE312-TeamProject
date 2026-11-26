@@ -1,32 +1,29 @@
 /**
  * The god's day (spec §4, §5; inventory #13-16, 31, 35, 36): Hunger and Malice at dawn with what they do at the top,
- * the Flame's drain, the heat's drift and cooling, rank and its blessing, the watershed; Nether at dusk and the
- * Ember's flare; the loss by being rooted out.
+ * the Flame's drain, the heat's drift and cooling, rank and its blessing, the mine taken (the run's end); Nether at
+ * dusk and the Ember's flare; the loss by being rooted out.
  */
 import { BALANCE } from '../content/balance';
 import { BLESSING as N, BLESSING_IDS } from '../content/blessings';
 import { EFFECT } from '../content/crystals';
-import { ROLES } from '../content/roles';
 import { dayOf } from '../content/clock';
-import { AREAS, LIFT_LINK } from '../content/world';
+import { AREAS } from '../content/world';
 import {
-  FACTIONS, addHeat, addHunger, addMalice, addNether, area, end, ev, everyone, flameLight, flockCount, flockOf, followers, gainIchor, heads, heatAll, here, mint,
-  loseDevotion, loseIchor, nbrs, pouchIds, rankUp, remove, settleRank, standingOf, type Ctx,
+  addHeat, addHunger, addMalice, addNether, area, end, ev, everyone, flameLight, flockCount, flockOf, followers, gainIchor, heads, heatAll, here, mint,
+  loseDevotion, loseIchor, pouchIds, rankUp, remove, settleRank, type Ctx,
 } from './core';
 import { deal, faithOf, followersEvil, lashOut } from './cards';
 import { bonus } from './bonus';
 import { oddCount } from './crystals';
-import { STAGE_TIER, netherMultiplier, round1 } from './formulas';
+import { netherMultiplier, round1 } from './formulas';
 import { inReach, whisperCost } from './influence';
 import { shuffled } from './rng';
-import { crusadeAtRank } from './threats';
-import type { BlessingId, FactionId, GameState, PlaceId } from '../types';
+import type { BlessingId, GameState, PlaceId } from '../types';
 
 
 /** Hunger per dawn (spec): 4 + Divinity + one per `hungerPerFollowers` noticed heads, less the Slow lines, Weeping more. */
 export function hungerRise(s: Readonly<GameState>): number {
-  const noticed = Math.round(heads(s) / STAGE_TIER[s.stage]);
-  const raw = BALANCE.hungerRiseBase + s.god.level + Math.floor(noticed / BALANCE.hungerPerFollowers) - bonus(s, 'hungerSlow') + oddCount(s, 'weeping') * EFFECT.weepingHunger;
+  const raw = BALANCE.hungerRiseBase + s.god.level + Math.floor(heads(s) / BALANCE.hungerPerFollowers) - bonus(s, 'hungerSlow') + oddCount(s, 'weeping') * EFFECT.weepingHunger;
   return Math.max(0, round1(raw));
 }
 /** Malice per dawn (spec): 4 + Divinity, less the Slow lines, Spite more. */
@@ -86,23 +83,18 @@ function urges(c: Ctx): void {
  */
 function drift(c: Ctx): void {
   const s = c.s;
-  const noticed = 1 / STAGE_TIER[s.stage];
   const all = new Map<PlaceId, number>();
   for (const p of everyone(s)) if (here(p)) all.set(area(p.work), (all.get(area(p.work)) ?? 0) + 1);
   const mine = flockCount(s, (f) => area(f.work));
   let seen = 0;
   let lit = 0;
-  const watch: Record<FactionId, number> = { temple: 0, council: 0, public: 0 };
   followers(s, (f) => {
     if (f.routine === 'lieLow') return;
     const a = area(f.work);
-    const d = AREAS[a]!;
-    seen += noticed * d.exposure * (1 - (mine.get(a) ?? 0) / (all.get(a) ?? 1));
-    if (d.patrol) watch[d.patrol.faction] += noticed * d.patrol.perHead;
-    if (flameLight(s, a) > 0) lit += noticed;
+    seen += 1 - (mine.get(a) ?? 0) / (all.get(a) ?? 1);
+    if (flameLight(s, a) > 0) lit += 1;
   });
   addHeat(c, 'public', round1(seen * BALANCE.crestPublicPerFollower), 'crests');
-  for (const f of FACTIONS) addHeat(c, f, round1(watch[f]), 'patrols');
   addHeat(c, 'temple', round1(lit * BALANCE.kilnCrestCult), 'crestsInFlame');
   addHeat(c, 'temple', Math.min(BALANCE.hoardCap, Math.floor(Math.max(0, pouchIds(s).length - BALANCE.hoardFree) / BALANCE.hoardPer)), 'hoard');
   const feed = round1(s.factions.public.suspicion * BALANCE.publicFeed);
@@ -110,17 +102,13 @@ function drift(c: Ctx): void {
   addHeat(c, 'council', feed, 'talk');
 }
 
-/** Each dawn heat cools, slower as the god grows; each Elite you hold cools their own power. */
+/** Each dawn heat cools, slower as the god grows. */
 export const decayAt = (level: number): number => Math.max(BALANCE.suspicionDecayMin, BALANCE.suspicionDecay - BALANCE.suspicionDecayPerLevel * (level - 1));
 function decay(c: Ctx): void {
   heatAll(c, -decayAt(c.s.god.level), 'time');
-  followers(c.s, (p) => {
-    const f = ROLES[p.role]!.serves;
-    if (f && standingOf(p) === 'elite') addHeat(c, f, -BALANCE.eliteDecay, 'eliteLooksAway');
-  });
 }
 
-/** Dawn, the god's part: the drains, the followers' own evil, the urges, the heat; then rank, blessing and the watershed. */
+/** Dawn, the god's part: the drains, the followers' own evil, the urges, the heat; then rank, blessing and the mine taken. */
 export function godDawn(c: Ctx): void {
   const steps = [drains, followersEvil, urges, drift, decay];
   for (const step of steps) {
@@ -130,8 +118,7 @@ export function godDawn(c: Ctx): void {
   const was = c.s.god.level;
   rankUp(c);
   if (c.s.god.level > was && !c.s.pending) offerBlessings(c);
-  watershed(c);
-  crusadeAtRank(c, was);
+  if (c.s.god.level >= BALANCE.takenLevel && c.s.flags.liftRooted) end(c, true, 'taken');
 }
 
 
@@ -154,41 +141,14 @@ export function pickBlessing(c: Ctx, id: BlessingId): void {
 }
 
 
-/**
- * Whisper becomes Shade at `shadeLevel` with the pit head rooted: the town opens around the pit head, every power
- * cools to `shadeBreather` at most and its announced moves lose the trail. The mine's rooted areas stay yours
- * (influence.ts setHold).
- */
-function watershed(c: Ctx): void {
-  const s = c.s;
-  if (s.stage !== 'whisper' || s.god.level < BALANCE.shadeLevel || !s.flags.surfaceRooted) return;
-  s.stage = 'shade';
-  s.flags.shadeDay = dayOf(s.tick);
-  let ring: PlaceId[] = [LIFT_LINK[1]];
-  for (let r = 0; r <= BALANCE.shadeRevealRadius; r++) {
-    const next: PlaceId[] = [];
-    for (const a of ring) {
-      s.places[a]!.explored = true;
-      for (const n of nbrs(s, a)) if (!s.places[n]!.explored) next.push(n);
-    }
-    ring = next;
-  }
-  for (const f of FACTIONS) {
-    const v = s.factions[f].suspicion;
-    if (v > BALANCE.shadeBreather) addHeat(c, f, BALANCE.shadeBreather - v, 'newShape');
-  }
-  s.threats = [];
-  ev(c, { kind: 'stage', stage: 'shade' });
-}
-
-
-/** Dusk, the god's part: Nether comes in (half the rest carries, at most a day's income), the deal; the Ember flares. */
+/** Dusk, the god's part: the action points refill, Nether comes in (half the rest carries, at most a day's income), the deal; the Ember flares. */
 export function godDusk(c: Ctx): void {
   const s = c.s;
   const g = s.god;
   const income = netherIncome(s);
   const carried = Math.min(round1(g.nether * BALANCE.carryRate), round1(income * BALANCE.carryCapTurns));
   addNether(c, round1(carried + income - g.nether));
+  g.ap = g.apMax;
   g.free = bonus(s, 'freeWhispers');
   g.boost = 0;
   deal(c);

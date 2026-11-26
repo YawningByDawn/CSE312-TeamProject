@@ -1,7 +1,8 @@
 // src/ui, the DOM interface over the canvas (implements `Ui`; docs/style.md §7). Owns the interface's layers, their
-// corner anchors and scale, and the pause veil; kit.ts its DOM helpers, the ui atlas's cells and the fonts.
-// src/ui/hud holds the rest layout's parts, one a file: the hand and the deal (cards), the clock, the feed, the god's
-// corner (god), the hints, the menus, the pouch, the powers and the hover tip; src/ui/panels what opens over them.
+// corner anchors and scale; kit.ts its DOM helpers, the ui atlas's cells and the fonts.
+// src/ui/hud holds the rest layout's parts, one a file: the hand and the deal (cards), the clock, the host's plate, the
+// feed, the god's corner (god) with the powers' suspicion, the goal and the quests under it, the hints, the menus, the
+// pouch with the people plate and the hover tip; src/ui/panels what opens over them.
 // Reads the view model each frame, the sim's Query and its pure helpers (sim/core, sim/cards), content's tables and
 // its words (`uiText`), and where the view stands a thing on screen; it changes nothing itself: every choice is an
 // `Intent` sent to app.
@@ -9,7 +10,7 @@ import type { Bind, Intent, Query, Settings, Ui, View, ViewModel } from '../type
 import type { Panels } from './panels';
 import { keyName } from '../content/keys';
 import { uiText } from '../content/text';
-import { DIM, INK, Words, div, installCss, surface } from './kit';
+import { DIM, Words, div, installCss } from './kit';
 import { Deal, Hand } from './hud/cards';
 import { Clock } from './hud/clock';
 import { Feed } from './hud/feed';
@@ -17,13 +18,17 @@ import { Hints } from './hud/hints';
 import { Menus } from './hud/menus';
 import { Tip } from './hud/tip';
 import { God } from './hud/god';
-import { Pouch } from './hud/pouch';
-import { Powers } from './hud/powers';
+import { Goal } from './hud/goal';
+import { HostPlate } from './hud/hostplate';
+import { Quests } from './hud/quests';
+import { Suspicion } from './hud/suspicion';
+import { Pouch, POUCH_H } from './hud/pouch';
+import { People } from './hud/people';
 
 // The rest layout frames the world from its corners: each corner is an anchor 24 px in from the screen's edge, all
 // scaled by one factor from the window and the Interface size setting, their parts laid out in design px of a
 // 1600x900 screen. A frame hands the view model to each part; a part writes only what changed. The panels mount in
-// their own layer over the rest layout and under the pause veil, and are framed after it.
+// their own layer over the rest layout, and are framed after it.
 
 /** The design screen the parts are laid out on. */
 const DESIGN_W = 1600, DESIGN_H = 900;
@@ -54,20 +59,18 @@ export function createUi(mountPanels?: MountPanels): Ui {
   let panels: Panels | null = null;
   const points: [HTMLElement, Corner][] = [];
   let rest: HTMLDivElement;
-  let veil: HTMLDivElement;
-  let paused = false;
   let hidden = false;
   let size: Settings['uiSize'] | null = null;
   let w = DESIGN_W, h = DESIGN_H, k = 1;
   /** Each corner's anchor in screen px. */
   let ax = {} as Record<Corner, number>, ay = {} as Record<Corner, number>;
   let tip: Tip;
+  let live: ViewModel;
   let skip: Words;
-  let pausedLine: Words;
   let menus: Menus;
 
-  function layer(parent: HTMLElement, cls = 'hg'): [HTMLDivElement, Anchors] {
-    const el = div(parent, cls);
+  function layer(parent: HTMLElement): [HTMLDivElement, Anchors] {
+    const el = div(parent, 'hg');
     const at = {} as Record<Corner, HTMLElement>;
     for (const c of CORNERS) points.push([(at[c] = div(el, 'hg-a')), c]);
     return [el, at];
@@ -82,6 +85,14 @@ export function createUi(mountPanels?: MountPanels): Ui {
 
   return {
     mount(root, send, q, where) {
+      // a button that opens a panel closes it when what it opens is already open (the grave stands open on a stone too)
+      const toggle = (i: Intent): void => {
+        if (i.kind === 'menu') return send(live.menu === i.menu ? { kind: 'menu', menu: null } : i);
+        if (i.kind !== 'focus') return send(i);
+        const on = live.focus as Record<string, unknown> | null, to = i.focus as Record<string, unknown> | null;
+        const same = on !== null && to !== null && (Object.entries(to).every(([k, v]) => on[k] === v) || (to.place === 'grave' && 'crystal' in on));
+        send(same ? { kind: 'focus', focus: null } : i);
+      };
       const from = (c: Corner): Where => (t, out) => where(t, out) && ((out.x = (out.x - ax[c]) / k), (out.y = (out.y - ay[c]) / k), true);
       installCss([]);
       const hud = div(root, 'hg');
@@ -98,19 +109,15 @@ export function createUi(mountPanels?: MountPanels): Ui {
       // a film may be skipped: the prompt bottom right while one plays (inventory #3)
       skip = new Words(menuAt.br, -400, -24, 18, DIM, 'right', 400);
       skip.el.hidden = true;
+      // top left the host and under it the feed's events; top right the god, the powers' suspicion, the goal and the quests;
+      // bottom left the pouch and the people; bottom right the clock
       parts.push(
-        new God(at.tl, send, q), new Powers(at.tr), new Pouch(at.bl, send), new Clock(at.br, send, q),
-        // the feed lays its notes out from the top-left anchor
-        new Feed(at.tl, at.tr, send, from('tl')),
-        new Hints(at, (t) => q.day(t), send), hand, deal,
+        new HostPlate(at.tl, send, q), new Feed(at.tl, toggle),
+        new God(at.tr, toggle, q), new Suspicion(at.tr), new Goal(at.tr, toggle, q),
+        new Pouch(at.bl, toggle), new People(at.bl, send, POUCH_H), new Clock(at.br, send, q),
+        new Quests(at.tr, q), new Hints(at, (t) => q.day(t), send), hand, deal,
       );
       menus = new Menus(menuAt, at.tr, send, q);
-      const [veilEl, veilAt] = layer(hud, 'hg hg-veil');
-      veil = veilEl;
-      veil.hidden = true;
-      const tab = surface(veilAt.c, 'parch', -170, -44, 340, 88);
-      new Words(tab, 0, 14, 30, INK, 'center', 340).set(uiText('hud.paused'));
-      pausedLine = new Words(tab, 0, 54, 17, INK, 'center', 340);
       tip = new Tip(hud, () => k);
       new ResizeObserver(([e]) => {
         w = e!.contentRect.width;
@@ -119,21 +126,18 @@ export function createUi(mountPanels?: MountPanels): Ui {
       }).observe(root);
     },
     frame(vm) {
+      live = vm;
       if (vm.settings.uiSize !== size) {
         size = vm.settings.uiSize;
         scale();
       }
       const keys = vm.settings.keys, name = (b: Bind): string => keyName(keys[b][0] ?? '');
-      if (vm.paused !== paused) {
-        veil.hidden = !(paused = vm.paused);
-        pausedLine.set(uiText('hud.pausedLine', { key: name('pause') }));
-      }
       // the title, the films and the defeat's drained world play over an empty screen
       const off = vm.title || vm.film !== null || vm.state.phase === 'lost';
       if (off !== hidden) rest.hidden = hidden = off;
       const film = vm.film !== null && vm.film.kind !== 'take';
       if (film === skip.el.hidden) skip.el.hidden = !film;
-      if (film) skip.set(uiText('hud.skip', { back: name('back'), pause: name('pause') }));
+      if (film) skip.set(uiText('hud.skip', { back: name('back'), skip: name('skip') }));
       if (!off) for (const p of parts) p.frame(vm);
       // the settings open over the title and the defeat too
       menus.frame(vm);

@@ -14,8 +14,8 @@ const mix = (h: number): number => {
 
 /** Which draw: each use has its own key so no two uses share a number. */
 export const K = {
-  stat: 1, trait: 2, work: 3, home: 4, hearth: 5, name: 6, tie: 7, shift: 8, habit: 9,
-  jitter: 10, crew: 11, evening: 12, shelter: 13, meal: 14, service: 15, regime: 16, sky: 17, event: 18, cast: 19, note: 20, wind: 21, veer: 22,
+  stat: 1, trait: 2, work: 3, home: 4, hearth: 5, name: 6, tie: 7, habit: 9,
+  jitter: 10, crew: 11, evening: 12, shelter: 13, meal: 14, service: 15, regime: 16, sky: 17, event: 18, cast: 19, note: 20, wind: 21, veer: 22, colour: 23,
 } as const;
 
 /** A draw in [0, 1) keyed by the seed, a use from `K` and up to two numbers. */

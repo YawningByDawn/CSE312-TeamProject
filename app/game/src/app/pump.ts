@@ -1,15 +1,17 @@
 import type { Action, Audio, Camera, Film, GameEvent, GameState, Intent, Query, Reason, Seed, Settings, Sim, Ui, View, ViewModel } from '../types';
+import { playTps } from '../content/clock';
 import { clearSave, readSave, readSettings, writeSave, writeSettings } from './save';
 
 /** A strike this rare or rarer plays its take. */
 const TAKE_ONE_IN = 10000;
 
-export interface Tracks { sim: Sim; query: Query; view: View; ui: Ui; audio: Audio; tickHz: number }
+export interface Tracks { sim: Sim; query: Query; view: View; ui: Ui; audio: Audio }
 
 /**
- * The one pump: real seconds in, whole sim ticks out at a fixed `tickHz`, and one `ViewModel` a frame for the view, the
- * ui and the audio. A film, the pause, the title, a pending choice and any phase but `live` hold the clock; nothing else
- * does. The vm is one object for the run's life: a frame writes its fields, never allocates it.
+ * The one pump: real seconds in, whole sim ticks out at `playTps` (the day's `DAY_SECONDS`, a night's actions' `NIGHT_SECONDS`), and one `ViewModel` a frame for the view, the
+ * ui and the audio. Time passes only up to the state's `until` (the night's actions and the day move it); a film, the
+ * title, a pending choice and any phase but `live` hold it too. The vm is one object for the run's life: a frame
+ * writes its fields, never allocates it.
  */
 export class Pump {
   readonly vm: ViewModel;
@@ -29,14 +31,35 @@ export class Pump {
     this.state = t.sim.create(seed);
     this.vm = {
       title: true, saved: readSave()?.day ?? null, settings, state: this.state, alpha: 0, time: 0, dt: 0,
-      camera: { x: 0, y: 0, zoom: 1 }, focus: null, hover: null, film: null, paused: false, menu: null, fresh: this.fresh,
+      camera: { x: 0, y: 0, zoom: 1 }, hostAt: { on: false, x: 0, y: 0, walked: 0, moving: false }, focus: null, hover: null, film: null, menu: null, fresh: this.fresh,
     };
   }
 
-  /** The clock runs: a live run with nothing held. */
+  /** The host's body before the last tick (`on` off: there was none): the view shows it moving from here to where it is now. */
+  private readonly before = { on: false, x: 0, y: 0, walked: 0 };
+
+  private stepOnce(): void {
+    const b = this.state.body, o = this.before;
+    [o.on, o.x, o.y, o.walked] = b ? [true, b.x, b.y, b.walked] : [false, 0, 0, 0];
+    this.take(this.t.sim.step(this.state));
+  }
+
+  /** The host's body as shown this frame: the last tick's move, `alpha` of the way. */
+  private showHost(): void {
+    const b = this.state.body, h = this.vm.hostAt, o = this.before;
+    h.on = !!b;
+    if (!h.on) return;
+    const k = o.on ? this.vm.alpha : 1;
+    h.x = o.x + (b!.x - o.x) * k;
+    h.y = o.y + (b!.y - o.y) * k;
+    h.walked = o.walked + (b!.walked - o.walked) * k;
+    h.moving = o.on && b!.walked > o.walked;
+  }
+
+  /** The clock runs: a live run with nothing held and time owed (the night's actions, the day). */
   running(): boolean {
     const vm = this.vm;
-    return !vm.title && !vm.paused && vm.film === null && vm.state.phase === 'live' && vm.state.pending === null;
+    return !vm.title && vm.film === null && vm.state.phase === 'live' && vm.state.pending === null && vm.state.tick < vm.state.until && !this.t.query.picking(vm.state);
   }
 
   /** One frame of `dt` real seconds: films and the clock move, then the view, ui and audio read the vm. */
@@ -53,21 +76,22 @@ export class Pump {
   advance(dt: number): void {
     const vm = this.vm;
     vm.dt = dt;
-    if (!vm.paused) vm.time += dt;
+    vm.time += dt;
     const film = vm.film;
     if (film) {
       film.t = Math.min(film.t + dt * this.filmRate, this.t.view.filmLength(film.kind));
       this.pose(film);
       if (film.t >= this.t.view.filmLength(film.kind)) vm.film = null;
     } else if (this.running()) {
-      this.carry += dt * this.t.tickHz;
+      this.carry += dt * playTps(this.state.tick);
       while (this.carry >= 1) {
         this.carry -= 1;
-        this.take(this.t.sim.step(this.state));
+        this.stepOnce();
         if (!this.running()) this.carry = 0;
       }
     }
     vm.alpha = this.carry;
+    this.showHost();
   }
 
   /** The camera a film holds at its `t`, from the camera it began on: a film ends, played or skipped, on its last pose. */
@@ -81,10 +105,10 @@ export class Pump {
 
   /** `n` ticks at once, held or not (tests and shots). */
   ticks(n: number): void {
-    for (let i = 0; i < n; i++) this.take(this.t.sim.step(this.state));
+    for (let i = 0; i < n; i++) this.stepOnce();
   }
 
-  /** What the sim did: into this frame's fresh events; a dawn replaces the save; the watershed and the ending play. */
+  /** What the sim did: into this frame's fresh events; a dawn replaces the save. */
   take(events: GameEvent[]): void {
     const vm = this.vm;
     for (const e of events) {
@@ -92,19 +116,28 @@ export class Pump {
       if (e.kind === 'dawn') {
         vm.saved = this.t.query.day(e.tick);
         writeSave({ day: vm.saved, state: this.state });
-      } else if (e.kind === 'stage' && e.stage === 'shade') vm.film = { kind: 'watershed', t: 0 };
       // a find of 1 in 10,000 or rarer holds the clock while the camera goes to it and back
-      else if (e.kind === 'strike' && e.oneIn >= TAKE_ONE_IN && !vm.film) vm.film = { kind: 'take', event: e, t: 0 };
+      } else if (e.kind === 'dusk') {
+        // the dusk card opens alone: a person, the grave or a menu (not settings) gives way to it
+        vm.focus = null;
+        if (vm.menu !== 'settings') vm.menu = null;
+      } else if (e.kind === 'strike' && e.oneIn >= TAKE_ONE_IN && !vm.film) vm.film = { kind: 'take', event: e, t: 0 };
       else if (e.kind === 'end') {
         clearSave();
         vm.saved = null;
-        if (e.won) vm.film = { kind: 'ending', t: 0 };
       }
     }
   }
 
+  /** The mark key: the host marks whoever stands nearest (nothing when no one does). */
+  markNearest(): void {
+    const target = this.t.query.near(this.state)[0];
+    if (target !== undefined) this.act({ type: 'mark', target });
+  }
+
   act(a: Action): { ok: boolean; why: Reason[] } {
     const r = this.t.sim.act(this.state, a);
+    if (a.type === 'possess') this.before.on = false; // a new body shows where it stands, not moving from the last
     this.take(r.events);
     return r;
   }
@@ -116,16 +149,15 @@ export class Pump {
         this.act(i.action);
         return;
       }
-      case 'focus': vm.focus = i.focus; return;
-      case 'pause': vm.paused = i.paused; return;
-      case 'endDay': {
-        const end = this.t.query.dayEnd(this.state.tick);
-        vm.paused = false;
-        while (this.running() && this.state.tick < end) this.take(this.t.sim.step(this.state));
-        this.carry = 0;
+      // a menu and a focus close each other (settings stands over the rest and leaves them)
+      case 'focus':
+        vm.focus = i.focus;
+        if (i.focus && vm.menu !== 'settings') vm.menu = null;
         return;
-      }
-      case 'menu': vm.menu = i.menu; return;
+      case 'menu':
+        vm.menu = i.menu;
+        if (i.menu && i.menu !== 'settings') vm.focus = null;
+        return;
       case 'skipFilm':
         if (vm.film) {
           vm.film.t = this.t.view.filmLength(vm.film.kind);
@@ -160,9 +192,9 @@ export class Pump {
     this.state = vm.state = state;
     vm.title = false;
     vm.film = null;
-    vm.paused = false;
     vm.menu = null;
     vm.focus = vm.hover = null;
     this.carry = 0;
+    this.before.on = false;
   }
 }

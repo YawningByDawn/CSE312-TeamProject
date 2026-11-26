@@ -1,10 +1,9 @@
 // src/audio, the sound (implements `Audio`). Owns the one AudioContext, its four buses (master, music, sfx, ambience,
 // from the settings), the voices and their ducking, and the streamed clips (loop.ts). Reads the view model each frame
-// (fresh events, film, camera, title, state), the sim's Query (hour, daylight, part of day, weekday), content's sound tables
+// (fresh events, film, title, state), the sim's Query (hour, daylight, part of day), content's sound tables
 // (handed in at boot) and the baked packs of assets/audio (docs/art-pipeline.md). Plays a cue for each fresh event, the
-// films' beats, a bed by what is on screen (the title is silent), ambience by where the camera looks, the hour, the
-// weekday, the weather and the town's mood. Silent until the first gesture lets the AudioContext run; `?mute=1` makes
-// no context at all.
+// films' beats, a bed by what is on screen (the title is silent), the mine's ambience by the hour and the weather.
+// Silent until the first gesture lets the AudioContext run; `?mute=1` makes no context at all.
 import raw from '../../assets/audio/manifest.json';
 import type { Affinity, Audio, Crystal, Film, GameEvent, Query, Settings, SoundCue, SoundTables, ViewModel, Weather } from '../types';
 import { Loop, type Clip } from './loop';
@@ -29,7 +28,6 @@ const AMB_FADE = 4;
 /** dB a stinger takes off the bed while it plays. */
 const STINGER_DUCK = -6;
 const db = (d: number): number => 10 ** (d / 20);
-const clamp01 = (x: number): number => Math.min(1, Math.max(0, x));
 
 /** The manifest's crystal material for each affinity. */
 const MATERIAL: Record<Affinity, string> = {
@@ -37,31 +35,18 @@ const MATERIAL: Record<Affinity, string> = {
 };
 
 /** What the mixer knows about the moment, 0..1 each. */
-interface Moment { mine: number; town: number; valley: number; day: number; shift: number; evening: number; weather: Weather; market: number; flame: number }
+interface Moment { day: number; shift: number; weather: Weather }
 
-/** Ambience layers and their level law. A layer with moods (crowd, market, tavern) plays the town's mood. */
+/** The mine's ambience layers and their level law. */
 const AMBIENCE: [string, (m: Moment) => number][] = [
-  ['grave', (m) => m.mine * 0.8],
-  ['lamps', (m) => m.mine * 0.6],
-  ['seep', (m) => m.mine * 0.5],
-  ['nether', (m) => m.mine * 0.4],
-  ['carts', (m) => m.mine * m.shift],
-  ['lift', (m) => (m.mine + m.town * 0.5) * m.shift],
-  ['water', (m) => (m.weather === 'rain' || m.weather === 'storm' ? m.mine : 0)],
-  ['beasts', (m) => m.mine * (1 - m.day) * 0.6],
-  ['crowd', (m) => m.town * m.day],
-  ['market', (m) => m.town * m.day * (0.3 + 0.7 * m.market)],
-  ['tavern', (m) => m.town * (0.2 + 0.8 * m.evening)],
-  ['hymn', (m) => m.town * m.day * m.flame],
-  ['council', (m) => m.town * m.day * 0.4],
-  ['smelter', (m) => m.town * m.shift * 0.6],
-  ['night', (m) => m.town * (1 - m.day)],
-  ['road', (m) => m.valley],
-  ['wind', (m) => Math.max(m.valley * 0.6, m.weather === 'wind' ? 1 - m.mine : 0)],
-  ['rain', (m) => (m.weather === 'rain' || m.weather === 'drizzle' ? 1 - m.mine : 0)],
-  ['rainMud', (m) => (m.weather === 'rain' || m.weather === 'storm' ? m.town * 0.6 : 0)],
-  ['storm', (m) => (m.weather === 'storm' ? 1 - m.mine * 0.5 : 0)],
-  ['fog', (m) => (m.weather === 'fog' ? 1 - m.mine : 0)],
+  ['grave', () => 0.8],
+  ['lamps', () => 0.6],
+  ['seep', () => 0.5],
+  ['nether', () => 0.4],
+  ['carts', (m) => m.shift],
+  ['lift', (m) => m.shift],
+  ['water', (m) => (m.weather === 'rain' || m.weather === 'storm' ? 1 : 0)],
+  ['beasts', (m) => (1 - m.day) * 0.6],
 ];
 
 /**
@@ -206,35 +191,15 @@ class Player implements Audio {
     const st = vm.state;
     const film = vm.film?.kind;
     const bed = vm.title ? null
-      : film === 'opening' ? null : film === 'watershed' ? 'watershed' : film === 'ending' || st.phase === 'won' ? 'ending'
-      : st.phase === 'lost' ? 'defeat' : st.phase === 'bonus' ? 'bonus' : st.stage;
+      : film === 'opening' ? null : st.phase === 'won' ? 'ending'
+      : st.phase === 'lost' ? 'defeat' : st.phase === 'bonus' ? 'bonus' : 'whisper';
     for (const name in MANIFEST.beds) this.level(`bed.${name}`, MANIFEST.beds[name]!, this.bedIn, name === bed ? 1 : 0, BED_FADE);
 
-    const zoom = vm.camera.zoom;
-    const part = this.q.part(st.tick);
-    const weekday = this.q.weekday(st.tick);
-    const m: Moment = {
-      mine: clamp01(2 - zoom), town: clamp01(zoom - 1) - 0.5 * clamp01(zoom - 2), valley: clamp01(zoom - 2), day,
-      shift: part === 'shift' ? 1 : 0, evening: part === 'dusk' || part === 'night' ? 1 : 0, weather: st.weather,
-      market: weekday === 'market' ? 1 : 0, flame: weekday === 'flame' ? 1 : 0,
-    };
-    const mood = this.mood(vm);
+    const m: Moment = { day, shift: this.q.part(st.tick) === 'shift' ? 1 : 0, weather: st.weather };
     for (const [layer, law] of AMBIENCE) {
       const v = vm.title || film === 'opening' ? 0 : law(m);
-      const clips = MANIFEST.amb[layer]!;
-      for (const k in clips) this.level(`amb.${layer}.${k}`, clips[k]!, this.ambBus, k === mood || !(mood in clips) && k === 'calm' ? v : 0, AMB_FADE);
+      this.level(`amb.${layer}.calm`, MANIFEST.amb[layer]!.calm!, this.ambBus, v, AMB_FADE);
     }
-  }
-
-  /** The town's mood: afraid or uneasy by the highest suspicion, fervent with a dozen followers, else calm. */
-  private mood(vm: ViewModel): string {
-    const f = vm.state.factions;
-    const level = Math.max(f.temple.level, f.council.level, f.public.level);
-    if (level >= 3) return 'afraid';
-    if (level >= 2) return 'uneasy';
-    let followers = 0;
-    for (const id in vm.state.people) if (vm.state.people[id]!.follower) followers++;
-    return followers >= 12 ? 'fervent' : 'calm';
   }
 
   /** A loop's level: made on first need (never for silence), glided after. */

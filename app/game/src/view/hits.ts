@@ -2,7 +2,7 @@ import { Circle, Container, type Renderer } from 'pixi.js';
 import type { Focus, PlaceId } from '../types';
 import { AT } from '../content/map';
 import { pit } from './quad';
-import { AREAS, PLACES } from '../content/world';
+import { AREAS } from '../content/world';
 
 // The one hit rule (#129): the scene graph's own hit areas. Anything clickable is a container made pickable here with
 // the focus it stands for; View.pick asks Pixi for the frontmost one under the point. The places are disks under
@@ -24,29 +24,26 @@ export function hit(renderer: Renderer, x: number, y: number): Focus {
   return o ? FOCUS.get(o)! : null;
 }
 
-/** Most of a place's disk, in its region's units: a lone place does not swallow the screen. */
-const PLACE_R = { mine: 70, town: 45 };
+/** Most of a place's disk, in mine units: a lone place does not swallow the screen. */
+const PLACE_R = 70;
 
-const regionOf = (p: PlaceId) => AREAS[AREAS[p] ? p : PLACES[p]?.area ?? p.split(':')[1]!]!.region;
-
-/** Every place's disk: the mine's in the pit's frame, the town's in its own. */
-export function placeHits(): { mine: Container; town: Container } {
-  const mine = pit(), town = new Container();
+/** Every place's disk, in the pit's frame. */
+export function placeHits(): Container {
+  const mine = pit();
   const ids = Object.keys(AT);
   const near = (p: PlaceId, among: PlaceId[]) => {
     const [x, y] = AT[p]!;
     let d = Infinity;
-    for (const o of among) if (o !== p && regionOf(o) === regionOf(p)) d = Math.min(d, Math.hypot(AT[o]![0] - x, AT[o]![1] - y));
+    for (const o of among) if (o !== p) d = Math.min(d, Math.hypot(AT[o]![0] - x, AT[o]![1] - y));
     return d / 2;
   };
   const areas = ids.filter((p) => AREAS[p]), places = ids.filter((p) => !AREAS[p]);
   // areas first, then places over them
   for (const p of [...areas, ...places]) {
-    const region = regionOf(p);
-    const r = AREAS[p] ? near(p, areas) : Math.min(PLACE_R[region], near(p, ids));
+    const r = AREAS[p] ? near(p, areas) : Math.min(PLACE_R, near(p, ids));
     const c = pickable(new Container(), { place: p });
     c.hitArea = new Circle(AT[p]![0], AT[p]![1], r);
-    (region === 'mine' ? mine : town).addChild(c);
+    mine.addChild(c);
   }
-  return { mine, town };
+  return mine;
 }

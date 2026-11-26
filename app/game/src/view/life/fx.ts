@@ -1,9 +1,8 @@
 import { Container, Sprite, type Texture } from 'pixi.js';
 import type { GameEvent, Layer, PlaceId, Query, UnitId, ViewModel } from '../../types';
-import { AT, DRESS, MINE_FRAME, SHAFT } from '../../content/map';
-import { AREAS, PLACES } from '../../content/world';
+import { AT, DRESS, MINE_FRAME } from '../../content/map';
+import { PLACES } from '../../content/world';
 import { GRADES } from '../../content/crystals';
-import { below } from '../camera';
 import type { Atlas } from '../atlas';
 import type { People } from './people';
 import { Hoard, gemCellOf } from './hoard';
@@ -12,10 +11,9 @@ import { ALT, BURN, DAWN, GRADE_INK, GRAVE, CROWN, RIDE, BACK, clipOf, partsOf, 
 // What happens, where it happens (#77, #81-89): each event's clip (clips.ts), a few parts of baked life-atlas cells,
 // placed at the event's person (their feet or their wick), its place, or the grave, sized in that place's figure heights
 // and grown by a stone's grade. A card plays at its target, else the grave; the dawn's bell-wave runs up its path.
-// Every part is a sprite of one fixed pool: nothing is made per event. Mine effects fade with the mine as the camera
-// rises out of it. The grave's hoard is placed with them.
+// Every part is a sprite of one fixed pool: nothing is made per event. The grave's hoard is placed with them.
 
-/** A playing clip: its parts from `start`, its anchors (town units), its figure height, its region and its stone. */
+/** A playing clip: its parts from `start`, its anchors (world units), its figure height and its stone. */
 interface Clip {
   parts: readonly Part[];
   start: number;
@@ -23,7 +21,6 @@ interface Clip {
   /** feet, wick height above them, the grave */
   fx: number; fy: number; crown: number; gx: number; gy: number;
   u: number; gu: number;
-  mine: boolean;
   k: number;
   seed: number;
   ink: number;
@@ -41,18 +38,15 @@ const hash = (a: number, b: number): number => {
   h = Math.imul(h ^ (h >>> 15), 0x85ebca6b);
   return ((h ^ (h >>> 13)) >>> 0) / 4294967296;
 };
-/** a mine point (mine units) in town units */
+/** a mine point (mine units) in world units */
 const mx = (x: number): number => MINE_FRAME.x + x / MINE_FRAME.per;
 const my = (y: number): number => MINE_FRAME.y + y / MINE_FRAME.per;
-/** a figure's height in town units: in the mine, in the town */
-const U_MINE = 6, U_TOWN = 24;
+/** a figure's height in world units */
+const U_MINE = 6;
 export const GRAVE_AT = { x: mx(DRESS.points.graveEye.x), y: my(DRESS.points.graveEye.y) };
-const placeAt = (p: PlaceId): [number, number] => {
-  const at = AT[p]!;
-  return AREAS[p]?.region === 'mine' ? [mx(at[0]), my(at[1])] : [at[0], at[1]];
-};
-/** the dawn's path (town units), each point's distance along it, and its length */
-const WAVE = [...DAWN.path.map(placeAt), [SHAFT.town[0], SHAFT.town[1]] as [number, number], placeAt('minehead')];
+const placeAt = (p: PlaceId): [number, number] => [mx(AT[p]![0]), my(AT[p]![1])];
+/** the dawn's path (world units), each point's distance along it, and its length */
+const WAVE = DAWN.path.map(placeAt);
 const ALONG = WAVE.map((_, i) => WAVE.slice(1, i + 1).reduce((d, p, j) => d + Math.hypot(p[0] - WAVE[j]![0], p[1] - WAVE[j]![1]), 0));
 const LEN = ALONG[ALONG.length - 1]!;
 /** the point `d` along the dawn's path */
@@ -63,20 +57,19 @@ function along(d: number, out: { x: number; y: number }): void {
   out.x = a[0] + (b[0] - a[0]) * k; out.y = a[1] + (b[1] - a[1]) * k;
 }
 
-export interface Anchor { x: number; y: number; u: number; crown: number; mine: boolean }
+export interface Anchor { x: number; y: number; u: number; crown: number }
 const at4 = { x: 0, y: 0, h: 0, crown: 0 };
-/** Where something happened (town units): `unit`'s feet as shown, else `place`'s point; its figure height and region. */
+/** Where something happened (world units): `unit`'s feet as shown, else `place`'s point; its figure height. */
 export function anchor(unit: UnitId | undefined, place: PlaceId | undefined, people: People, out: Anchor): boolean {
   if (unit && people.where(unit, at4)) {
-    out.x = at4.x; out.y = at4.y; out.u = at4.h; out.crown = at4.crown; out.mine = at4.h < (U_MINE + U_TOWN) / 2;
+    out.x = at4.x; out.y = at4.y; out.u = at4.h; out.crown = at4.crown;
     return true;
   }
   if (!place) return false;
   const area = PLACES[place]?.area ?? place, at = AT[place] ?? AT[area];
   if (!at) return false;
-  out.mine = AREAS[area]?.region === 'mine';
-  out.x = out.mine ? mx(at[0]) : at[0]; out.y = out.mine ? my(at[1]) : at[1];
-  out.u = out.mine ? U_MINE : U_TOWN; out.crown = out.u * 0.9;
+  out.x = mx(at[0]); out.y = my(at[1]);
+  out.u = U_MINE; out.crown = out.u * 0.9;
   return true;
 }
 
@@ -86,7 +79,7 @@ export class Fx implements Layer {
   readonly root = new Container({ isRenderGroup: true });
   private readonly pool: Sprite[] = [];
   private readonly clips: Clip[] = [];
-  private readonly where: Anchor = { x: 0, y: 0, u: 0, crown: 0, mine: true };
+  private readonly where: Anchor = { x: 0, y: 0, u: 0, crown: 0 };
   private readonly seen = { x: 0, y: 0, h: 0, crown: 0 };
   private readonly pt = { x: 0, y: 0 };
   private readonly frames = new Map<string, Texture[]>();
@@ -94,8 +87,6 @@ export class Fx implements Layer {
   private dawn = -1;
   private used = 0;
   private serial = 0;
-  /** this frame's tithe stones by tither: the glints leave a quarter second apart, at most six from one */
-  private readonly carried = new Map<string, number>();
 
   constructor(private readonly q: Query, private readonly life: Atlas, private readonly people: People) {
     this.root.eventMode = 'none';
@@ -109,17 +100,16 @@ export class Fx implements Layer {
   }
 
   frame(vm: ViewModel): boolean {
-    const t = vm.time, b = below(vm.camera.zoom);
-    this.carried.clear();
+    const t = vm.time;
     for (const e of vm.fresh) this.play(e, vm);
     let n = 0;
     for (let i = this.clips.length - 1; i >= 0; i--) if (this.clips[i]!.end <= t) this.clips.splice(i, 1);
-    for (const c of this.clips) n = this.place(c, t, c.mine ? b : 1 - b, n);
-    if (this.dawn >= 0) n = this.wave(t - this.dawn, b, n);
+    for (const c of this.clips) n = this.place(c, t, n);
+    if (this.dawn >= 0) n = this.wave(t - this.dawn, n);
     const was = this.used;
     for (let i = n; i < was; i++) this.pool[i]!.visible = false;
     this.used = n;
-    const hoard = this.hoard.frame(vm, b);
+    const hoard = this.hoard.frame(vm);
     return n > 0 || was > 0 || hoard;
   }
 
@@ -128,23 +118,16 @@ export class Fx implements Layer {
     if (e.kind === 'dawn') { this.dawn = vm.time; return; }
     const name = clipOf(e, vm.state);
     if (!name) return;
-    let delay = 0;
-    if (e.kind === 'tithe') {
-      const k = this.carried.get(e.unit!) ?? 0;
-      if (k >= 6) return;
-      this.carried.set(e.unit!, k + 1);
-      delay = 0.25 * k;
-    }
     const s = vm.state, w = this.where, parts = partsOf(name);
     const c: Clip = {
-      parts, start: vm.time + delay, unit: null, fx: GRAVE_AT.x, fy: GRAVE_AT.y, crown: U_MINE * 0.9, gx: GRAVE_AT.x, gy: GRAVE_AT.y,
-      u: U_MINE, gu: U_MINE, mine: true, k: 1, seed: this.serial, ink: GRADE_INK[2]!, gem: 'gem-c2-0-0', end: 0,
+      parts, start: vm.time, unit: null, fx: GRAVE_AT.x, fy: GRAVE_AT.y, crown: U_MINE * 0.9, gx: GRAVE_AT.x, gy: GRAVE_AT.y,
+      u: U_MINE, gu: U_MINE, k: 1, seed: this.serial, ink: GRADE_INK[2]!, gem: 'gem-c2-0-0', end: 0,
     };
     const onPerson = !!e.unit && this.people.where(e.unit, this.seen);
     if (anchor(e.unit, e.place, this.people, w)) {
       if (onPerson) c.unit = e.unit!;
       else if (this.q.visibility(s, PLACES[e.place!]?.area ?? e.place!) === 'void') return;
-      c.fx = w.x; c.fy = w.y; c.u = w.u; c.crown = w.crown; c.mine = w.mine;
+      c.fx = w.x; c.fy = w.y; c.u = w.u; c.crown = w.crown;
     } else if (e.kind !== 'play' && parts.some((p) => p[2] !== GRAVE)) return;
     // the stone: its grade's ink and shape, a rarer one bigger and longer (a strike's clip is its grade's own)
     const cid = 'crystal' in e ? e.crystal : null;
@@ -169,11 +152,10 @@ export class Fx implements Layer {
   }
 
   /** Lay out one clip's parts from pool sprite `n`; the next free sprite. */
-  private place(c: Clip, t: number, fade: number, n: number): number {
+  private place(c: Clip, t: number, n: number): number {
     if (c.unit && this.people.where(c.unit, this.seen)) {
       c.fx = this.seen.x; c.fy = this.seen.y; c.crown = this.seen.crown;
     }
-    if (fade <= 0) return n;
     const sk = Math.sqrt(c.k), age = (t - c.start) / sk;
     for (let pi = 0; pi < c.parts.length; pi++) {
       const [cell, tint, at, t0, dur, r0, r1, a, count = 1, spread = 0, rise = 0, how = '', turn = 0] = c.parts[pi]!;
@@ -204,6 +186,7 @@ export class Fx implements Layer {
           if (line) { const g = smooth(Math.min(1, u * 3)); x = x0 + (x - x0) * g; y = y0 + (y - y0) * g; }
         }
         y -= rise >= 0 ? rise * fig * u : -rise * fig * (1 - u);
+        if (how.includes('c')) y -= 0.55 * fig; // at the chest
         const r = (r0 + (r1 - r0) * u) * fig * (count > 1 ? 1 : sk);
         const name = cell === '@gem' ? c.gem : cell;
         const tex = this.tex(name, u);
@@ -227,7 +210,7 @@ export class Fx implements Layer {
         }
         sp.tint = how.includes('a') && i % 2 ? ALT : tint < 0 ? c.ink : tint;
         sp.blendMode = how.includes('n') || gem ? 'normal' : 'add';
-        sp.alpha = a * fade * Math.min(1, u / 0.15) * Math.min(1, (1 - u) / 0.5);
+        sp.alpha = a * Math.min(1, u / 0.15) * Math.min(1, (1 - u) / 0.5);
         sp.visible = true;
       }
     }
@@ -235,10 +218,10 @@ export class Fx implements Layer {
   }
 
   /** The dawn's bell-wave `age` s in: warm pools trailing a bright front up the path, a ring and glints at each stop. */
-  private wave(age: number, b: number, n: number): number {
+  private wave(age: number, n: number): number {
     const D = DAWN, end = D.wave + D.fade;
     if (age >= end) { this.dawn = -1; return n; }
-    const w = D.width * U_MINE, f = inOut(age / D.wave), front = f * LEN, fade = (1 - smooth((age - D.wave) / D.fade)) * b, p = this.pt;
+    const w = D.width * U_MINE, f = inOut(age / D.wave), front = f * LEN, fade = 1 - smooth((age - D.wave) / D.fade), p = this.pt;
     const put = (cell: string, x: number, y: number, r: number, a: number, tint: number, g: boolean): void => {
       if (a <= 0.004 || n >= POOL) return;
       const sp = this.pool[n++]!, tex = this.life.texture(cell), cl = this.life.cell(cell), sc = (2 * r) / tex.frame.width;

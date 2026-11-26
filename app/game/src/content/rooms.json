@@ -1,9 +1,0 @@
-{
-  "pithead": "pithead", "tallyhouse": "tally", "lamphouse": "lamps", "tavern": "tavern", "tannery": "cloth", "graveyard": "graves",
-  "stables": "carts", "cartshed": "carts", "haulyard": "carts", "smelter": "smelter", "forge": "forge", "market": "food", "gemworks": "gems",
-  "bakery": "food", "chandlery": "lamps", "pawnshop": "lender", "well": "well", "washplace": "wash", "apothecary": "apothecary",
-  "alehouse": "tavern", "school": "school", "loomhouse": "cloth", "gardens": "brew", "brewhouse": "brew", "pottery": "brew",
-  "chapel": "shrine", "temple": "shrine", "councilhall": "keep", "vault": "keep", "scriptorium": "records", "barracks": "barracks",
-  "drillyard": "barracks", "gate": "gate", "inn": "tavern", "ropewalk": "cloth", "rows": "home", "highhouses": "home", "templesteps": "shrine",
-  "road": "gate"
-}

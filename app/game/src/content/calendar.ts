@@ -19,7 +19,7 @@ export interface DayDef {
 export const WEEK: readonly DayDef[] = [
   { kind: 'work', count: true, carts: false },
   { kind: 'work', count: true, carts: false },
-  { kind: 'market', count: true, carts: true },
+  { kind: 'cart', count: true, carts: true },
   { kind: 'work', count: true, carts: false },
   { kind: 'payday', count: true, carts: true },
   { kind: 'flame', count: true, carts: false },
@@ -33,27 +33,21 @@ const FACES: PlaceId[] = ['heartvein', 'eastworks', 'westdrift', 'lowgallery', '
 
 export const CALENDAR_EFFECTS: Readonly<Record<Weekday, readonly CalendarEffect[]>> = {
   work: [],
-  market: [
-    { kind: 'guards', target: 'market', value: 2 },
-    { kind: 'guards', target: 'citygate', value: 1 },
-    { kind: 'guards', target: 'lift', value: -1 },
-    { kind: 'crowd', target: 'market', value: 2.2 },
-    { kind: 'crowd', target: 'citygate', value: 1.6 },
-    { kind: 'whisperZone', target: 'market', value: 0.04 },
+  cart: [
+    { kind: 'guards', target: 'lift', value: 1 },
+    { kind: 'crowd', target: 'lift', value: 1.6 },
   ],
   payday: [
-    { kind: 'guards', target: 'minehead', value: 1 },
-    { kind: 'guards', target: 'slagrows', value: 1 },
-    { kind: 'crowd', target: 'slagrows', value: 1.5 },
-    { kind: 'whisperZone', target: 'slagrows', value: 0.05 },
+    { kind: 'guards', target: 'overseer', value: 1 },
+    { kind: 'crowd', target: 'overseer', value: 1.5 },
+    { kind: 'whisperZone', target: 'overseer', value: 0.05 },
     { kind: 'notice', target: 'public', value: 1.1 },
   ],
   flame: [
     ...FACES.map((z): CalendarEffect => ({ kind: 'crew', target: z, value: 0.5 })),
-    { kind: 'guards', target: 'kilntemple', value: 2 },
+    { kind: 'guards', target: 'kilnshrine', value: 2 },
     { kind: 'guards', target: 'lift', value: -1 },
-    { kind: 'crowd', target: 'kilntemple', value: 2.5 },
-    { kind: 'crowd', target: 'slagrows', value: 0.5 },
+    { kind: 'crowd', target: 'kilnshrine', value: 2.5 },
     { kind: 'notice', target: 'temple', value: 1.2 },
   ],
   rest: [
@@ -61,6 +55,6 @@ export const CALENDAR_EFFECTS: Readonly<Record<Weekday, readonly CalendarEffect[
     { kind: 'guards', target: 'lift', value: -1 },
     { kind: 'guards', target: 'overseer', value: -1 },
     { kind: 'search', target: 'lift', value: 0.6 },
-    { kind: 'crowd', target: 'wellsquare', value: 1.6 },
+    { kind: 'crowd', target: 'bunks', value: 1.6 },
   ],
 };

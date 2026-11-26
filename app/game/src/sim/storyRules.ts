@@ -4,17 +4,15 @@
  */
 import { BALANCE } from '../content/balance';
 import { DAY_TICKS, dayOf } from '../content/clock';
-import { GRADE_VALUE } from '../content/crystals';
-import { STAGES } from '../content/stages';
+import { STAGE } from '../content/stages';
 import { STORIES } from '../content/stories';
 import {
-  addEffect, addHeat, addHunger, addMalice, addNether, area, convert, everyone, gainDevotion, gainXp, here, inMine,
-  heatAll, loseDevotion, mint, nbrs, pouchIds, remove, standingOf, type Ctx,
+  addEffect, addHeat, addHunger, addMalice, addNether, area, convert, everyone, gainDevotion, gainXp, here,
+  heatAll, loseDevotion, mint, nbrs, pouchIds, remove, spend, standingOf, type Ctx,
 } from './core';
+import { hurt } from './host';
 import { active, visibility } from './influence';
 import { chance, pick } from './rng';
-import { noticeWearers } from './town';
-import { ITEM } from '../content/items';
 import { spawn } from './world';
 import type { GameState, Person, PlaceId, Reason, StoryId } from '../types';
 
@@ -45,11 +43,6 @@ const resist = (ps: readonly Person[], by: number): void => { for (const p of ps
 const vent = (c: Ctx, m: number): void => addMalice(c, -m);
 const grieve = (p: Person, by: number): void => { p.trait = 'grieving'; p.resistance = Math.max(0, p.resistance - by); };
 
-/** Crystals from the pouch, cheapest first; refused before when the pouch is short. */
-function spend(c: Ctx, count: number): void {
-  const ids = pouchIds(c.s).sort((a, b) => GRADE_VALUE[c.s.crystals[a]!.grade] - GRADE_VALUE[c.s.crystals[b]!.grade] || (a < b ? -1 : 1));
-  for (const id of ids.slice(0, count)) delete c.s.crystals[id];
-}
 const costs = (count: number) => (s: Readonly<GameState>): Reason | null => (pouchIds(s).length < count ? { key: 'why.cost', slots: { n: count } } : null);
 const found = (c: Ctx, count: number): void => { for (let i = 0; i < count; i++) mint(c); };
 
@@ -74,7 +67,7 @@ export const RULES: Readonly<Record<StoryId, StoryRule>> = {
   },
   caveIn: {
     cast: (s) => {
-      const a = one(s, STAGES[s.stage].caveInAreas.filter((x) => people(s, (p) => area(p.work) === x).length > 0));
+      const a = one(s, STAGE.caveInAreas.filter((x) => people(s, (p) => area(p.work) === x).length > 0));
       if (!a) return null;
       const there = people(s, (p) => area(p.work) === a);
       const pool = there.filter((p) => !p.follower);
@@ -89,7 +82,7 @@ export const RULES: Readonly<Record<StoryId, StoryRule>> = {
   tallyInspection: {
     cast: (s) => {
       if (s.factions.council.suspicion < n('tallyInspection').minHeat!) return null;
-      const fl = flock(s, (p) => inMine(p.work));
+      const fl = flock(s);
       const u = one(s, fl.filter((p) => p.pocket.length > 0)) ?? one(s, fl);
       return u ? { unit: u, place: area(u.work) } : null;
     },
@@ -99,12 +92,12 @@ export const RULES: Readonly<Record<StoryId, StoryRule>> = {
         const u = k.unit!;
         if (!here(u) || u.pocket.length === 0) return 'nobody';
         addHeat(c, 'council', n('tallyInspection').heat!, 'story');
-        u.stats.health = Math.max(0, u.stats.health - n('tallyInspection').harm!);
+        hurt(c, u, n('tallyInspection').harm!);
         u.caught += 1;
-        const gone = u.stats.health <= 0 ? 'dead' : u.caught >= BALANCE.caughtTaken ? 'taken' : null;
-        if (!gone) return;
-        remove(c, u, gone);
-        return gone === 'dead' ? 'died' : 'taken';
+        if (u.stats.hp <= 0) return 'died';
+        if (u.caught < BALANCE.caughtTaken) return;
+        remove(c, u, 'taken');
+        return 'taken';
       },
     ],
     refuse: [costs(STORIES.tallyInspection!.n.cost!)],
@@ -127,10 +120,10 @@ export const RULES: Readonly<Record<StoryId, StoryRule>> = {
   },
   deathInTunnels: {
     cast: (s) => {
-      const below = strangers(s, (p) => inMine(p.work));
+      const below = strangers(s);
       if (below.length <= n('deathInTunnels').minPeople!) return null;
-      const u = one(s, [...below].sort((a, b) => a.stats.health - b.stats.health || (a.id < b.id ? -1 : 1)).slice(0, n('deathInTunnels').weakest!))!;
-      const mourner = one(s, below.filter((p) => p !== u && (p.household === u.household || u.ties.includes(p.id))));
+      const u = one(s, [...below].sort((a, b) => a.stats.hp - b.stats.hp || (a.id < b.id ? -1 : 1)).slice(0, n('deathInTunnels').weakest!))!;
+      const mourner = one(s, below.filter((p) => p !== u && u.ties.includes(p.id)));
       return { unit: u, ...(mourner ? { unit2: mourner } : {}), place: area(u.work) };
     },
     now: (c, k) => {
@@ -170,10 +163,9 @@ export const RULES: Readonly<Record<StoryId, StoryRule>> = {
     },
     options: [
       (c, k) => { remove(c, k.unit!, 'dead', 0); vent(c, n('informer').malice!); addHeat(c, 'public', n('informer').heat!, 'story'); },
-      (c, k) => {
+      (c) => {
         addHeat(c, 'council', n('informer').council!, 'story');
         addHeat(c, 'public', n('informer').public!, 'story');
-        noticeWearers(c, flock(c.s, (p) => area(p.work) === k.place), ITEM.informerNotice);
       },
     ],
   },
@@ -183,7 +175,7 @@ export const RULES: Readonly<Record<StoryId, StoryRule>> = {
   },
   railAccident: {
     cast: (s) => {
-      for (const f of flock(s, (p) => inMine(p.work))) {
+      for (const f of flock(s)) {
         const pinned = one(s, strangers(s, (p) => area(p.work) === area(f.work)));
         if (pinned) return { unit: pinned, unit2: f, place: area(f.work) };
       }
@@ -191,7 +183,7 @@ export const RULES: Readonly<Record<StoryId, StoryRule>> = {
     },
     options: [
       (c, k) => {
-        k.unit2!.stats.health = Math.max(1, k.unit2!.stats.health - n('railAccident').harm!);
+        hurt(c, k.unit2!, n('railAccident').harm!, 1);
         resist([k.unit!], n('railAccident').resist!);
       },
       (c, k) => { remove(c, k.unit!, 'dead', 0); vent(c, n('railAccident').malice!); },
@@ -241,7 +233,7 @@ export const RULES: Readonly<Record<StoryId, StoryRule>> = {
     cast: (s) => {
       if (s.factions.council.suspicion < n('overseerLedger').minHeat!) return null;
       const near = new Set(['overseer', ...nbrs(s, 'overseer')]);
-      const u = one(s, flock(s, (p) => near.has(area(p.work)) || p.stats.cunning >= n('overseerLedger').minCunning!));
+      const u = one(s, flock(s, (p) => near.has(area(p.work)) || p.stats.intelligence >= n('overseerLedger').minIntelligence!));
       return u ? { unit: u, place: 'overseer' } : null;
     },
     options: [
@@ -294,96 +286,14 @@ export const RULES: Readonly<Record<StoryId, StoryRule>> = {
     weight: (s) => (s.factions.council.suspicion >= n('warBells').minHeat! ? STORIES.warBells!.weight : STORIES.warBells!.weightElse!),
     now: (c) => { addHeat(c, 'council', -n('warBells').cool!, 'story'); addHeat(c, 'public', -n('warBells').publicCool!, 'story'); },
   },
-  marketRumour: {
-    cast: (s) => {
-      const stalls = strangers(s, (p) => area(p.work) === 'market');
-      return stalls.length >= n('marketRumour').minWorkers! ? { unit: one(s, stalls)!, place: 'market' } : null;
-    },
-    options: [
-      (c) => { resist(strangers(c.s, (p) => area(p.work) === 'market'), n('marketRumour').resist!); addHeat(c, 'public', n('marketRumour').heat!, 'story'); },
-      (c) => { addHeat(c, 'public', -n('marketRumour').cool!, 'story'); },
-    ],
-  },
-  feverRows: {
-    cast: (s) => {
-      const rows = strangers(s, (p) => area(p.home) === 'slagrows');
-      return rows.length >= n('feverRows').minResidents! ? { unit: one(s, rows)!, place: 'slagrows' } : null;
-    },
-    options: [
-      (c) => {
-        spend(c, n('feverRows').cost!);
-        resist(strangers(c.s, (p) => area(p.home) === 'slagrows'), n('feverRows').resist!);
-        addHeat(c, 'temple', n('feverRows').heat!, 'story');
-      },
-      (c) => {
-        const sick = strangers(c.s, (p) => area(p.home) === 'slagrows').sort((a, b) => a.stats.health - b.stats.health || (a.id < b.id ? -1 : 1));
-        for (const p of sick.slice(0, n('feverRows').dead!)) remove(c, p, 'dead', 0);
-        vent(c, n('feverRows').malice!);
-      },
-    ],
-    refuse: [costs(STORIES.feverRows!.n.cost!)],
-  },
-  magistrateDinner: {
-    cast: (s) => {
-      const host = strangers(s, (p) => p.role === 'magistrate')[0];
-      const guest = host ? one(s, flock(s, (p) => !inMine(p.home))) : undefined;
-      return host && guest ? { unit: guest, unit2: host, place: area(guest.home) } : null;
-    },
-    options: [
-      (c, k) => {
-        resist(strangers(c.s, (p) => area(p.home) === k.place), n('magistrateDinner').resist!);
-        resist([k.unit2!], n('magistrateDinner').hostResist!);
-        addHeat(c, 'council', n('magistrateDinner').heat!, 'story');
-      },
-      () => undefined,
-    ],
-  },
-  deserters: {
-    cast: (s) => {
-      const watch = strangers(s, (p) => p.role === 'soldier');
-      return watch.length >= n('deserters').count! + 3 ? { unit: watch[0]!, count: n('deserters').count!, place: 'haulyard' } : null;
-    },
-    options: [
-      (c) => {
-        for (const p of deserted(c.s)) convert(c, p, n('deserters').faith!);
-        addHeat(c, 'council', n('deserters').heat!, 'story');
-      },
-      (c) => {
-        for (const p of deserted(c.s)) remove(c, p, 'dead');
-        addHeat(c, 'council', -n('deserters').cool!, 'story');
-      },
-    ],
-  },
-  graveRobbers: {
-    cast: (s) => {
-      const u = one(s, strangers(s, (p) => area(p.home) === 'slagrows' && (p.trait === 'bitter' || p.trait === 'greedy')));
-      return u ? { unit: u, place: 'gravefield' } : null;
-    },
-    options: [
-      (c, k) => { found(c, n('graveRobbers').crystals!); resist([k.unit!], n('graveRobbers').resist!); addHeat(c, 'temple', n('graveRobbers').heat!, 'story'); },
-      (c, k) => { remove(c, k.unit!, 'taken'); addHeat(c, 'temple', -n('graveRobbers').cool!, 'story'); },
-    ],
-  },
-  cityRider: {
-    cast: (s) => {
-      if (s.flags.shadeDay === 0 || day(s) - s.flags.shadeDay < n('cityRider').minDays!) return null;
-      const u = one(s, strangers(s, (p) => area(p.work) === 'citygate')) ?? one(s, strangers(s, (p) => !inMine(p.work)));
-      return u ? { unit: u, place: 'citygate' } : null;
-    },
-    now: (c) => { addHeat(c, 'council', n('cityRider').heat!, 'story'); },
-  },
   freshHands: {
     // the mine runs short of free hands: fewer than maxShare of everyone who ever worked it are here and not yours
     weight: (s) => {
       if (day(s) < n('freshHands').minDay!) return 0;
-      const ever = everyone(s).filter((p) => inMine(p.work)).length;
-      return strangers(s, (p) => inMine(p.work)).length < n('freshHands').maxShare! * ever ? STORIES.freshHands!.weight : 0;
+      return strangers(s).length < n('freshHands').maxShare! * everyone(s).length ? STORIES.freshHands!.weight : 0;
     },
     // the newcomer comes off the lift as the story is told: the world makes them
     cast: (s) => ({ unit: spawn(s, 'fresh', 'bunks'), place: 'bunks' }),
     now: () => {},
   },
 };
-
-/** The watch who walked off: the first `count` soldiers not yours. */
-const deserted = (s: Readonly<GameState>): Person[] => strangers(s, (q) => q.role === 'soldier').slice(0, n('deserters').count!);

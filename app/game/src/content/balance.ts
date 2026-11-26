@@ -51,9 +51,6 @@ export const BALANCE = {
   // --- people ---
   /** Personal Resistance roll added to trait + role. */
   personalResist: [10, 26] as const,
-  /** Crowds close ranks: a gathered group whispered to as one resists as its mean plus this, at most groupResistCap. */
-  groupResist: 5,
-  groupResistCap: 60,
   /** Effective Resistance is clamped to 0..this. */
   resistanceCap: 100,
   /** The mine grows wary: +this Resistance for everyone unconverted, per follower head beyond `warinessFree`. */
@@ -95,12 +92,10 @@ export const BALANCE = {
   holdBase: 2.5,
   holdPerV: 1,
   holdAsleep: 0.6,
-  /** Town blocks are bigger: a follower's stain counts this much there. */
-  holdTown: 0.5,
   /** Pushback per Day: the Flame's ward in its area / next to it; each non-follower guard, overseer or priest per half-day present; a hunter; a raid. */
   wardPush: 6,
   wardPushNear: 2,
-  watcherPush: 3,
+  watcherPush: 1,
   raidPush: 25,
   /** A guard or overseer who stands on ground at least this soaked notices (Council heat +stainNoticeGov). */
   stainNoticeAt: 50,
@@ -109,8 +104,6 @@ export const BALANCE = {
   prayDevotion: 5,
   /** Odds bonus for whispering to a sleeper. */
   sleeperBonus: 0.12,
-  /** Share of mine workers (diggers, haulers, sorters) on the night shift. */
-  nightShiftShare: 0.3,
   /** A whisper that turns someone stains their area at once by this much (the ripple). */
   convertHold: 6,
 
@@ -128,7 +121,7 @@ export const BALANCE = {
   /** ... and this much less per level above 1 (the mine stops forgetting as you grow), never below `suspicionDecayMin`. */
   suspicionDecayPerLevel: 0.15,
   suspicionDecayMin: 1,
-  /** The mob (public Hostile) beats this many followers (the riot one more); each loses this much health. */
+  /** The mob (public Hostile) beats this many followers (the riot one more); each loses this much HP. */
   mobVictims: 2,
   /** The Inquisitor's song: Devotion lost by each exposed follower in its zone (pious: more). */
   cantorSong: 10,
@@ -166,8 +159,6 @@ export const BALANCE = {
   gateAlarmCult: 10,
   /** Ichor lost when a hunter (the inspector, the Inquisitor) stands in your grave at Dawn. */
   hunterIchor: 1,
-  /** Ichor lost when a relic of yours is found and destroyed. */
-  relicIchor: 1,
   /** Chance each Dawn that a follower lying low is actually hidden (from hunters, inspections and purges). */
   lieLowCover: 0.7,
 
@@ -186,41 +177,17 @@ export const BALANCE = {
   xpEvilDivisor: 2,
 
   // --- events ---
+  /** A story's chance at each dawn, and at each hour of the night the clock runs through. */
   eventChance: 0.6,
+  nightEventChance: 0.05,
 
-  // --- stages (the stage advances in place) ---
-  /** Highest level reachable before the pit head has taken root (L4 needs it; XP keeps banking). */
+  // --- the run's end ---
+  /** Highest level reachable before the lift has taken root (L4 needs it; XP keeps banking). */
   whisperLevelCap: 3,
-  /** Level at which the stage becomes Shade (with the surface reached). */
-  shadeLevel: 4,
-  /** Level that ends this build (with the town gate Active). */
-  winLevel: 7,
-  /** At the stage advance every Suspicion track cools to at most this (the deep's hunters lose your new shape). */
-  shadeBreather: 40,
-  /** At the stage advance the town opens (Sensed) this many steps around the pit head. */
-  shadeRevealRadius: 2,
-
-  // --- the open world (DECISIONS ### P4a) ---
-  /** Public drift multiplier for a follower standing in a town block (the mine is 1). */
-  townExposure: 2,
-  /** The market square and the well: everyone comes, everyone talks. */
-  marketExposure: 3,
-  /** The shanties: nobody counts who sleeps there. */
-  shantyExposure: 1.25,
-  /** Temple eyes: cult Suspicion per follower head per Dawn in the temple and the high houses. */
-  templeCultPerHead: 1.2,
-  /** The graveyard is the Temple's ground too. */
-  graveyardCultPerHead: 0.5,
-  /** Council patrols: government Suspicion per follower head per Dawn in the Keep. */
-  keepGovPerHead: 1.2,
-  /** XP for a converted Elite. */
-  xpElite: 60,
+  /** The rank that ends the run with the lift rooted: the mine is taken. */
+  takenLevel: 4,
   /** A turned Elite cools its faction's track once by this much. */
   eliteTurnCool: 15,
-  /** Each Elite you hold cools their faction's track by this every Dawn. */
-  eliteDecay: 2,
-  /** XP for a town block first made Active territory (a mine area pays xpZone). */
-  xpTownZone: 30,
   // --- cards (DECISIONS §43; the cards a draw deals per stage: `STAGE_DRAW`) ---
   /** The hand holds at most this many cards (blessings add more). */
   handMax: 5,
@@ -258,8 +225,8 @@ export const BALANCE = {
   delveHurt: 0.06,
   /** The Deep's depth until it is opened (its pools are worked thinly above the sealed seam). */
   sealedDepth: 2,
-  /** Strike chance × (1 + (Strength − 50) / strengthSpan). */
-  strengthSpan: 250,
+  /** Strike chance × (1 + (Strength − 10) / strengthSpan). */
+  strengthSpan: 50,
   /** A found seam adds this to the face's multiplier (the Council does not know). */
   seamBonus: 0.4,
   /** Mean value of one strike on the base table (52/27/13/5.5/2/0.5 % × 1/2/4/8/16/32). */
@@ -277,6 +244,9 @@ export const BALANCE = {
   searchMax: 0.9,
   /** On a search day, each follower carrying crystals is searched with this chance. */
   searchEach: 0.5,
+  /** A carrier's search chance × (1 − Intelligence / searchWit); an offering's spotting × (1 − Intelligence / offerWit). */
+  searchWit: 60,
+  offerWit: 40,
   searchHeatPerValue: 0.5,
   caughtTaken: 2,
   offerSpot: 0.12,
@@ -302,17 +272,6 @@ export const BALANCE = {
   hoardFree: 12,
   hoardPer: 4,
   hoardCap: 3,
-  // --- Shade (the town): the tithe and the vault ---
-  /** Rolls per head of a turned town crowd (coin, trinkets, stones off the carts). */
-  titheTown: 0.08,
-  /** Chance each tithe roll brings a crystal. */
-  titheChance: 0.5,
-  /** At most this many tithe rolls a day from one group. */
-  titheMaxPerGroup: 5,
-  /** The vault in the tally hall: a guaranteed Impossible crystal, plus this many Royal. */
-  vaultRoyal: 1,
-  /** The Council's heat when it finds its vault opened (its writ follows). */
-  vaultCouncil: 25,
 } as const;
 
 /** Flame stones profaned by an act of evil done where they lie (`profane.ts`): the Temple's heat per stone, at most heatCap. */
@@ -323,10 +282,8 @@ export const PROFANE = {
 
 /** Ties between people (`ties.ts`). */
 export const TIES = {
-  /** Whisper odds on someone tied to a follower of yours (kin, a friend, a lover, their household, a workmate)… */
+  /** Whisper odds on someone tied to a follower of yours (kin, a friend, a lover, a workmate). */
   odds: 0.08,
-  /** … and more while that follower preaches. */
-  preachOdds: 0.12,
   /** One of theirs devoured by you: each tie who is not yours hardens by this Resistance; each who is yours loses this Devotion. */
   devouredResist: 8,
   devouredDevotion: 8,
@@ -341,15 +298,4 @@ export const TIES = {
   maliceCap: 3,
   /** Workmates are tied only in a place of at most this many hands (a gallery's diggers, a stall), never a whole trade. */
   workmatesMax: 12,
-} as const;
-
-/** The town's people (docs/town.md §2, §4). A gathered group resists by `BALANCE.groupResist` more. */
-export const TOWN = {
-  /** A group is gathered when at least this share of its living members (and at least gatherMin) are at one place. */
-  gatherShare: 0.5,
-  gatherMin: 2,
-  /** An area with at least this many ordinary people not yours holds a crowd (Sermon of Ash, Riot). */
-  crowdAt: 4,
-  /** Trades of a place without working there (a child at school, an elder at the well, a beggar on the steps): never a building's hands. */
-  notWorkers: ['child', 'elder', 'beggar'] as readonly string[],
 } as const;

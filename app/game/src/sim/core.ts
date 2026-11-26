@@ -5,18 +5,15 @@
 import { BALANCE, TIES } from '../content/balance';
 import { CALENDAR_EFFECTS, CART_DAY } from '../content/calendar';
 import { AT, dayOf, nextAt } from '../content/clock';
-import { EFFECT } from '../content/crystals';
+import { EFFECT, GRADE_VALUE } from '../content/crystals';
 import { WEATHER_RULES } from '../content/weather';
 import { AREAS } from '../content/world';
 import { ROLES } from '../content/roles';
-import { THREAT } from '../content/threats';
 import { applyGain, ichorMax, levelForXp, round1 } from './formulas';
 import { blessed, bonus } from './bonus';
-import { boonYours, buildingsIn, handsOf, heldByHands, holding } from './buildings';
-import { worn } from './items';
 import { newCrystal, oddCount, type RollOpts } from './crystals';
 import { calendarOf } from './world/sky';
-import { area, areaDef, inMine } from './world/area';
+import { area, areaDef } from './world/area';
 import { nbrs } from './world/graph';
 import { roster } from './world/society';
 import type { Effect, FactionId, GameEvent, GameState, GoneReason, Person, PlaceId, Tick, UnitId } from '../types';
@@ -35,7 +32,7 @@ export const untilShiftEnd = (s: Readonly<GameState>): Tick => nextAt(s.tick, AT
 
 // ---------- the world graph (content): rules work on areas, people are at places inside them ----------
 
-export { area, areaDef, inMine, nbrs };
+export { area, areaDef, nbrs };
 
 /** The Flame's light in an area: 2 at a lit source, 1 beside one, 0 dark (a snuffed area is dark). */
 export function flameLight(s: Readonly<GameState>, a: PlaceId): 0 | 1 | 2 {
@@ -100,10 +97,10 @@ export function gainXp(c: Ctx, n: number): void {
   ev(c, { kind: 'xp', delta: n });
 }
 
-/** Ranks the XP has earned (capped at Whisper III until the pit head took root): each one an AP, a socket, Ichor, a blessing pick. */
+/** Ranks the XP has earned (capped at Whisper III until the lift took root): each one an AP, a socket, Ichor, a blessing pick. */
 export function rankUp(c: Ctx): void {
   const g = c.s.god;
-  const cap = c.s.flags.surfaceRooted ? BALANCE.winLevel : BALANCE.whisperLevelCap;
+  const cap = c.s.flags.liftRooted ? BALANCE.takenLevel : BALANCE.whisperLevelCap;
   const to = Math.min(cap, levelForXp(g.xp));
   while (g.level < to) {
     g.level += 1;
@@ -131,21 +128,6 @@ export function loseIchor(c: Ctx, n: number, why: string): void {
   s.god.ichor = Math.max(0, s.god.ichor - n);
   ev(c, { kind: 'ichor', delta: -n, note: { key: `ichor.${why}` } });
   if (s.god.ichor <= 0) end(c, false, 'ichor');
-}
-
-/** The writ against the pit head takes a seal; at the last the shaft is sealed and the run is lost. */
-export function addSeal(c: Ctx): void {
-  const s = c.s;
-  s.flags.seals += 1;
-  if (s.flags.seals >= THREAT.writMax) end(c, false, 'sealed');
-}
-
-/** The writ loses `n` seals: the Magistrate turned tears it all, the ledgers burned or the records forged tear one. */
-export function tearWrit(c: Ctx, n: number, by: 'magistrate' | 'evil' | 'records'): void {
-  const s = c.s;
-  const was = s.flags.seals;
-  s.flags.seals = Math.max(0, was - n);
-  if (s.flags.seals !== was) ev(c, { kind: 'story', story: 'writ', note: { key: `writ.torn.${by}${s.flags.seals > 0 ? '.some' : ''}`, slots: { n: s.flags.seals } } });
 }
 
 export function end(c: Ctx, won: boolean, why: string): void {
@@ -182,8 +164,7 @@ export function addHeat(c: Ctx, f: FactionId, amount: number, why: string): void
   const s = c.s;
   let n = amount;
   if (n > 0) {
-    if (has(s, 'blind', f)) return;
-    n *= (1 - bonus(s, 'calm')) * door(s, 'notice', f);
+    n *=(1 - bonus(s, 'calm')) * door(s, 'notice', f);
     if (f === 'temple' && oddCount(s, 'paleLight') > 0) n *= EFFECT.paleLightMult;
   }
   const fa = s.factions[f];
@@ -214,7 +195,7 @@ export const peopleIn = (s: Readonly<GameState>, a: PlaceId, f: (p: Person) => b
 /** Not yours. */
 export const stranger = (p: Readonly<Person>): boolean => !p.follower;
 export const asleep =(p: Readonly<Person>): boolean => 'place' in p.at && p.at.doing === 'sleep';
-export const digs = (p: Readonly<Person>): boolean => ROLES[p.role]!.labour === 'dig' && inMine(p.work);
+export const digs = (p: Readonly<Person>): boolean => ROLES[p.role]!.labour === 'dig';
 export const loyal = (p: Readonly<Person>): boolean => p.trait === 'loyal';
 export const standingOf = (p: Readonly<Person>) => ROLES[p.role]!.standing;
 
@@ -230,25 +211,17 @@ export function gainDevotion(c: Ctx, p: Person, base: number): void {
 }
 
 /** Devotion lost (the loyal lose half); at zero a follower lapses. */
-/** After a change to a person: each building of `holding` before it that changed hands says so (one left masterless goes with its ground, unsaid). */
-function handsMoved(c: Ctx, was: readonly [PlaceId, boolean][]): void {
-  for (const [b, y] of was) if (heldByHands(c.s, b) === !y) ev(c, { kind: 'building', place: b, yours: !y });
-}
-
 export function loseDevotion(c: Ctx, p: Person, n: number): void {
   p.stats.devotion = round1(Math.max(0, p.stats.devotion - (loyal(p) ? n / 2 : n)));
   if (p.stats.devotion > 0 || !p.follower) return;
-  const was = holding(c.s, p);
   p.follower = false;
   p.routine = null;
   p.resistance += 10;
   dropPocket(c.s, p);
   ev(c, { kind: 'lost', unit: p.id, note: { key: 'people.lapsed', slots: { name: p.name } } });
-  handsMoved(c, was);
 }
 
 export function convert(c: Ctx, p: Person, devotion: number): void {
-  const was = holding(c.s, p);
   p.follower = true;
   p.routine = 'pray';
   p.stats.devotion = Math.max(1, Math.min(100, devotion));
@@ -258,9 +231,7 @@ export function convert(c: Ctx, p: Person, devotion: number): void {
   t.turned += 1;
   t.peak = Math.max(t.peak, heads(c.s));
   ev(c, { kind: 'turned', unit: p.id, place: whereNow(p, c.s.tick) });
-  gainXp(c, standingOf(p) === 'elite' ? BALANCE.xpElite : BALANCE.xpFollower);
-  if (p.role === 'magistrate') tearWrit(c, c.s.flags.seals, 'magistrate');
-  handsMoved(c, was);
+  gainXp(c, BALANCE.xpFollower);
 }
 
 /** Hold changes in one area: rooting at 100 pays XP once, falling below `rootLostBelow` costs an Ichor. */
@@ -268,8 +239,7 @@ export function setHold(c: Ctx, id: PlaceId, to: number): void {
   const s = c.s;
   const ps = s.places[id]!;
   const def = AREAS[id]!;
-  // the grave is always yours; after the watershed so is every mine area that took root
-  if (def.anchored || (ps.rooted && s.stage === 'shade' && def.region === 'mine')) return;
+  if (def.anchored) return; // the grave is always yours
   const was = ps.hold;
   ps.hold = round1(Math.max(0, Math.min(100, to)));
   if (ps.hold === was) return;
@@ -277,31 +247,27 @@ export function setHold(c: Ctx, id: PlaceId, to: number): void {
   ev(c, { kind: 'hold', place: id, hold: ps.hold, was });
   if (ps.hold >= 100 && !ps.rooted) {
     ps.rooted = true;
-    gainXp(c, inMine(id) ? BALANCE.xpZone : BALANCE.xpTownZone);
-    if (def.gate && !s.flags.surfaceRooted) {
-      s.flags.surfaceRooted = true;
+    gainXp(c, BALANCE.xpZone);
+    if (def.gate && !s.flags.liftRooted) {
+      s.flags.liftRooted = true;
       addHeat(c, 'council', BALANCE.gateAlarmGov, 'gate');
       addHeat(c, 'temple', BALANCE.gateAlarmCult, 'gate');
     }
   } else if (ps.rooted && ps.hold < BALANCE.rootLostBelow) {
     ps.rooted = false;
     loseIchor(c, BALANCE.zoneLostIchor, 'purged');
-  } else return;
-  // a building nobody masters goes with its ground
-  for (const b of buildingsIn(id)) if (!handsOf(s, b).master) ev(c, { kind: 'building', place: b, yours: ps.rooted });
+  }
 }
 
 /** A person leaves the world. A devoured or killed one's soul hardens into a crystal for the grave. */
 export function remove(c: Ctx, p: Person, why: GoneReason, soulLuck?: number): void {
   if (!here(p)) return;
   const was = p.follower;
-  const held = holding(c.s, p);
   p.gone = why;
   p.goneDay = dayOf(c.s.tick);
   p.follower = false;
   p.routine = null;
   dropPocket(c.s, p);
-  handsMoved(c, held);
   if (was) {
     c.s.ledger.lost += 1;
     ev(c, { kind: 'lost', unit: p.id, note: { key: `people.${why}`, slots: { name: p.name } } });
@@ -339,6 +305,11 @@ function tiesNotice(c: Ctx, p: Person, why: 'devoured' | 'taken'): void {
 
 /** A crystal reaches the grave's pouch. */
 export const pouchIds = (s: Readonly<GameState>): string[] => Object.keys(s.crystals).filter((id) => 'pouch' in s.crystals[id]!.at);
+/** Stones out of the pouch, the lowest grade first; the caller checked the pouch holds `count`. */
+export function spend(c: Ctx, count: number): void {
+  const ids = pouchIds(c.s).sort((a, b) => GRADE_VALUE[c.s.crystals[a]!.grade] - GRADE_VALUE[c.s.crystals[b]!.grade] || (a < b ? -1 : 1));
+  for (const id of ids.slice(0, count)) delete c.s.crystals[id];
+}
 export function gainCrystal(c: Ctx, id: string): void {
   const x = c.s.crystals[id]!;
   x.at = { pouch: true };
@@ -346,26 +317,17 @@ export function gainCrystal(c: Ctx, id: string): void {
 }
 /** A new stone for the pouch: its id. */
 export const mint = (c: Ctx, o: RollOpts = {}): string => { const id = newCrystal(c.s, { pouch: true }, o).id; gainCrystal(c, id); return id; };
-/** A stone from a follower's pocket reaches the pouch, as tribute, offering or tithe. */
-export function cash(c: Ctx, p: Person, id: string, kind: 'tribute' | 'offer' | 'tithe'): void {
+/** A stone from a follower's pocket reaches the pouch, as tribute or offering. */
+export function cash(c: Ctx, p: Person, id: string, kind: 'tribute' | 'offer'): void {
   p.pocket.splice(p.pocket.indexOf(id), 1);
   gainCrystal(c, id);
   ev(c, { kind, unit: p.id, crystal: id });
 }
 
-/** One who leaves your side loses what they carry: the stones in their pocket and the things they wear. */
+/** One who leaves your side loses the stones in their pocket. */
 export function dropPocket(s: GameState, p: Person): void {
   for (const id of p.pocket) delete s.crystals[id];
   p.pocket.length = 0;
-  for (const id of p.worn.slice()) destroyItem(s, id);
-}
-/** A thing gone: off its wearer, it and its stone. */
-export function destroyItem(s: GameState, id: string): void {
-  const it = s.items[id]!;
-  const w = it.wearer ? s.people[it.wearer]!.worn : [];
-  if (w.includes(id)) w.splice(w.indexOf(id), 1);
-  delete s.crystals[it.crystal];
-  delete s.items[id];
 }
 
 /** Stones in a person's pocket, as ids (the pocket is the truth; a crystal's `at` mirrors it). */
@@ -402,38 +364,25 @@ export function influence(s: Readonly<GameState>): number {
 export const presence = (s: Readonly<GameState>): number => round1(influence(s) / 100);
 
 /**
- * The flock as it stands now: its headcount, how many stand in each area, the homes and posts it holds, and the
- * god's Presence. One pass over the people and the areas; a rule that asks of many people (every whisper, every
- * target) takes it once and asks it of each.
+ * The flock as it stands now: its headcount, how many stand in each area, the posts it holds, and the god's
+ * Presence. One pass over the people and the areas; a rule that asks of many people (every whisper, every target)
+ * takes it once and asks it of each.
  */
 export interface Flock {
   heads: number;
   at: ReadonlyMap<PlaceId, number>;
-  homes: ReadonlySet<PlaceId>;
   works: ReadonlySet<PlaceId>;
-  /** The strongest worn whisper help of a follower standing in each area. */
-  help: ReadonlyMap<PlaceId, number>;
   presence: number;
-  /** In the town, the households with a child at a school of yours: what children repeat at home puts them in reach. */
-  taught: ReadonlySet<string>;
 }
 export function flockOf(s: Readonly<GameState>): Flock {
   const at = new Map<PlaceId, number>();
-  const help = new Map<PlaceId, number>();
-  const homes = new Set<PlaceId>();
   const works = new Set<PlaceId>();
   let n = 0;
   followers(s, (f) => {
     n += 1;
     const a = area(whereNow(f, s.tick));
     at.set(a, (at.get(a) ?? 0) + 1);
-    const h = worn(s, f, 'whisperHelp');
-    if (h > (help.get(a) ?? 0)) help.set(a, h);
-    homes.add(f.home);
     works.add(f.work);
   });
-  const taught = new Set<string>();
-  const schools = s.stage === 'shade' ? boonYours(s, 'lesson') : [];
-  if (schools.length) for (const p of everyone(s)) if (here(p) && p.role === 'child' && schools.includes(p.work)) taught.add(p.household);
-  return { heads: n, at, homes, works, help, presence: presence(s), taught };
+  return { heads: n, at, works, presence: presence(s) };
 }

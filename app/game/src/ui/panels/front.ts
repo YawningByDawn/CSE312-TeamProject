@@ -182,14 +182,14 @@ export class Title implements Panel {
 /** The run's days lasted, everyone it turned, its mine, how far it rose and its whispers: what the defeat tells. */
 function runLines(s: Readonly<GameState>, days: number): string[] {
   const t = s.tally;
-  const mine = Object.keys(AREAS).filter((a) => AREAS[a]!.region === 'mine');
+  const mine = Object.keys(AREAS);
   const pct = Math.round((100 * mine.filter((a) => s.places[a]!.rooted).length) / mine.length);
   const realm = uiText(`realm.${Math.min(7, s.god.level)}`);
   return [
     days <= 1 ? uiText('defeat.nights.one') : uiText('defeat.nights.many', { n: days }),
     t.turned === 0 ? uiText('defeat.followers.none') : t.turned === 1 ? uiText('defeat.followers.one') : uiText('defeat.followers.many', { ever: t.turned, peak: t.peak }),
     pct === 0 ? uiText('defeat.mine.none') : pct === 100 ? uiText('defeat.mine.all') : uiText('defeat.mine.end', { pct }),
-    uiText(s.stage === 'shade' ? 'defeat.reach.town' : s.flags.surfaceRooted ? 'defeat.reach.pit' : 'defeat.reach.none', { realm }),
+    uiText(s.flags.liftRooted ? 'defeat.reach.lift' : 'defeat.reach.none', { realm }),
     t.whispers === 0 ? uiText('defeat.whispers.none') : uiText('defeat.whispers.some', { w: t.whispers, c: t.turned }),
   ];
 }
@@ -275,27 +275,14 @@ export class Defeat implements Panel {
   }
 }
 
-/** The ending's lines over its film: [from s, to s, key, size]. */
-const LINES: readonly [number, number, string, number][] = [[1.6, 5.2, 'ending.1', 40], [12.5, 18.6, 'ending.2', 30], [22.8, 27.8, 'ending.3', 32]];
-const TYPE_RATE = 34;
-
 export class Ending implements Panel {
-  private words: Words | null = null;
-  private shown = '';
   constructor(private readonly c: Ctx) {}
 
   key(vm: ViewModel): string | null {
-    if (vm.film?.kind === 'ending') return 'film';
     return vm.state.phase === 'won' && !vm.film && !vm.title ? `card|${vm.state.tick}` : null;
   }
 
   build(root: HTMLElement, vm: ViewModel): void {
-    if (vm.film) {
-      this.words = new Words(root, -760, 340, 40, '#e6d9ff', 'center', 1520);
-      this.shown = '';
-      return;
-    }
-    this.words = null;
     const s = vm.state;
     const veil = div(root, 'hg-b hgp-slab', -1200, -700, 2400, 1400);
     veil.style.background = '#05040a';
@@ -323,16 +310,6 @@ export class Ending implements Panel {
     back.el.style.animation = 'hgp-fade 0.9s 1.2s both, hgp-pulse 2.4s 2.1s ease-in-out infinite alternate';
   }
 
-  tick(vm: ViewModel): void {
-    if (!this.words || vm.film?.kind !== 'ending') return;
-    const t = vm.film.t;
-    const l = LINES.find(([a, b]) => t >= a && t < b);
-    const text = l ? uiText(l[2]).slice(0, Math.floor((t - l[0]) * TYPE_RATE)) : '';
-    if (text === this.shown) return;
-    this.shown = text;
-    if (l) this.words.el.style.fontSize = `${l[3]}px`;
-    this.words.set(text);
-  }
 
   press(e: KeyboardEvent, vm: ViewModel): boolean {
     if (vm.film || !(bound(vm.settings, 'confirm', e) || bound(vm.settings, 'back', e))) return false;

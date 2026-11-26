@@ -1,5 +1,4 @@
-import type { AtlasManifest, CardId, Crystal, GameState, Item, Person } from '../../types';
-import { ITEMS } from '../../content/items';
+import type { AtlasManifest, CardId, Crystal, GameState, Person } from '../../types';
 import { blessingSlots } from '../../content/blessings';
 import { CARDS, cardSlots } from '../../content/cards';
 import { uiText } from '../../content/text';
@@ -13,9 +12,9 @@ import { BLOOD, DIM, INK, PALE, VIOLET, Words, attr, div, surface } from '../kit
 type Cells = AtlasManifest['cells'];
 interface Sheet { cells: Cells; w: number; h: number; cls: string; url: string }
 
-const manifests = import.meta.glob<AtlasManifest & Record<string, unknown>>('../../../assets/{ui,cardart,crystals,crystalmarks/*,portraits/*,interiors/*,front,title,defeat}/manifest.json', { eager: true, import: 'default' });
+const manifests = import.meta.glob<AtlasManifest & Record<string, unknown>>('../../../assets/{ui,cardart,crystals,crystalmarks/*,portraits/*,front,title,defeat}/manifest.json', { eager: true, import: 'default' });
 // the defeat's atlas is the view's mipmapped png: the panels take its level 0
-const pictures = import.meta.glob<string>(['../../../assets/{ui,cardart,crystals,crystalmarks/*,portraits/*,interiors/*,front,title}/*.webp', '../../../assets/defeat/defeat.png'], { eager: true, query: '?url', import: 'default' });
+const pictures = import.meta.glob<string>(['../../../assets/{ui,cardart,crystals,crystalmarks/*,portraits/*,front,title}/*.webp', '../../../assets/defeat/defeat.png'], { eager: true, query: '?url', import: 'default' });
 
 const SHEETS = new Map<string, Sheet & { m: AtlasManifest & Record<string, unknown> }>();
 for (const [path, m] of Object.entries(manifests)) {
@@ -161,14 +160,6 @@ export function portrait(parent: HTMLElement, s: Readonly<GameState>, p: Readonl
   cell(parent, PAGES[0]!, 'ring', x, y, k);
 }
 
-/** The baked room `name` (1168x282 design px at `s` 0.5) with whoever sits at each of its places, in their trade, lit
- * violet when yours and gold when the Flame's (each trade's cells on the page its room's manifest names). */
-export function room(parent: HTMLElement, name: string, x: number, y: number, seats: readonly Readonly<Person>[]): void {
-  const dir = `interiors/${name}`, { trades, places } = sheet(dir).m as unknown as { trades: Record<string, string>; places: number };
-  cell(parent, dir, 'room', x, y, 0.5);
-  for (const [i, p] of seats.slice(0, places).entries()) cell(parent, trades[p.role]!, `place.${i}.${p.follower ? 'yours' : 'flame'}.${p.role}`, x, y, 0.5);
-}
-
 export const CARD_W = 165, CARD_H = 246;
 
 /** The name band's width a card's name fits in, and a Fell letter's mean width in em. */
@@ -182,7 +173,7 @@ export function card(parent: HTMLElement, s: Readonly<GameState>, id: CardId, x:
   cell(box, 'cardart', id, 0, 0, 0.5);
   const d = blessing ? null : CARDS[id]!;
   cell(box, 'ui', `card.over.${d?.kind ?? 'miracle'}`, 0, 0, 0.5);
-  const cost = d?.kind === 'miracle' ? cardCost(s, id) : 0;
+  const cost = d?.kind === 'miracle' ? cardCost(id) : 0;
   if (cost > 0) cell(box, 'ui', `card.cost.${Math.min(8, cost)}`, 0, 0, 0.5);
   const words = blessing ? `blessing.${id}` : `card.${id}`;
   const name = uiText(`${words}.name`);
@@ -191,14 +182,6 @@ export function card(parent: HTMLElement, s: Readonly<GameState>, id: CardId, x:
   line(box, 14, 180, CARD_W - 28, 15, PALE, uiText(`${words}.line`, blessing ? blessingSlots(id) : cardSlots(id))).style.textAlign = 'center';
   return box;
 }
-
-/** A made thing's words by its form or kind (`ring`, `draught`...): its name with its stone's, its line, its curse. */
-export function thingText(key: keyof typeof ITEMS, part: 'name' | 'line' | 'gift', crystal = ''): string {
-  const g = ITEMS[key]!.gift;
-  return uiText(`item.${key}.${part}`, { crystal, days: g.sick ?? 0, n: -(g.resist ?? 0), pct: Math.round((g.odds ?? 0) * 100) });
-}
-export const itemText = (s: Readonly<GameState>, it: Readonly<Item>, part: 'name' | 'line' | 'gift'): string =>
-  thingText(it.form ?? (it.kind as Exclude<Item['kind'], 'jewel'>), part, s.crystals[it.crystal]!.name);
 
 /** Wrapped lines at (x, y), `w` wide. */
 export function line(parent: HTMLElement, x: number, y: number, w: number, size: number, color: string, text: string): HTMLDivElement {

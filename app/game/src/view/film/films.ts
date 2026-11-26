@@ -1,11 +1,8 @@
 // src/view/film, the films: the view's `notes` layer and its camera poses. Owns each film's length and keyed camera
-// (`filmLength`, `pose`: the opening, the watershed, the ending, a take) and what it lays over the world. Reads the
-// view model's film and its fresh events, the people and effect anchors (src/view/life), content's map, world and
-// crystals, and assets/defeat.
+// (`filmLength`, `pose`: the opening, a take) and what it lays over the world. Reads the view model's film and its
+// fresh events, the people and effect anchors (src/view/life) and crystals, and assets/defeat.
 import { Container, Filter, GlProgram, Sprite, Texture, defaultFilterVert, type Renderer } from 'pixi.js';
-import type { AtlasManifest, Camera, Film, GameEvent, Layer, PlaceId, ViewModel } from '../../types';
-import { AT, MINE_FRAME, SHAFT, TOWN } from '../../content/map';
-import { AREAS } from '../../content/world';
+import type { AtlasManifest, Camera, Film, GameEvent, Layer, ViewModel } from '../../types';
 import { GRADES } from '../../content/crystals';
 import { ORIGIN, scale } from '../camera';
 import { Atlas } from '../atlas';
@@ -17,51 +14,13 @@ import defeatUrl from '../../../assets/defeat/defeat.png?url';
 
 // The camera's films and its feel (#7, #90, #91, #93, #94). App owns the one camera: during a film it asks `pose` for
 // the film's keyed camera (monotone between keys) and the camera ends on the film's last pose. The view draws that
-// camera shaken, punched and leant by what just happened, its clock held still through a hit-stop. Over the world: the
-// watershed's glowing point of the mine, the pit head's glow and the lift's load rising; the ending's procession, the far city's gold and the
-// war's red, the closing dark; the defeat's drain to gray then black, closing on the grave's eye (assets/defeat's
-// ramps). The words over them are the panels'.
+// camera shaken, punched and leant by what just happened, its clock held still through a hit-stop. Over the world:
+// the dim; the defeat's drain to gray then black, closing on the grave's eye (assets/defeat's ramps). The words over
+// them are the panels'.
 
 /** Seconds each film runs. The opening is a video over the canvas (./opening.ts); the camera holds on play's start under it. */
-const LENGTH: Record<Film['kind'], number> = { opening: OPENING_S, watershed: 22, ending: 33.5, take: 3.2 };
+const LENGTH: Record<Film['kind'], number> = { opening: OPENING_S, take: 3.2 };
 export const filmLength = (kind: Film['kind']): number => LENGTH[kind];
-
-/** The zoom showing `px` screen px per town unit on the 1600-wide canvas the old films were keyed on. */
-const zoomAt = (px: number): number => Math.log2(15 / (px * 0.8)) / 2.41;
-const mine = (x: number, y: number): [number, number] => [MINE_FRAME.x + x / MINE_FRAME.per, MINE_FRAME.y + y / MINE_FRAME.per];
-const CAGE = mine(SHAFT.mine[0], SHAFT.mine[1]);
-const MOUTH = SHAFT.town;
-/** the town at rest, the far city (town units) and its reach */
-const HOME: [number, number, number] = [TOWN.w / 2, TOWN.h / 2, zoomAt(0.55)];
-const CITY = [10100, -2500] as const, CITY_R = 1500;
-const GATE = AT.citygate!, MARKET = AT.market!;
-const road = (u: number, dy = 0): [number, number] => [GATE[0] + (CITY[0] - GATE[0]) * u, GATE[1] + (CITY[1] - GATE[1]) * u + dy];
-const lerp2 = (a: readonly number[], b: readonly number[], k: number): [number, number] => [a[0]! + (b[0]! - a[0]!) * k, a[1]! + (b[1]! - a[1]!) * k];
-const G = [GRAVE_AT.x, GRAVE_AT.y - 6] as const;
-
-/** A film's keys after its first (the camera it starts from): seconds, town x, y, zoom. */
-const KEYS: Record<'watershed' | 'ending', readonly (readonly number[])[]> = {
-  watershed: [
-    [1.6, ...G, zoomAt(6.2)], [3, ...G, zoomAt(6.324)], [5.6, G[0] + (CAGE[0] - G[0]) * 0.5, G[1] + (CAGE[1] - G[1]) * 0.6, zoomAt(4.5)],
-    [8, MOUTH[0], MOUTH[1] - 4, zoomAt(3.1)], [10.2, MOUTH[0], MOUTH[1], zoomAt(1.55)], [12.3, MOUTH[0], MOUTH[1] + 4, zoomAt(0.86)],
-    [14.5, MOUTH[0], MOUTH[1] + 8, zoomAt(0.56)], [17.2, ...lerp2(MOUTH, HOME, 0.7), HOME[2]], [18.8, ...lerp2(MOUTH, HOME, 0.95), HOME[2]],
-    [20.4, ...HOME], [22, ...HOME],
-  ],
-  ending: [
-    [1.4, MARKET[0] + 60, MARKET[1] - 10, zoomAt(1.05)], [5.5, ...lerp2([MARKET[0] + 60, MARKET[1] - 10], GATE, 0.3), zoomAt(0.8)],
-    [8.5, ...lerp2([MARKET[0] + 60, MARKET[1] - 10], GATE, 0.45), HOME[2] + 0.03], [12, ...lerp2(GATE, road(0.3), 0.7), zoomAt(0.15)],
-    [16, ...road(0.7, 300), zoomAt(0.115)], [20.5, CITY[0] - 0.32 * CITY_R, CITY[1] + 0.3 * CITY_R, zoomAt(0.21)],
-    [29, CITY[0] - 0.1 * CITY_R, CITY[1] + 0.12 * CITY_R, zoomAt(0.2436)], [33.5, CITY[0] - 0.1 * CITY_R, CITY[1] + 0.12 * CITY_R, zoomAt(0.2436)],
-  ],
-};
-
-/** The watershed's point (s): the mine is one point and the town the god knows opens outward from the pit. */
-const POINT = 14.5;
-const TOWN_AREAS = (Object.keys(AREAS) as PlaceId[]).filter((a) => AREAS[a]!.region === 'town' && a !== 'minehead' && AT[a]);
-const reach = (a: PlaceId): number => Math.hypot(AT[a]![0] - MOUTH[0], (AT[a]![1] - MOUTH[1]) * 1.3);
-const FAR = Math.max(1, ...TOWN_AREAS.map(reach));
-/** When (film seconds) a town area opens in the watershed, nearest the pit first; until then it is Void. */
-export const watershedOpens = (area: PlaceId): number => POINT + 0.2 + 2.2 * ((AT[area] ? reach(area) : FAR) / FAR);
 
 /**
  * The camera's feel by event: lean (zoom in by this factor, back at `back` s), dim (s), then beats: at s, hit-stop
@@ -77,7 +36,6 @@ const STRIKE: readonly Feel[] = [
 const FEEL: Partial<Record<string, Feel>> = {
   heard: { beats: [[0, 0, 0.004, 0, 0]] },
   turned: { lean: 1.14, back: 2, beats: [[0, 50, 0.006, 0, 0], [1.55, 80, 0.01, 0.6, 200]] },
-  exposed: { lean: 1.2, back: 1.9, dim: 1.8, beats: [[0.7, 140, 0, 1.08, 320]] },
   seized: { beats: [[0.7, 90, 0, 0.9, 260]] },
   devour: { lean: 1.25, back: 1.3, dim: 1.8, beats: [[0.42, 120, -0.012, 2.1, 450], [1.05, 60, 0, 1.2, 260]] },
   evil: { dim: 1.2, beats: [[0.4, 90, -0.012, 2.4, 420]] },
@@ -87,13 +45,11 @@ const FEEL: Partial<Record<string, Feel>> = {
   temple: { beats: [[0, 60, 0, 2.7, 500]] },
   council: { beats: [[0, 0, 0, 1.2, 400]] },
 };
-/** the films' own beats: the watershed's lift going and its bloom */
-const FILM_FEEL: Partial<Record<Film['kind'], Feel>> = { watershed: { beats: [[1.8, 0, 0, 3, 600], [14.5, 0, 0, 2.5, 800]] } };
 const feelOf = (e: GameEvent): Feel | undefined => {
   switch (e.kind) {
     case 'strike': return STRIKE[GRADES.indexOf(e.grade)];
     case 'whisper': return e.ok ? FEEL.heard : undefined;
-    case 'search': return e.found.length || e.item ? FEEL.seized : undefined;
+    case 'search': return e.found.length ? FEEL.seized : undefined;
     case 'play': return FEEL[e.cardKind];
     case 'threat': return e.how === 'landed' ? FEEL.council : undefined;
     default: return FEEL[e.kind];
@@ -165,7 +121,6 @@ export class Films implements Layer {
   /** the frame's model as the view draws it: the camera felt, on the held clock */
   private readonly vm: { -readonly [K in keyof ViewModel]: ViewModel[K] };
   private readonly cam: Camera = { x: 0, y: 0, zoom: 1 };
-  private film: Film | null = null;
   private keyed: Film | null = null;
   private keys: (readonly number[])[] = [];
   private readonly kicks: Kick[] = [];
@@ -173,15 +128,9 @@ export class Films implements Layer {
   private last = 0;
   private stopUntil = -1;
   private lostAt = -1;
-  private readonly at: Anchor = { x: 0, y: 0, u: 0, crown: 0, mine: true };
+  private readonly at: Anchor = { x: 0, y: 0, u: 0, crown: 0 };
   // what it lays over the world
   private readonly veil = new Sprite(Texture.WHITE);
-  private readonly point: Sprite;
-  private readonly pit: Sprite;
-  private readonly load: Sprite;
-  private readonly gold: Sprite;
-  private readonly war: Sprite;
-  private readonly wicks: Sprite[] = [];
   /** the defeat: its atlas (fetched when the run is lost), the drain's filter, the dark's ramp and the black round it */
   private defeat: Atlas | null | undefined;
   private drain: Filter | null = null;
@@ -190,28 +139,15 @@ export class Films implements Layer {
   private readonly edges = [0, 1, 2, 3].map(() => new Sprite(Texture.WHITE));
   private busy = false;
 
-  constructor(life: Atlas, private readonly people: People, private readonly world: Container, private readonly screen: { w: number; h: number }, private readonly renderer: Renderer) {
+  constructor(private readonly people: People, private readonly world: Container, private readonly screen: { w: number; h: number }, private readonly renderer: Renderer) {
     this.vm = {} as ViewModel;
     this.root.eventMode = 'none';
-    const glow = (name: string, tint: number): Sprite => {
-      const s = this.root.addChild(life.sprite(name));
-      s.blendMode = 'add';
-      s.tint = tint;
-      s.visible = false;
-      return s;
-    };
     for (const s of [this.veil, this.ramp, ...this.edges]) {
       s.tint = 0x060508;
       s.visible = false;
       this.root.addChild(s);
     }
     this.ramp.anchor.set(0.5);
-    this.point = glow('glow-0.3', 0xa274e0);
-    this.pit = glow('glow-0.1', 0xa274e0);
-    this.load = glow('glow-0.3', 0xcfaef0);
-    this.gold = glow('glow-0.1', 0xffd479);
-    this.war = glow('glow-0.1', 0xa82c20);
-    for (let i = 0; i < 46; i++) this.wicks.push(glow('glow-0.3', 0xa274e0));
   }
 
   /** The film's camera at its `t` from `from`, the camera it began on (app's one camera takes it each frame). */
@@ -220,11 +156,9 @@ export class Films implements Layer {
     if (film !== this.keyed) {
       this.keyed = film;
       const start = [0, from.x + ORIGIN.x, from.y + ORIGIN.y, from.zoom];
-      if (film.kind === 'take') {
-        const e = film.event, a = this.at;
-        const to = anchor(e.unit, e.place, this.people, a) ? [a.x, a.y - a.u * 0.5, Math.min(from.zoom, (a.mine ? 1 : HOME[2]) - Math.log2(1.35) / 2.41)] : start.slice(1);
-        this.keys = [start, [0.8, ...to], [2.4, ...to], [3.2, ...start.slice(1)]];
-      } else this.keys = [start, ...KEYS[film.kind]];
+      const e = film.event, a = this.at;
+      const to = anchor(e.unit, e.place, this.people, a) ? [a.x, a.y - a.u * 0.5, Math.min(from.zoom, 1 - Math.log2(1.35) / 2.41)] : start.slice(1);
+      this.keys = [start, [0.8, ...to], [2.4, ...to], [3.2, ...start.slice(1)]];
     }
     out.x = track(this.keys, 1, film.t) - ORIGIN.x;
     out.y = track(this.keys, 2, film.t) - ORIGIN.y;
@@ -235,11 +169,6 @@ export class Films implements Layer {
   view(live: ViewModel): ViewModel {
     const v = Object.assign(this.vm, live);
     const film = live.film;
-    if (film !== this.film) {
-      this.film = film;
-      const f = film && FILM_FEEL[film.kind];
-      if (f) this.kicks.push({ at: live.time, f });
-    }
     // the held clock: a hit-stop freezes what animates
     const dt = live.time - this.last;
     this.last = live.time;
@@ -276,35 +205,12 @@ export class Films implements Layer {
 
   /** The overlays: the films' lights, the dim, the defeat's drain. */
   frame(vm: ViewModel): boolean {
-    const film = vm.film, t = film?.t ?? 0, cam = vm.camera, s = scale(cam.zoom);
-    const busy = !!film || this.kicks.some((k) => k.f.dim) || vm.state.phase === 'lost';
+    const cam = vm.camera, s = scale(cam.zoom);
+    const busy = !!vm.film || this.kicks.some((k) => k.f.dim) || vm.state.phase === 'lost';
     if (!busy && !this.busy) return false;
     this.busy = busy;
-    const glow = (sp: Sprite, x: number, y: number, r: number, a: number): void => {
-      sp.visible = a > 0.004;
-      if (!sp.visible) return;
-      sp.position.set(x, y);
-      sp.scale.set((2 * r) / sp.texture.frame.width);
-      sp.alpha = Math.min(1, a);
-    };
-    const ws = film?.kind === 'watershed', end = film?.kind === 'ending';
-    // the watershed: the mine a glowing point as the camera leaves it, the pit head's glow, the lift's load rising
-    const out = smooth(1, HOME[2], cam.zoom);
-    glow(this.point, ORIGIN.x, ORIGIN.y, 57.6 / s, ws ? out * (1 - smooth(19.9, 21.7, t)) * (0.85 + 0.15 * Math.sin(2.3 * t)) : 0);
-    glow(this.pit, MOUTH[0], MOUTH[1], 30, ws ? (0.6 + 0.4 * smooth(1.8, 4, t) + 0.3 * smooth(11.5, 14.5, t)) * (1 - smooth(20.4, 22, t)) * 0.5 : 0);
-    const rise = 1 - (1 - smooth(5, 11, t)) ** 1.4;
-    glow(this.load, CAGE[0] + (MOUTH[0] - CAGE[0]) * rise, CAGE[1] + (MOUTH[1] - CAGE[1]) * rise, 26 / s, ws ? smooth(4.4, 5.6, t) * (1 - smooth(6.6, 8, t)) : 0);
-    // the ending: the procession up the road, the city's gold turning, the war's red, the close
-    const way = road(0.24);
-    this.wicks.forEach((w, i) => {
-      const go = Math.max(0, t - 9 - (i / 46) * 5.5) * 520, len = Math.hypot(way[0] - GATE[0], way[1] - GATE[1]) - 40 - ((i * 37) % 260);
-      const k = Math.min(go, len) / Math.hypot(way[0] - GATE[0], way[1] - GATE[1]);
-      glow(w, GATE[0] + (way[0] - GATE[0]) * k + (((i * 53) % 21) - 10) * 4, GATE[1] + (way[1] - GATE[1]) * k, 5 / s, end ? smooth(9, 10.5, t) * (1 - smooth(27.8, 29, t)) : 0);
-    });
-    glow(this.gold, CITY[0], CITY[1], CITY_R * 0.6, end ? smooth(22.1, 24.1, t) * (1 - smooth(28.6, 29.6, t)) : 0);
-    glow(this.war, CITY[0] + 0.35 * CITY_R, CITY[1] + 0.1 * CITY_R, CITY_R * 0.5, end ? 0.6 * smooth(18, 21, t) * (1 - smooth(28.4, 29.6, t)) : 0);
-    // the dark: a dim, the ending's close (the watershed's town opens block by block in the fog)
-    let dark = end ? smooth(28.4, 29.6, t) : 0;
+    // the dark: a dim
+    let dark = 0;
     for (const k of this.kicks) if (k.f.dim) dark = Math.max(dark, 0.3 * smooth(0, 0.25, vm.time - k.at) * (1 - smooth(k.f.dim * 0.6, k.f.dim, vm.time - k.at)));
     const close = this.lose(vm, s);
     // the uniform dark under the close's ramp (source over: each layer over the last)

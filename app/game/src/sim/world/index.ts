@@ -1,28 +1,25 @@
 /**
  * src/sim/world, the people's lives, which the rules import. Owns who lives in the world
- * (society: every trade's headcount, the named people, homes, households, ties), where each is and what they do by
- * the hour (plans), the routes on content's world graph (graph, area), the calendar and the weather (sky), the
- * world's events and the day's feed (events), and the keyed draws they roll (draw). Reads content's world, day,
- * clock, calendar, weather, roles, people, names, traits, worldEvents and discoveries, and the rules' standing and
- * whereabouts (sim/core); writes only the people (populated, placed, newcomers), the weather and wind, and events.
- * Everyone is placed by their plan, walking the world graph between places and riding the lift between the mine and
- * the town, the opposition's walkers on their way, and the groups that gather. A person plans when they arrive and
- * when their plan can change: its hour comes, or the weather or a crew or lift door it read turns, or their routine does.
+ * (society: every trade's headcount, the named people, bunks, ties), where each is and what they do by the hour
+ * (plans), the routes on content's world graph (graph, area), the calendar and the weather (sky), the world's events
+ * and the day's feed (events), and the keyed draws they roll (draw). Reads content's world, day, clock, calendar,
+ * weather, roles, people, names, traits, worldEvents and discoveries, and the rules' whereabouts (sim/core); writes
+ * only the people (populated, placed, newcomers), the weather and wind, and events.
+ * Everyone is placed by their plan, walking the world graph between places, the opposition's walkers on their way.
+ * A person plans when they arrive and when their plan can change: its hour comes, or the weather or a crew door it
+ * read turns, or their routine does.
  */
 import { TPH, dayOf } from '../../content/clock';
-import { TOWN } from '../../content/balance';
-import { TRAVEL } from '../../content/world';
-import type { Activity, Effect, GameEvent, GameState, GroupId, Person, PlaceId, Threat, UnitId, Weather } from '../../types';
-import { standingOf, whereNow } from '../core';
-import { inMine } from './area';
+import type { Activity, Effect, GameEvent, GameState, PlaceId, Threat, Weather } from '../../types';
+import { whereNow } from '../core';
 import { K, keyedInt } from './draw';
 import { dawnOf, stepEvents, variants } from './events';
 import { route } from './graph';
-import { DOORS, WEATHER, habitPlace, plan, planned, shiftOf, hasHabit, haunts, type Target } from './plans';
+import { DOORS, WEATHER, plan, planned, haunts, type Target } from './plans';
 import { populate as settle, roster, type Roster } from './society';
-import { liftRuns, weatherAt, windAt } from './sky';
+import { weatherAt, windAt } from './sky';
 
-export { calendarOf, indoorsAt, liftRuns, regimeOf, weatherAt } from './sky';
+export { calendarOf, regimeOf, weatherAt } from './sky';
 export { echoes, eventsOf } from './events';
 export { makeName, spawn, tieKind } from './society';
 export { haunts, route };
@@ -53,14 +50,14 @@ function livesOf(r: Roster): Lives {
   return L;
 }
 
-/** What turned since the last tick that plans read: `WEATHER`, `DOORS` (a crew or lift door opened or shut). */
+/** What turned since the last tick that plans read: `WEATHER`, `DOORS` (a crew door opened or shut). */
 function turned(s: Readonly<GameState>, L: Lives): number {
   let t = 0;
   if (s.weather !== L.weather) { L.weather = s.weather; t |= WEATHER; }
   let n = 0;
   for (let i = 0; i < s.effects.length; i++) {
     const e = s.effects[i]!;
-    if ((e.kind !== 'crew' && e.kind !== 'liftStop') || e.until <= s.tick) continue;
+    if (e.kind !== 'crew' || e.until <= s.tick) continue;
     if (L.doors[n] !== e) { L.doors[n] = e; t |= DOORS; }
     n++;
   }
@@ -97,16 +94,7 @@ function live(s: GameState, r: Roster, L: Lives, i: number): void {
     L.uses[i] = made.uses;
   }
   const at = p.at as { place: PlaceId; spot: number; doing: Activity };
-  let dest = t.place;
-  if (inMine(at.place) !== inMine(dest)) {
-    const up = inMine(at.place);
-    L.uses[i] |= WEATHER | DOORS;
-    if (!liftRuns(s)) dest = up ? 'bunks' : p.home;
-    else if (at.place === (up ? 'lift' : 'pithead')) {
-      p.at = { route: up ? ['lift', 'pithead'] : ['pithead', 'lift'], from: s.tick, to: s.tick + TRAVEL.lift, doing: 'ride' };
-      return;
-    } else dest = up ? 'lift' : 'pithead';
-  }
+  const dest = t.place;
   if (at.place === dest) {
     const doing = dest === t.place ? t.doing : t.doing === 'sleep' ? 'sleep' : 'idle';
     if (at.doing !== doing) at.doing = doing;
@@ -116,51 +104,7 @@ function live(s: GameState, r: Roster, L: Lives, i: number): void {
   p.at = { route: way.path, from: s.tick, to: s.tick + Math.max(1, way.ticks), doing: 'walk' };
 }
 
-/** A group's members: `house:<home>`, `crew:<work>:<shift>`, `flock:<place>` (who keep that chapel), `watch:<shift>`; never an Elite. */
-export function members(s: Readonly<GameState>, g: GroupId): UnitId[] {
-  const out: UnitId[] = [];
-  const [kind, x, y] = g.split(':', 3) as [string, string, string | undefined];
-  const r = roster(s);
-  for (let i = 0; i < r.all.length; i++) {
-    const p = r.all[i]!;
-    if (p.gone || standingOf(p) === 'elite') continue;
-    const k = r.key[i];
-    const ok = kind === 'house' ? p.household === g
-      : kind === 'crew' ? p.work === x && shiftOf(s.seed, p, k) === y
-        : kind === 'flock' ? hasHabit(s.seed, p, 'chapel', k) && haunts(s.seed, p).includes(x)
-          : kind === 'watch' ? (p.role === 'soldier' || p.role === 'watchman' || p.role === 'sergeant') && shiftOf(s.seed, p, k) === x
-            : false;
-    if (ok) out.push(p.id);
-  }
-  return out;
-}
-
-/** The groups `p` is one of, in `members`' terms: their household, their crew, the flock of their chapel, the watch. */
-export function groupsOf(s: Readonly<GameState>, p: Readonly<Person>): GroupId[] {
-  if (standingOf(p) === 'elite') return [];
-  const shift = shiftOf(s.seed, p);
-  const out = [p.household, `crew:${p.work}:${shift}`];
-  if (hasHabit(s.seed, p, 'chapel')) out.push(`flock:${habitPlace('chapel', p.home)}`);
-  if (p.role === 'soldier' || p.role === 'watchman' || p.role === 'sergeant') out.push(`watch:${shift}`);
-  return out;
-}
-
-/** Where most of the group stands now, if that is at least content's share of it and two of them. */
-export function together(s: Readonly<GameState>, g: GroupId): PlaceId | null {
-  const ms = members(s, g);
-  const count = new Map<PlaceId, number>();
-  let best: PlaceId | null = null, most = 0;
-  for (const id of ms) {
-    const a = s.people[id]!.at;
-    if (!('place' in a)) continue;
-    const n = (count.get(a.place) ?? 0) + 1;
-    count.set(a.place, n);
-    if (n > most) { most = n; best = a.place; }
-  }
-  return most >= TOWN.gatherMin && most >= TOWN.gatherShare * ms.length ? best : null;
-}
-
-/** Everyone, with homes, work, households and ties, from the seed and content's tables, each where their plan has them. */
+/** Everyone, with bunks, work and ties, from the seed and content's tables, each where their plan has them. */
 export function populateWorld(s: GameState): void {
   settle(s);
   s.weather = weatherAt(s.seed, s.tick);
