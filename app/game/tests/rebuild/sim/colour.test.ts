@@ -13,7 +13,6 @@ import type { GameState } from '../../../src/types';
 const { sim } = makeSim();
 const begin = (seed = 7): GameState => {
   const s = sim.create(seed);
-  sim.act(s, { type: 'take', card: s.god.deal![0]! });
   return s;
 };
 /** `n` acts at `place` on day `d` of the run (the clock set to it). */

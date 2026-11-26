@@ -112,10 +112,6 @@ function timeFrames() {
     await measure('rest');
     await measure('pan', `(t) => ({ x: ${PAN} * Math.sin(2 * Math.PI * ${SWAY_HZ} * t), y: 0, zoom: 1 })`);
     await measure('zoom', `(t) => ({ x: 0, y: 0, zoom: 1 + ${ZOOM} * Math.sin(2 * Math.PI * ${SWAY_HZ} * t) })`);
-    await plain.evaluate(() => {
-      const take = window.__hg.legal().find((a) => a.type === 'take');
-      if (!take || !window.__hg.act(take).ok) throw new Error('perf: the starting gift could not be taken');
-    });
     await plain.waitForTimeout(2000);
     await measure('day');
     await plain.close();

@@ -9,7 +9,7 @@ import { decayAt, emberAt, hungerRise, maliceRise, netherIncome } from '../../..
 import { makeSim } from '../../../src/sim';
 import type { Action, GameEvent, GameState, Sim } from '../../../src/types';
 
-/** The script: take the first card dealt, then try the first whisper the rules allow each fiftieth step; sleep whenever the clock stands. */
+/** The script: pass each deal, then try the first whisper the rules allow each fiftieth step; sleep whenever the clock stands. */
 function play(sim: Sim, s: GameState, ticks: number, log: Action[]): void {
   for (let i = 0; i < ticks && s.phase === 'live'; i++) {
     if (s.pending?.kind === 'blessing') act(sim, s, { type: 'pickBlessing', blessing: s.pending.offers[0]! }, log);
@@ -30,11 +30,7 @@ function act(sim: Sim, s: GameState, a: Action, log: Action[]): void {
 /** A run begun and its first day played out: the god at the first dusk, the night its own. */
 function begin(sim: Sim, seed: number): GameState {
   const s = sim.create(seed);
-  expect(s.phase).toBe('bonus');
-  const gift = s.god.deal![0]!;
-  expect(sim.act(s, { type: 'take', card: gift }).ok).toBe(true);
   expect(s.phase).toBe('live');
-  expect(s.tally.gift).toBe(gift);
   expect(s.host).toBe('g01');
   while (s.tick < s.until) {
     if (s.pending?.kind === 'story') sim.act(s, { type: 'story', option: 1 });
@@ -46,6 +42,22 @@ function begin(sim: Sim, seed: number): GameState {
 }
 
 describe('the run', () => {
+  it('the first day deals nothing: no card at the start, the first deal is the first dusk\'s', () => {
+    const { sim } = makeSim();
+    const s = sim.create(5);
+    expect(s.god.deal).toBeNull();
+    expect(s.god.hand).toEqual([]);
+    expect(isDay(s.tick)).toBe(true);
+    const dealt: GameEvent[] = [];
+    while (s.tick < s.until) {
+      expect(s.god.deal).toBeNull();
+      if (s.pending?.kind === 'story') sim.act(s, { type: 'story', option: 1 });
+      else dealt.push(...sim.step(s).filter((e) => e.kind === 'deal'));
+    }
+    expect(tod(s.tick)).toBe(AT.dusk);
+    expect(dealt.map((e) => (e.kind === 'deal' ? e.cards : null))).toEqual([s.god.deal]);
+  });
+
   it('one seed and one action log give one state', () => {
     const run = (seed: number): { s: GameState; log: Action[] } => {
       const { sim } = makeSim();
@@ -82,7 +94,7 @@ describe('the run', () => {
     const seen = (a: string): string => query.visibility(s, a);
     expect(s.places.grave!.rooted).toBe(true);
     expect([seen('grave'), seen('heartvein'), seen('cartway')]).toEqual(['active', 'active', 'active']);
-    expect(s.places.cartway!.hold).toBe(BALANCE.graveRingStart);
+    expect(s.places.cartway!.hold).toBeGreaterThanOrEqual(BALANCE.graveRingStart); // the first dawn's creep may add
     expect(['westdrift', 'bunks', 'sorting', 'eastworks', 'lowgallery'].map(seen)).toEqual(Array(5).fill('sensed'));
     expect(['kilnshrine', 'overseer', 'lift', 'sump'].map(seen)).toEqual(Array(4).fill('void'));
   });
@@ -249,9 +261,9 @@ describe("the god's day (spec §4, §5)", () => {
     expect(hungerRise(s)).toBe(4 + 2 + 2);
   });
 
-  it('the god wakes at Hunger 30 and Malice 10', () => {
+  it('the god starts at Hunger 30 and Malice 10, and the first dawn raises each by a day\'s rise', () => {
     const s = makeSim().sim.create(9);
-    expect([s.god.hunger, s.god.malice]).toEqual([BALANCE.startHunger, BALANCE.startMalice]);
+    expect([s.god.hunger, s.god.malice]).toEqual([BALANCE.startHunger + hungerRise(s), BALANCE.startMalice + maliceRise(s)]);
   });
 
   it('Malice rises 4 + Divinity', () => {

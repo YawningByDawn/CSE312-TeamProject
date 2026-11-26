@@ -34,7 +34,7 @@ export type ThreatId = string;
 /** A world event's id (wedding, brawl, inspector...) from content's event table. */
 export type StoryId = string;
 /** bonus: the opening's last frame, pick 1 of 3. live: the clock runs. won: the mine is taken. lost: Ichor 0 or rooted out. */
-export type Phase = 'bonus' | 'live' | 'won' | 'lost';
+export type Phase = 'live' | 'won' | 'lost';
 export type Standing = 'mortal' | 'elite' | 'blessed' | 'demigod' | 'god';
 export type FactionId = 'temple' | 'council' | 'public';
 export type Grade = 'dull' | 'clear' | 'bright' | 'blazing' | 'royal' | 'impossible';
@@ -276,7 +276,7 @@ export interface GameState {
    * The whole run, never cleared (the defeat's lines): everyone ever turned, the most followers at once, whispers
    * spoken, the card kept from the opening's deal.
    */
-  tally: { turned: number; peak: number; whispers: number; gift: CardId | null };
+  tally: { turned: number; peak: number; whispers: number };
 }
 
 // ---------- actions (the only way anything changes the state) ----------

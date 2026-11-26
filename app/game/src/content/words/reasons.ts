@@ -1,7 +1,6 @@
 /** The sim's reasons: why an action is refused (`why.*`), why a power's heat moved (`heat.*`, slot `n` the change), why Ichor or Nether moved, how a run ends (`end.*`), and what you want next (`goal.*`). */
 export const REASON_WORDS: Readonly<Record<string, string>> = {
   'why.over': 'The run is over',
-  'why.pickBonus': 'Choose a gift first',
   'why.pickOne': 'Take one first',
   'why.pending': 'Answer it first',
   'why.notOffered': 'Not on offer',

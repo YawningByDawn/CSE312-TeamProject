@@ -1,0 +1,1 @@
+{"note":"CARD BACK, baked by scripts/art/cardback.py. card.back: the face-down card, k = 2 px per CSS px, origin the card's top left (assets/ui card.plate shares it): the deal's cards rise with it and turn over to the plate.","file":"cardback.webp","w":332,"h":494,"levels":1,"cells":{"card.back":[0,0,332,494,2,9,7]}}

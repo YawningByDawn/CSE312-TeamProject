@@ -51,7 +51,11 @@ export function installCss(sheets: readonly Sheet[]): void {
     '.hg-card.hg-rest, .hg-card.hg-rest:hover { filter: brightness(0.7) saturate(0.45); }',
     '.hg-deny { animation: hg-deny 0.3s ease-out; } @keyframes hg-deny { 25% { translate: -5px 0; } 50% { translate: 5px 0; } 75% { translate: -3px 0; } }',
     '.hg-big { transition: transform 0.36s ease-in, opacity 0.3s ease-in; } .hg-big:hover { transform: translateY(-16px) scale(1.04); }',
-    '.hg-dealt { animation: hg-dealt 0.56s cubic-bezier(0.2, 0.8, 0.25, 1) both; } @keyframes hg-dealt { from { opacity: 0; transform: translateY(420px) scale(0.4); } }',
+    // the deal's card rises from below the screen face down, then turns over on the spot (durations and delays from cards.ts)
+    '.hg-big { perspective: 1200px; }',
+    '.hg-dealt { animation: hg-dealt cubic-bezier(0.2, 0.8, 0.25, 1) both; } @keyframes hg-dealt { from { transform: translateY(1000px); } }',
+    '.hg-turn { transform-style: preserve-3d; animation: hg-turn ease-in-out both; } @keyframes hg-turn { from { transform: rotateY(180deg); } }',
+    '.hg-face { backface-visibility: hidden; } .hg-backface { transform: rotateY(180deg); }',
     '.hg-big.hg-kept { transform: translate(var(--tx), var(--ty)) scale(0.6); opacity: 0.3; }',
     '.hg-big.hg-drop { transform: translateY(110px); opacity: 0; }',
     // a number said over the place it fell: it rises and fades

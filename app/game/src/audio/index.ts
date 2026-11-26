@@ -192,7 +192,7 @@ class Player implements Audio {
     const film = vm.film?.kind;
     const bed = vm.title ? null
       : film === 'opening' ? null : st.phase === 'won' ? 'ending'
-      : st.phase === 'lost' ? 'defeat' : st.phase === 'bonus' ? 'bonus' : 'whisper';
+      : st.phase === 'lost' ? 'defeat' : 'whisper';
     for (const name in MANIFEST.beds) this.level(`bed.${name}`, MANIFEST.beds[name]!, this.bedIn, name === bed ? 1 : 0, BED_FADE);
 
     const m: Moment = { day, shift: this.q.part(st.tick) === 'shift' ? 1 : 0, weather: st.weather };

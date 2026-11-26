@@ -13,8 +13,6 @@ import type { PlaceId } from '../../../src/types';
 function begin(): Ctx {
   const { sim } = makeSim();
   const s = sim.create(7);
-  sim.act(s, { type: 'take', card: null });
-  s.phase = 'live';
   return { s, out: [] };
 }
 const pouch = (c: Ctx): number => Object.values(c.s.crystals).filter((x) => 'pouch' in x.at).length;

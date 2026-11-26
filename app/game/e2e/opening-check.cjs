@@ -1,5 +1,5 @@
 // The opening (src/view/film/opening.ts): Begin on the title plays the video over the canvas, on the film's clock,
-// and hands off to the first gameplay view and the starting gift when it ends.
+// and hands off to the first gameplay view, the first day, when it ends.
 //   python tools/browser_job.py --build node e2e/opening-check.cjs
 // Writes screenshots/opening-<s>.png at 1, 4, 7.6 and 9 s after Begin; exits 1 on a failed check or a console error.
 const path = require('node:path');
@@ -32,7 +32,7 @@ const { launchBrowser, startStatic, collectConsole, ROOT } = require('./lib/brow
     const v = await video();
     const phase = await page.evaluate(() => window.__hg.state().phase);
     check(v.hidden && v.paused, `the video is gone after 8 s: ${JSON.stringify(v)}`);
-    check(phase === 'bonus', `the starting gift follows (${phase})`);
+    check(phase === 'live', `the first day follows (${phase})`);
     await page.screenshot({ path: path.join(ROOT, 'screenshots', 'opening-9.png') });
   } finally {
     await browser.close();
