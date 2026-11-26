@@ -2763,5 +2763,5 @@ Owner: "it's merely that the hitbox is off 99%" · "or just the hitbox is bad". 
 
 ## 129. An enemy's thin red outline (PLAY, enemy-outline)
 
-- **A skeleton carries a thin red line round its whole figure** (owner: "enemies should have a thin red outline around them"). Red is harm (`docs/style.md` 7); the line is the interface's harm red `#e0574a` (`src/ui/kit.ts` `BLOOD`), `0.55` rig units wide outside the ink contour, about 1 px at the mine's play zoom.
+- **A skeleton carries a thin red line round its whole figure** (owner: "enemies should have a thin red outline around them"). Red is harm (`docs/style.md` 7); the line is a dark, desaturated blood red `#662a25`, dimmer than the interface's harm red, `0.25` rig units wide outside the ink contour, a hairline (half a css px) at the mine's play zoom (owner: "red is too bright, make it dimmer and also make it thinner").
 - **Baked, not drawn.** `scripts/art/combat.py` bakes beside each of `s01`'s parts its outline `o:<part>` (every bin: every facing, frame and the pick's 48 angles), the part's silhouette grown by the width, in both detail levels. A look with outlines (`o:tr` among its parts) has the rig lay each part's outline first, under all the parts (`Body.layout`), so only the figure's rim shows; the stamp and the sprite paths place them as any part.

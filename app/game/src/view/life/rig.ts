@@ -338,7 +338,7 @@ export class Body {
 
 /** A small figure's box in rig units (feet at 0,0, facing +x): every part of every baked step lies inside it, the
  * lying loops' heads (sleep, collapse) at its ends, a rope held high on the ride at its top. */
-export const BOX = { x0: -28, x1: 43, y0: -69, y1: 23 } as const;
+export const BOX = { x0: -28, x1: 43, y0: -69, y1: 22 } as const;
 /** The finest stamp px per rig unit (stamps.ts): where a figure stops being small (28 device px over 40 rig units) rounded up. */
 export const R_MAX = 2 ** -0.5;
 /** Stamp px per rig unit for a figure shown at `devPx` device px per rig unit: quarter octaves at or above it. */

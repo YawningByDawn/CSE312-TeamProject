@@ -7,7 +7,7 @@ python scripts/art/combat.py [root]   (Python 3 with Pillow and NumPy; determini
 - the skeleton: one of the mine's dead as a look of its own (people.json `s01`, role `skeleton`, its parts in
   assets/people/s01.hi.webp and its low detail on assets/poses/lo-4.webp), walking, swinging its old pick and
   falling apart under the people's clip names (`idle`, `walk:own:<dir>`, `swing:<dir>`, `collapse`). Every part has its
-  outline `o:<part>` beside it: the part's silhouette grown by `OUTLINE` in harm red, drawn behind the whole figure (rig.ts).
+  outline `o:<part>` beside it: the part's silhouette grown by `OUTLINE` in dark blood red, drawn behind the whole figure (rig.ts).
 - hit: a struck body's flash and chips, frames `hit-0..` of the life atlas (assets/life), white for the game to tint.
 """
 import json
@@ -143,8 +143,8 @@ DUSK = (0x5e, 0x4d, 0x37)
 REST = {'thigh': 5.54, 'shin': 5.18, 'upper': 4.73, 'fore': 4.79, 'torso': 13.65}
 TB = math.pi / 16
 K = {'lo': 0.625, 'hi': 0.218772}
-# an enemy's thin red outline: about a px at the mine's play zoom (1.9 css px per rig unit), harm red (src/ui/kit.ts BLOOD)
-OUTLINE, HARM = 0.55, (0xe0, 0x57, 0x4a)
+# an enemy's red hairline: half a css px at the mine's play zoom (1.9 per rig unit), a dark desaturated blood red
+OUTLINE, HARM = 0.25, (0x66, 0x2a, 0x25)
 
 
 def bone_limb(L, r, knob0, knob1, mat, twin=False, seed=0):
