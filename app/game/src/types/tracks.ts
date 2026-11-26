@@ -42,8 +42,6 @@ export interface Query {
   tieKind(s: Readonly<GameState>, a: UnitId, b: UnitId): TieKind;
   hour(tick: Tick): Hour;
   day(tick: Tick): number;
-  /** The tick a held day ends on: the next dusk by day, the next dawn by dusk and night. */
-  dayEnd(tick: Tick): Tick;
   weekday(tick: Tick): Weekday;
   part(tick: Tick): DayPart;
   /** The sun's height, -1 at midnight to 1 at noon: the one light curve; daylight is its 0..1 above the horizon. */
@@ -96,15 +94,14 @@ export interface ViewModel {
   state: Readonly<GameState>;
   /** 0..1 between the last tick and the next: the view interpolates walks with it. */
   alpha: number;
-  /** Render seconds since boot: animation frames are picked from it (frozen while paused). */
+  /** Render seconds since boot: animation frames and the interface's timers are picked from it. */
   time: number;
-  /** Real seconds of the last frame, paused or not: the interface's timers count it. */
+  /** Real seconds of the last frame: the interface's timers count it. */
   dt: number;
   camera: Camera;
   focus: Focus;
   hover: Focus;
   film: Film | null;
-  paused: boolean;
   menu: Menu;
   /** Events since the last frame, for effects and notes; app clears it after the frame. */
   fresh: readonly GameEvent[];
@@ -148,9 +145,6 @@ export interface Layer {
 export type Intent =
   | { kind: 'act'; action: Action }
   | { kind: 'focus'; focus: Focus }
-  | { kind: 'pause'; paused: boolean }
-  /** The clock runs at once to `Query.dayEnd`, stopping where anything holds it. */
-  | { kind: 'endDay' }
   | { kind: 'skipFilm' }
   | { kind: 'menu'; menu: Menu }
   | { kind: 'newRun'; seed?: Seed }
@@ -161,7 +155,7 @@ export type Intent =
 
 /** What a key does: each is bound to the keys (`KeyboardEvent.key`, lower case) in `Settings.keys`. */
 export type Bind =
-  | 'up' | 'down' | 'left' | 'right' | 'zoomIn' | 'zoomOut' | 'pause' | 'confirm' | 'back' | 'stats' | 'people' | 'again'
+  | 'up' | 'down' | 'left' | 'right' | 'zoomIn' | 'zoomOut' | 'skip' | 'confirm' | 'back' | 'stats' | 'people' | 'again'
   | 'details' | 'pick1' | 'pick2' | 'pick3' | 'pick4' | 'pick5' | 'profiler';
 
 /**

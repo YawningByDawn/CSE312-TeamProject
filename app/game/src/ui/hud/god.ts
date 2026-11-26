@@ -4,13 +4,15 @@ import { uiText } from '../../content/text';
 import { maxIchor } from '../../sim/core';
 import { DIM, INK, PALE, Pic, VIOLET, Words, row, surface } from '../kit';
 
-// The god's corner, top left (inventory #95, docs/style.md §7): the grave crystal filling as Hunger falls, rank as its
+// The god's corner, bottom left (inventory #95, docs/style.md §7): the grave crystal filling as Hunger falls, rank as its
 // lit facets; Hunger's word on a hide tab with its value and groove; Malice's word, value and groove; Ichor and Nether
-// with what comes in a night. A click opens the stats menu. Under it the goal in plain words; a click goes there.
+// with what comes in a night. A click opens the stats menu. Over it the goal in plain words; a click goes there.
 
 export const GOD_W = 372;
 export const GOD_H = 164;
 const GOAL_H = 42;
+/** The corner's whole height over the bottom anchor, the goal included. */
+export const GOD_TOP = GOD_H + 12 + GOAL_H;
 const FILL_STEPS = 20;
 const FACETS = 5;
 const HUNGER_X = 128, HUNGER_Y = 66, HUNGER_W = 228;
@@ -50,7 +52,7 @@ export class God {
   private state: Readonly<GameState> | null = null;
 
   constructor(anchor: HTMLElement, send: (i: Intent) => void, private readonly q: Query) {
-    this.box = surface(anchor, 'slab', 0, 0, GOD_W, GOD_H, 'hg-hit');
+    this.box = surface(anchor, 'slab', 0, -GOD_H, GOD_W, GOD_H, 'hg-hit');
     this.box.addEventListener('click', () => send({ kind: 'menu', menu: 'stats' }));
     const b = this.box;
     this.grave = new Pic(b, 62, 66, 'grave.0');
@@ -79,7 +81,7 @@ export class God {
     const nr = row(b, 178, 122);
     this.nether = new Words(nr, 0, 0, 28, VIOLET).num();
     this.perNight = new Words(nr, 0, 0, 17, DIM);
-    this.goalBox = surface(anchor, 'parch', 0, GOD_H + 12, GOD_W, GOAL_H, 'hg-hit');
+    this.goalBox = surface(anchor, 'parch', 0, -GOD_TOP, GOD_W, GOAL_H, 'hg-hit');
     this.goal = new Words(this.goalBox, 0, 11, 20, INK, 'center', GOD_W);
     this.goalBox.addEventListener('click', () => {
       const to = GOAL_AT[this.goalKey];

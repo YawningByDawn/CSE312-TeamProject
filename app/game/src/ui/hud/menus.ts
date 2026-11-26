@@ -5,11 +5,10 @@ import { area, maxIchor, whereNow } from '../../sim/core';
 import { portrait, verb, slab } from '../panels/art';
 import { BLOOD, DIM, PALE, Pic, VIOLET, Words, attr, div, row, surface } from '../kit';
 import type { Anchors } from '../index';
-import { GOD_H } from './god';
-import { POWERS_W } from './powers';
+import { GOD_TOP } from './god';
 
 // The menus (inventory #107, 109, 110): what app's `vm.menu` holds open, one at a time over the rest layout. The stats
-// menu (I, or the god's corner) hangs under the god's corner: each night's urges and stores, your people, your rank,
+// menu (I, or the god's corner) stands over the god's corner: each night's urges and stores, your people, your rank,
 // the powers, a label and a number a row, its line on hover. The characters menu (P): yours, then those walking against
 // you, a face, a name, a trade, where they are and what they do; a click looks at them. Settings (back, or the cog), in
 // two tabs: General, the volumes, the interface's size, the hints and, in a run, Main menu (the save kept); Keys, each
@@ -39,9 +38,9 @@ export class Menus {
   private listen: [Bind, number] | null = null;
 
   constructor(private readonly at: Anchors, cogAt: HTMLElement, private readonly send: (i: Intent) => void, private readonly q: Query) {
-    this.cog = surface(cogAt, 'slab', -POWERS_W - 56, 0, 44, 44, 'hg-hit');
+    // the cog stands in the top right corner itself
+    this.cog = surface(cogAt, 'slab', -44, 0, 44, 44, 'hg-hit');
     new Pic(this.cog, 22, 22, 'icon.cog');
-    // the cog stands left of the powers, where nothing else is
     this.cog.addEventListener('click', () => this.send({ kind: 'menu', menu: 'settings' }));
     // a plate waiting for a key takes the next one before anything else reads it
     window.addEventListener('keydown', (e) => {
@@ -110,7 +109,7 @@ export class Menus {
       ]],
     ];
     const h = 84 + groups.reduce((a, [, rows]) => a + 38 + rows.length * 30, 0) + 16;
-    const el = this.pane(this.at.tl, 0, GOD_H + 12, STATS_W, h, uiText('menu.stats'));
+    const el = this.pane(this.at.bl, 0, -GOD_TOP - 12 - h, STATS_W, h, uiText('menu.stats'));
     let y = 80;
     for (const [head, rows] of groups) {
       new Words(el, 28, y + 8, 17, DIM).set(head);

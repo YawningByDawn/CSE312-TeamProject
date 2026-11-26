@@ -1,15 +1,17 @@
 import type { Action, Audio, Camera, Film, GameEvent, GameState, Intent, Query, Reason, Seed, Settings, Sim, Ui, View, ViewModel } from '../types';
+import { PLAY_TPS } from '../content/clock';
 import { clearSave, readSave, readSettings, writeSave, writeSettings } from './save';
 
 /** A strike this rare or rarer plays its take. */
 const TAKE_ONE_IN = 10000;
 
-export interface Tracks { sim: Sim; query: Query; view: View; ui: Ui; audio: Audio; tickHz: number }
+export interface Tracks { sim: Sim; query: Query; view: View; ui: Ui; audio: Audio }
 
 /**
- * The one pump: real seconds in, whole sim ticks out at a fixed `tickHz`, and one `ViewModel` a frame for the view, the
- * ui and the audio. A film, the pause, the title, a pending choice and any phase but `live` hold the clock; nothing else
- * does. The vm is one object for the run's life: a frame writes its fields, never allocates it.
+ * The one pump: real seconds in, whole sim ticks out at `PLAY_TPS`, and one `ViewModel` a frame for the view, the
+ * ui and the audio. Time passes only up to the state's `until` (the night's actions and the day move it); a film, the
+ * title, a pending choice and any phase but `live` hold it too. The vm is one object for the run's life: a frame
+ * writes its fields, never allocates it.
  */
 export class Pump {
   readonly vm: ViewModel;
@@ -29,14 +31,14 @@ export class Pump {
     this.state = t.sim.create(seed);
     this.vm = {
       title: true, saved: readSave()?.day ?? null, settings, state: this.state, alpha: 0, time: 0, dt: 0,
-      camera: { x: 0, y: 0, zoom: 1 }, focus: null, hover: null, film: null, paused: false, menu: null, fresh: this.fresh,
+      camera: { x: 0, y: 0, zoom: 1 }, focus: null, hover: null, film: null, menu: null, fresh: this.fresh,
     };
   }
 
-  /** The clock runs: a live run with nothing held. */
+  /** The clock runs: a live run with nothing held and time owed (the night's actions, the day). */
   running(): boolean {
     const vm = this.vm;
-    return !vm.title && !vm.paused && vm.film === null && vm.state.phase === 'live' && vm.state.pending === null;
+    return !vm.title && vm.film === null && vm.state.phase === 'live' && vm.state.pending === null && vm.state.tick < vm.state.until;
   }
 
   /** One frame of `dt` real seconds: films and the clock move, then the view, ui and audio read the vm. */
@@ -53,14 +55,14 @@ export class Pump {
   advance(dt: number): void {
     const vm = this.vm;
     vm.dt = dt;
-    if (!vm.paused) vm.time += dt;
+    vm.time += dt;
     const film = vm.film;
     if (film) {
       film.t = Math.min(film.t + dt * this.filmRate, this.t.view.filmLength(film.kind));
       this.pose(film);
       if (film.t >= this.t.view.filmLength(film.kind)) vm.film = null;
     } else if (this.running()) {
-      this.carry += dt * this.t.tickHz;
+      this.carry += dt * PLAY_TPS;
       while (this.carry >= 1) {
         this.carry -= 1;
         this.take(this.t.sim.step(this.state));
@@ -117,14 +119,6 @@ export class Pump {
         return;
       }
       case 'focus': vm.focus = i.focus; return;
-      case 'pause': vm.paused = i.paused; return;
-      case 'endDay': {
-        const end = this.t.query.dayEnd(this.state.tick);
-        vm.paused = false;
-        while (this.running() && this.state.tick < end) this.take(this.t.sim.step(this.state));
-        this.carry = 0;
-        return;
-      }
       case 'menu': vm.menu = i.menu; return;
       case 'skipFilm':
         if (vm.film) {
@@ -160,7 +154,6 @@ export class Pump {
     this.state = vm.state = state;
     vm.title = false;
     vm.film = null;
-    vm.paused = false;
     vm.menu = null;
     vm.focus = vm.hover = null;
     this.carry = 0;

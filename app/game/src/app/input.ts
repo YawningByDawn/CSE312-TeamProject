@@ -4,7 +4,7 @@ import type { Bind, Camera, View } from '../types';
 import type { Pump } from './pump';
 
 // The player's hands: the pointer picks by the view's own hit areas, drag pans 1:1, wheel, pinch and keys zoom toward
-// a goal the camera eases to, and the keys bound to the stats, the characters, back (settings) and pause. The canvas
+// a goal the camera eases to, and the keys bound to the stats, the characters, back (settings) and the film skip. The canvas
 // gets the pointer only where the ui lets it through (#ui is pointer-events: none outside its panels).
 
 const ZOOM_MIN = 0;
@@ -18,7 +18,7 @@ const PAN_KEY = 900;
 const EASE = 0.2;
 /** A press that moves less than this is a click, not a drag. */
 const CLICK_PX = 5;
-/** The pause key held this long skips a film. */
+/** The skip key held this long skips a film. */
 const SKIP_HOLD_S = 1;
 
 /** The held binds' pan (x, y) and zoom. */
@@ -69,7 +69,7 @@ export class Input {
     this.anchor.on = false;
   }
 
-  /** Each frame before the pump's: held keys, the pause key's hold, the camera easing to its goal. */
+  /** Each frame before the pump's: held keys, the skip key's hold, the camera easing to its goal. */
   update(dt: number): void {
     const vm = this.pump.vm;
     if (this.spaceHeld >= 0 && vm.film && (this.spaceHeld += dt) >= SKIP_HOLD_S) {
@@ -171,7 +171,7 @@ export class Input {
     const moves = MOVE_BINDS.filter(on);
     if (!down) {
       for (const b of moves) this.held.delete(b);
-      if (on('pause')) this.spaceHeld = -1;
+      if (on('skip')) this.spaceHeld = -1;
       return;
     }
     if (moves.length > 0) {
@@ -185,10 +185,9 @@ export class Input {
       reloadFlipped('prof');
     } else if (on('back')) {
       this.pump.send(vm.film ? { kind: 'skipFilm' } : { kind: 'menu', menu: vm.menu ? null : 'settings' });
-    } else if (on('pause')) {
+    } else if (on('skip') && vm.film) {
       e.preventDefault();
-      if (vm.film) this.spaceHeld = 0;
-      else if (!vm.title) this.pump.send({ kind: 'pause', paused: !vm.paused });
+      this.spaceHeld = 0;
     } else if ((on('stats') || on('people')) && !vm.title && !vm.film) {
       const menu = on('stats') ? 'stats' : 'people';
       this.pump.send({ kind: 'menu', menu: vm.menu === menu ? null : menu });

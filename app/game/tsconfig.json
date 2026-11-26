@@ -16,5 +16,5 @@
     "allowImportingTsExtensions": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["src", "probes.ts", "vite.config.ts"]
+  "include": ["src", "tests", "scripts", "dev", "vite.config.ts"]
 }

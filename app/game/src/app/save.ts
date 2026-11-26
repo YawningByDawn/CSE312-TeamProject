@@ -15,7 +15,7 @@ export function readSave(): Save | null {
   const raw = localStorage.getItem(SAVE);
   if (raw === null) return null;
   const save = JSON.parse(raw) as Save;
-  return save.state.v === 2 ? save : null;
+  return save.state.v === 3 ? save : null;
 }
 
 export const writeSave = (s: Save): void => localStorage.setItem(SAVE, JSON.stringify(s));

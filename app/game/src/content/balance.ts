@@ -186,7 +186,9 @@ export const BALANCE = {
   xpEvilDivisor: 2,
 
   // --- events ---
+  /** A story's chance at each dawn, and at each hour of the night the clock runs through. */
   eventChance: 0.6,
+  nightEventChance: 0.05,
 
   // --- stages (the stage advances in place) ---
   /** Highest level reachable before the pit head has taken root (L4 needs it; XP keeps banking). */

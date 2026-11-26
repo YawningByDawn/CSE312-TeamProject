@@ -1,2 +1,20 @@
 node_modules
 dist
+*.log
+.vite
+test-results
+__pycache__/
+
+.worktrees/
+.claude/settings.local.json
+.temp/
+# tools/browser_job.py: a job's copy of the worktree while it runs on the game VM
+/.gamejob/
+
+# shot output stays local; baselines are the only committed images
+screenshots/*
+!screenshots/baselines/
+
+# the workshop's approval cards and the owner's rulings are live state of the owner's checkout, never committed
+data/workshop/approvals*.json
+data/workshop/media/

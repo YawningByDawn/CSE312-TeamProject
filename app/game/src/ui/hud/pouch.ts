@@ -2,7 +2,7 @@ import type { GameState, Grade, Intent, ViewModel } from '../../types';
 import { uiText } from '../../content/text';
 import { DIM, PALE, Pic, Words, surface } from '../kit';
 
-// The crystal pouch, bottom left (inventory #97): the pouch and up to three columns of shards by grade with their counts,
+// The crystal pouch, bottom right (inventory #97): the pouch and up to three columns of shards by grade with their counts,
 // the lowest grades folded into the first column so the three brightest keep their own. A click opens the grave.
 
 export const POUCH_W = 336;
@@ -21,7 +21,7 @@ export class Pouch {
   private state: Readonly<GameState> | null = null;
 
   constructor(anchor: HTMLElement, send: (i: Intent) => void) {
-    const b = surface(anchor, 'slab', 0, -POUCH_H, POUCH_W, POUCH_H, 'hg-hit');
+    const b = surface(anchor, 'slab', -POUCH_W, -POUCH_H, POUCH_W, POUCH_H, 'hg-hit');
     b.addEventListener('click', () => send({ kind: 'focus', focus: { place: 'grave' } }));
     new Pic(b, 56, 58, 'pouch');
     for (let i = 0; i < COLS; i++) {

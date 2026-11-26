@@ -6,6 +6,7 @@ export const REASON_WORDS: Readonly<Record<string, string>> = {
   'why.pending': 'Answer it first',
   'why.notOffered': 'Not on offer',
   'why.closed': 'Not now',
+  'why.day': 'The day passes by itself. Act at dusk.',
   'why.ap': 'Needs {n} {n|action|actions}',
   'why.nether': 'Needs {n} Nether',
   'why.cost': 'Needs {n} crystal worth',

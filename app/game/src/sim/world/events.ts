@@ -27,7 +27,7 @@ interface Happening { e: number; tick: Tick; od: number; oe: number; who?: UnitI
 const FOLLOWS = WORLD_EVENTS.flatMap((e, i) => (e.follows ? [i] : []));
 
 /** The tick day `d` dawns on. */
-export const dawnOf = (d: number): Tick => d * DAY_TICKS - AT.night + AT.dawn;
+export const dawnOf = (d: number): Tick => d * DAY_TICKS - AT.dusk + AT.dawn;
 const draw = (seed: number, d: number, e: number, use: number): number => keyed(seed, K.event, d, e * 8 + use);
 
 function eligible(def: WorldEventDef, d: number, ws: readonly Weather[]): boolean {

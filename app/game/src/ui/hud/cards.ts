@@ -5,7 +5,7 @@ import { cardFee, evilBonus } from '../../sim/cards';
 import { handMax } from '../../sim/core';
 import { CARD_H, CARD_W, card, cell, verb } from '../panels/art';
 import { DIM, INK, PALE, Pic, Words, attr, div, surface } from '../kit';
-import { CLOCK_H, CLOCK_W } from './clock';
+import { GOD_W } from './god';
 import { POUCH_H, POUCH_W } from './pouch';
 
 // The cards (inventory #113, DECISIONS §43). The hand, bottom centre: up to five plates resting small, a card rising on
@@ -26,7 +26,7 @@ const CLEAR = 12;
 /** A press that moves less than this (screen px) is no drag. */
 const CLICK_PX = 5;
 /** The discard zone at the screen's right edge, its foot clear of the bottom-right panel. */
-const TRASH_W = 190, TRASH_H = 340, TRASH_Y = -Math.max(CLOCK_H, POUCH_H) - 3 * CLEAR - TRASH_H;
+const TRASH_W = 190, TRASH_H = 340, TRASH_Y = -POUCH_H - 3 * CLEAR - TRASH_H;
 /** The ui atlas names the powers by their old tracks. */
 const TRACK = { temple: 'cult', council: 'gov', public: 'public' } as const;
 
@@ -90,7 +90,7 @@ export class Hand {
     const s = vm.state, g = s.god;
     this.live = s.phase === 'live' && !g.deal && !vm.menu && !vm.title && !vm.film;
     // the hand, the fee, Malice's multiplier and the band move with events, Nether and the screen; the key is read only then
-    const band = Math.floor(2 * (this.half() - Math.max(POUCH_W, CLOCK_W) - CLEAR));
+    const band = Math.floor(2 * (this.half() - Math.max(GOD_W, POUCH_W) - CLEAR));
     if (vm.fresh.length === 0 && g.nether === this.nether && g.malice === this.malice && s.phase === this.phase && band === this.band) return;
     this.nether = g.nether;
     this.malice = g.malice;

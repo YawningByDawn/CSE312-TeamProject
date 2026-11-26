@@ -6,7 +6,7 @@
 
 // ---------- time (the live clock, LIVE row) ----------
 
-/** Sim ticks since the run began. The sim steps at content's TICK_HZ (10); one day is DAY_TICKS (1200 = 120 s). */
+/** Sim ticks since the run began (at the dusk); one day is DAY_TICKS (1200). */
 export type Tick = number;
 /** Hour of the day, 0..24, derived from the tick by the sim (`Query.hour`). One clock for day, light and animation. */
 export type Hour = number;
@@ -242,10 +242,12 @@ export type Pending =
 
 export interface GameState {
   /** The state's shape: a save of another is dropped. */
-  v: 2;
+  v: 3;
   seed: Seed;
   rng: RngState;
   tick: Tick;
+  /** The tick the clock runs to: it stands there (the player's turn, the night) until an action moves it on or the day sets it. */
+  until: Tick;
   phase: Phase;
   stage: StageId;
   weather: Weather;
@@ -308,6 +310,8 @@ export type Action =
   | { type: 'answer'; threat: ThreatId; with: ItemId | 'favour' | 'hide' }
   | { type: 'story'; option: number }
   | { type: 'openVault' }
+  /** Skip the rest of the night to dawn. */
+  | { type: 'sleep' }
   /**
    * A gift of a building of yours, then it rests: a rumour cools `target`, a power; a debt is called in on `target`, one
    * who owes; food, poisoned or blessed (`mode`), waits for `target`, a town area, `day` days ahead; the guards look away

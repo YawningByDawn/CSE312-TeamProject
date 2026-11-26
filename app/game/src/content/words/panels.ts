@@ -255,6 +255,7 @@ export const PANEL_WORDS: Readonly<Record<string, string>> = {
   'dusk.nothing': 'Nothing tonight',
   'dusk.offerHint': 'Set a follower to Offer, and they bring you what they dig.',
   'ledger.title': 'Dusk, day {n}',
+  'ledger.happened': 'What happened',
   'ledger.grave': 'To your grave',
   'ledger.nether': 'Nether',
   'ledger.turned': 'Turned',

@@ -1,0 +1,29 @@
+# Brief — PLAY-v2: rewrite the play scene and the feel (top priority; replaces `P5-play.md`)
+
+Handoff/log: `handoffs/PLAY-v2.md`. Port **5205**. Scratch `/tmp/playv2/`.
+Read: `DECISIONS.md` **§14 (binding — the owner ordered a rewrite of the whole loop and feel; read every line)**, §13.10 C–F, §13.11, §13.1–13.3, §13.6; `handoffs/briefs/SIM-v2.md` (the sim is being rewritten in parallel — its API contract section is what you code against; the exact shapes appear in `handoffs/P4.md`); `handoffs/P5-fix.md` (shell, settings, layout rules), `handoffs/P7.md` (cutscene hand-over, `drawGodThread`), `handoffs/P6b.md` (world renderer: one camera over mine + town), `handoffs/briefs/STAIN.md` (what the renderers will accept for partial colour and day replay), `handoffs/P2-people.md` if present (people module: tasks and reactions it can show).
+
+The owner played the current scene: dead, confusing, nothing changes colour, followers sit still, cannot explore, cannot zoom out. **Write a new scene `src/scenes/play/` from scratch** (do not port `src/scenes/whisper` wholesale; reuse small parts only where they are right). The player must always be watching something move and something change colour, and must know what to do without reading.
+
+## The scene
+1. **One world, one camera:** pan and zoom freely from a close-up of the mine out to the whole town at any time (wheel, pinch, drag, keys, a "whole world / my mine" button). Use the world renderer (`createWorldRenderer`) when available; until then the mine renderer behind one adapter file (`world.ts`) with the same interface, so the swap is one file.
+2. **Night (you act)** — spatial, no menus:
+   - Hover/click a person: a small card (name, job, one line about them, odds as word + percent, or why they are out of reach in plain words). Click **Whisper**: the thread flies, they react, and on success colour ripples out where they stand.
+   - Click a follower, then click a place: a route appears on the ground with one line saying what they will do there (`sendPreview`) and the cost; confirm with a click. They set off at once. Right-click/Esc cancels. A follower card shows what they are doing now, **Recall** and **Lie low**.
+   - One miracle a night (compact hand, already built), eat crystals, End Night. Evil acts appear only when they exist.
+3. **Day (you watch, 6–10 s, speed from Settings, skippable):** play the sim's ordered day events on the living world — bell, lift rides, people walking their routes, followers doing their tasks with a brief mark at their feet, **colour creeping** where Hold changed (drive the renderer's stain per `STAIN.md`), enemies moving, heat changes. The camera frames what matters (the biggest colour change, a discovery, an attack) unless the player moves it. End with a three-line summary at most, then night.
+4. **HUD (§13.10 C–E):** You (Ichor pips, Hunger) · Spend (Nether "+N a night", Crystals) · Danger (one indicator that opens). Goal panel: "Turn the mine to colour — 23 %", "Reach the surface — pit head 0 %" (clicking moves the camera there and pulses the ground). Chronicle collapsed by default. Nothing else on screen at the start; things appear when first relevant with one sentence.
+5. **Guidance without reading:** the first night is three guided beats that follow the player's actions (whisper to the miner by your grave → send them into the gray next door and watch it colour at dawn → end the night). One hint at a time, always dismissible, never returning (§13.10 F).
+6. **Feedback:** every click answers within 100 ms (sound + visual); every night ends with visible change; numbers that change animate at their source (the grave, the person's feet) — nothing floats over heads permanently.
+7. Keep from P5-fix: shell gear/settings/pause, layout rules, `e2e/layout-check.cjs` passing at every size. Keep the cutscene hand-over pixel-identical and draw the god's thread per `handoffs/P7.md`. Scenes: `title → cutscene → play → ending/defeat` (bonus pick is an overlay on play's first frame — keep the existing placeholder flow working until that piece lands).
+
+## The shot loop is part of this piece (§14.8)
+Write `e2e/playtest-reel.cjs`: plays the real build through the real UI from the title for five nights with a fixed seed and writes `screenshots/reel/`: stills of every step; frame strips (8 frames over 2 s, one image) of the mine at rest, a whisper, a Send, the Day replay; the same moments zoomed out to the town; a contact sheet `reel.png`; and `reel.json` with numbers — people who moved per second at rest, pixels that changed colour per day, clicks and seconds per night, console errors. **Run it after every milestone and look at the strips yourself (downscaled)**; write what you saw in the handoff. If people are not moving, colour is not spreading, or a first-time player would be lost, it is not done.
+
+## Working alongside others
+- Until the settings/layout builder (P5-fix) reports, `src/app/**`, `src/ui/**`, `src/scenes/whisper/**`, `src/scenes/title/**` are theirs: build in `src/scenes/play/**` (new) and your e2e script; read but do not edit their files. After they report (the orchestrator will tell you, or `handoffs/P5-fix.md` says "REPORTED"), you own `src/app/**`, `src/ui/**`, all scenes except `src/scenes/cutscene/**`, `index.html`, `e2e/{playtest-reel,play-shots,smoke,layout-check}.cjs`; then remove `src/scenes/whisper/**` and `e2e/whisper-shots.cjs`.
+- The sim API will move under you for a while: code against the contract in `SIM-v2.md`, keep one thin adapter (`sim.ts`) so breaks land in one file, and write what you need from the sim under "Requests to SIM" in your handoff. Never edit `src/sim/**`, `src/render/**`, `src/audio/**`.
+- Append `### PLAY-v2 — Play scene` at the end of `DECISIONS.md`.
+
+## Report
+What a first-time player sees and does in nights 1–3 (with reel image paths), the reel numbers, what is still stubbed waiting on sim/renderers, requests, known issues.

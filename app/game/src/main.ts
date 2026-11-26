@@ -5,7 +5,6 @@ import { Pump } from './app/pump';
 import { flag } from './content/flags';
 import { SOUNDS } from './content/sounds';
 import { createAudio } from './audio';
-import { TICK_HZ } from './content/clock';
 import { makeSim } from './sim';
 import { createUi } from './ui';
 import { mountPanels } from './ui/panels';
@@ -29,7 +28,7 @@ const muted = flag('mute') === '1';
 const view = createView(canvas, window.devicePixelRatio || 1, query, muted);
 const ui = createUi(mountPanels(framework?.account ?? null));
 const audio = createAudio(query, SOUNDS, muted);
-const pump = new Pump({ sim, query, view, ui, audio, tickHz: TICK_HZ }, seed, flag('fast') === '1' ? FAST_FILMS : 1);
+const pump = new Pump({ sim, query, view, ui, audio }, seed, flag('fast') === '1' ? FAST_FILMS : 1);
 const input = new Input(pump, view, canvas);
 installDebug(pump, sim, input, framework?.net ?? null);
 
@@ -42,10 +41,6 @@ function resize(): void {
   input.resize(w, h);
 }
 
-// Solo pauses itself when the tab hides: the live clock never runs unseen.
-document.addEventListener('visibilitychange', () => {
-  if (document.hidden) pump.send({ kind: 'pause', paused: true });
-});
 window.addEventListener('resize', resize);
 
 await Promise.all([view.load(), audio.load()]);

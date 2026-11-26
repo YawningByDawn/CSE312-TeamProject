@@ -6,12 +6,14 @@
  * No DOM, IO, wall clock or Math.random. One rule area a file: the god's day (god), the mine's (mining), colour and the
  * whisper (influence), the cards, the grave and its stones (grave, crystals, bonus), the town's benches, buildings,
  * gifts and tithe, the powers' moves (threats), the stories, discoveries; core.ts holds what they share.
- * Tick 0 is the opening's night; the run waits in `bonus` on the first deal, and the take begins the clock. Each tick
- * the action points refill (`apMax` a day) and the hour's rules run: dawn, the shift's swings, its end, dusk.
+ * Tick 0 is the dusk; the run waits in `bonus` on the first deal, and the take begins the turn. The night is the player's
+ * turn: the clock stands (`step` does nothing at `until`) and each action point spent moves `until` on by its share of the
+ * night (`nightUntil`), a `sleep` to the dawn; the day then passes by itself, dawn to dusk, where the action points
+ * refill. Each tick the hour's rules run: dawn, the shift's swings, its end, dusk.
  */
 import { BALANCE } from '../content/balance';
 import { GIFTS } from '../content/gifts';
-import { AT, DAY_TICKS, dayOf, hourOf, nextAt, partOf, tod } from '../content/clock';
+import { AT, NIGHT_TICKS, TPH, dayOf, hourOf, isDay, nextAt, partOf, tod } from '../content/clock';
 import { AREAS, NEIGHBOURS, PLACES } from '../content/world';
 import { dealCards, discard, discardWhy, cardCost, play, playWhy, reroll, rerollWhy, take, takeWhy, cardFee, cardTargets, payment, faithOf } from './cards';
 import { bonus } from './bonus';
@@ -33,7 +35,7 @@ import { discoverDawn } from './discoveries';
 import { giftActions, giftWhy, giftsDawn, useGift } from './gifts';
 import { duskStones, shiftEnd, shiftTick } from './mining';
 import { townShiftEnd } from './tithe';
-import { chooseStory, pendingSlots, storyDawn, storyWhy } from './stories';
+import { chooseStory, pendingSlots, storyRoll, storyWhy } from './stories';
 import { answer, answerNether, answerWhy, crossings, powersDawn, powersDusk } from './threats';
 import { newCrystal } from './crystals';
 import { seedRng } from './rng';
@@ -63,7 +65,7 @@ function blank(seed: number): GameState {
   }
   for (const a in AREAS) if (AREAS[a]!.anchored) for (const n of NEIGHBOURS[a]!) places[n]!.hold = BALANCE.graveRingStart;
   return {
-    v: 2, seed, rng: seedRng(seed), tick: 0, phase: 'bonus', stage: 'whisper', weather: 'clear', wind: 0,
+    v: 3, seed, rng: seedRng(seed), tick: 0, until: 0, phase: 'bonus', stage: 'whisper', weather: 'clear', wind: 0,
     god: {
       level: 1, xp: 0, nether: 0, ichor: BALANCE.startIchor, hunger: BALANCE.startHunger, malice: BALANCE.startMalice, ap: 0, apMax: 0, sockets: [], blessings: [],
       hand: [], deal: null, rerolls: 0, played: 0, free: 0, boost: 0,
@@ -106,6 +108,12 @@ function price(s: Readonly<GameState>, fl: Flock, a: Action): Omit<Check, 'ok' |
   }
 }
 
+/** The tick the night has run to once the action points held are spent: each point is 1/`apMax` of the night, the last the dawn. */
+function nightUntil(s: Readonly<GameState>): number {
+  const g = s.god;
+  return nextAt(s.tick, AT.dawn) - Math.round((NIGHT_TICKS * Math.max(0, g.ap)) / g.apMax);
+}
+
 /** Why an action is refused now (empty: it may be taken). */
 function why(s: Readonly<GameState>, fl: Flock, a: Action): Reason[] {
   if (s.phase === 'won' || s.phase === 'lost') return [{ key: 'why.over' }];
@@ -113,9 +121,11 @@ function why(s: Readonly<GameState>, fl: Flock, a: Action): Reason[] {
   if (s.pending?.kind === 'story') return a.type === 'story' ? storyWhy(s, a.option) : [{ key: 'why.pending' }];
   if (s.pending?.kind === 'facet') return a.type === 'chooseCut' ? chooseCutWhy(s, a.index) : [{ key: 'why.pending' }];
   if (s.pending) return s.pending.kind === 'blessing' && a.type === 'pickBlessing' ? (s.pending.offers.includes(a.blessing) ? [] : [{ key: 'why.notOffered' }]) : [{ key: 'why.pending' }];
+  if (isDay(s.tick)) return [{ key: 'why.day' }];
   const day = dayOf(s.tick);
   const r = ((): Reason[] => {
     switch (a.type) {
+      case 'sleep': return [];
       case 'whisper': return whisperWhy(s, fl, s.people[a.target], day);
       case 'whisperGroup': return groupWhy(s, fl, a.group, day);
       case 'setRoutine': return routineWhy(s, s.people[a.unit], a.routine);
@@ -153,6 +163,7 @@ function apply(c: Ctx, fl: Flock, a: Action): void {
   const g = s.god;
   const p = price(s, fl, a);
   g.ap -= p.ap;
+  if (p.ap > 0) s.until = Math.max(s.until, nightUntil(s));
   g.nether = round1(g.nether - p.nether);
   if (g.free > 0 && (a.type === 'whisper' || a.type === 'whisperGroup')) g.free -= 1;
   switch (a.type) {
@@ -169,6 +180,7 @@ function apply(c: Ctx, fl: Flock, a: Action): void {
       break;
     case 'discard': discard(c, a.card); break;
     case 'reroll': reroll(c); break;
+    case 'sleep': s.until = Math.max(s.until, nextAt(s.tick, AT.dawn)); break;
     case 'play': play(c, a.card, a.pay, a.target); break;
     case 'eat': eat(c, a.crystal); break;
     case 'set': set(c, a.crystal, a.socket); break;
@@ -210,7 +222,6 @@ export function makeSim(): { sim: Sim; query: Query } {
     const l = s.ledger;
     l.crystals = l.nether = l.turned = l.lost = 0;
     l.suspicion.temple = l.suspicion.council = l.suspicion.public = 0;
-    s.god.ap = Math.min(s.god.ap, s.god.apMax); // Quickening's AP is for its day only
     ev(c, { kind: 'dawn', weekday: weekdayOf(s.tick) });
     graveDawn(c);
     itemsDawn(c);
@@ -220,7 +231,8 @@ export function makeSim(): { sim: Sim; query: Query } {
     discoverDawn(c);
     if (s.phase === 'live') godDawn(c);
     if (s.phase === 'live') powersDawn(c);
-    storyDawn(c);
+    storyRoll(c, BALANCE.eventChance);
+    s.until = nextAt(s.tick, AT.dusk);
   }
 
   const sim: Sim = {
@@ -235,6 +247,7 @@ export function makeSim(): { sim: Sim; query: Query } {
       }
       settleRank(s);
       s.god.ap = s.god.apMax;
+      s.god.nether = round1(netherIncome(s)); // the first dusk's income: the run begins at the dusk
       for (const t of BALANCE.startTiers) newCrystal(s, { pouch: true }, { tier: t });
       s.god.rerolls = bonus(s, 'rerolls');
       s.god.free = bonus(s, 'freeWhispers');
@@ -244,12 +257,9 @@ export function makeSim(): { sim: Sim; query: Query } {
 
     step(s) {
       out.length = 0;
-      if (s.phase !== 'live' || s.pending) return out;
+      if (s.phase !== 'live' || s.pending || s.tick >= s.until) return out;
       c.s = s;
       s.tick += 1;
-      const g = s.god;
-      // AP is held as a whole count of 1/DAY_TICKS steps, re-read each tick, so it never drifts off a whole number
-      if (g.ap < g.apMax) g.ap = Math.min(g.apMax, (Math.round(g.ap * DAY_TICKS) + g.apMax) / DAY_TICKS);
       const t = tod(s.tick);
       if (t === AT.dawn) dawn();
       if (t === AT.shift) ev(c, { kind: 'shiftStart', weekday: weekdayOf(s.tick) });
@@ -266,6 +276,7 @@ export function makeSim(): { sim: Sim; query: Query } {
         ev(c, { kind: 'dusk', weekday: weekdayOf(s.tick) });
       }
       if (t === AT.night) ev(c, { kind: 'night', weekday: weekdayOf(s.tick) });
+      if (t % TPH === 0 && !isDay(s.tick) && s.phase === 'live') storyRoll(c, BALANCE.nightEventChance);
       if (s.phase === 'live') crossings(c);
       if (s.phase === 'live') stepWorld(s, out);
       pruneEffects(s);
@@ -287,7 +298,7 @@ export function makeSim(): { sim: Sim; query: Query } {
       const all: Action[] = [];
       const g = s.god;
       for (const card of g.deal ?? []) all.push({ type: 'take', card });
-      all.push({ type: 'take', card: null }, { type: 'reroll' });
+      all.push({ type: 'take', card: null }, { type: 'reroll' }, { type: 'sleep' });
       if (s.pending?.kind === 'blessing') for (const blessing of s.pending.offers) all.push({ type: 'pickBlessing', blessing });
       if (s.pending?.kind === 'story') for (let option = 1; option <= s.pending.options; option++) all.push({ type: 'story', option });
       if (s.pending?.kind === 'facet') for (let index = 0; index < s.pending.cuts.length; index++) all.push({ type: 'chooseCut', index });
@@ -345,7 +356,6 @@ export function makeSim(): { sim: Sim; query: Query } {
     tieKind: (s, a, b) => tieKind(s, s.people[a]!, s.people[b]!),
     hour: hourOf,
     day: dayOf,
-    dayEnd: (t) => (tod(t) >= AT.dawn && tod(t) < AT.dusk ? nextAt(t, AT.dusk) : nextAt(t, AT.dawn)),
     weekday: weekdayOf,
     part: partOf,
     sun: (h) => Math.sin(((h - 6) / 12) * Math.PI),

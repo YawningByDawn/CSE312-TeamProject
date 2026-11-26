@@ -160,7 +160,7 @@ export function plan(s: Readonly<GameState>, p: Readonly<Person>, k = idKey(p.id
   const turn = k % TPH;
   const day = dayOf(s.tick - turn);
   const j = (keyed(s.seed, K.jitter, k, day) * 2 - 1) * DAY.jitter;
-  const dawn = s.tick - turn - ((s.tick - turn + AT.night - AT.dawn) % DAY_TICKS);
+  const dawn = s.tick - turn - ((s.tick - turn + AT.dusk - AT.dawn) % DAY_TICKS);
   now.s = s; now.p = p; now.r = ROLES[p.role]!; now.k = k; now.day = day; now.wd = calendarOf(day).kind;
   now.x = (s.tick - dawn) / TPH - j; now.hold = 24 + turn / TPH - j; now.uses = 0; now.until = Infinity;
   const to = gathered(s, p) ?? (p.role === 'child' ? childDay() : p.role === 'elder' ? elderDay() : grownDay());

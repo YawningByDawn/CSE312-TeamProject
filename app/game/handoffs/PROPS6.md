@@ -1,0 +1,14 @@
+# PROPS 6 — why three props passed and the rest failed (read side by side at full size, beside mine.png crops)
+1. **Form first.** Offerings, gourds and hearth are round, lopsided bodies whose light *turns*: `pot()` paints a lit plane, a highlight, a core shadow and the floor's bounce at the far edge, so each reads as a volume. Frame, adit, cart, tally lamp, canister, notch board were boxes: one flat local colour per face plus a lit stripe, so they read as cut-out cards.
+2. **Marks stood in for form on the failures.** Hatch scribbles, flecks, repeated plank grain and the basket's identical stitches cover flat colour; on the passing props marks are few and *on* a form that already works.
+3. **Line.** The failures carry a long, uniformly heavy black contour (posts, lintel, cart rim, canister) that runs ruler-straight: a sticker edge. The passing ones use moderate weight that breaks and thins toward the light, brown inner lines, and their contours are curves, so the weight change shows.
+4. **Irregularity.** Passing: nothing symmetric, every pot leans or bulges, the sack slumps. Failing: posts parallel, lintel straight, overhangs equal, legs mirrored, crystals and stones of one size and tone.
+5. **Story in the details.** Passing: zigzag band, tied cloth lid, patched sack, wax runs, food in the bowl, crumbs, a pot hung over coals. Failing: details are generic construction (nails, rivets, "a split") rather than signs of use.
+6. **Grouping and light of their own.** The passing three are several objects at different sizes around a light source that warms them (candle, coals). Lone failing props sit unlit in the dark ground.
+7. **Materials.** mine.png paints timber as warm, softly graded logs with rounded ends; metal and stone as soft gradients ochre-to-teal; fire as layered glowing tongues; crystals as luminous lilac with depth. Ours: grey-noise metal, flat teal blocks, a flat spiky yellow flame, crystals as three flat faces.
+
+## What changed in the kit (src/feel-gen/props/form.ts, pen.ts)
+- `log`: a timber along a crooked line, width irregular along it, shaded as a cylinder (soft strips through the ramp by the light at each cross position: lit edge, core, bounce), adze facets, checks along the grain with a lit lip, knots, bark strips, end grain (sawn or axe-rounded) or splinters, ao, damp and moss at the foot, soot, hand wear.
+- `stone`: lumpy flat-bottomed rock lit by a radial gradient through an ochre→teal ramp, a hard shoulder facet, bounce, cracks, moss.
+- `fire`: five layers of glowing tongues (deep red → white-hot core), no outline, halo, loose licks, sparks, lit smoke. `gem`: a crystal with a back face seen through it, graded faces, an inner facet plane, a refracted streak, a glint.
+- `inkC` takes `vary` (pressure swelling along the line); new work uses a warm brown-black ink (`WINK`) and lighter weights.

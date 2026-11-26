@@ -1,0 +1,22 @@
+# RESTART note — read this first (2026-11-23)
+
+All running builders were stopped at once by accident, mid-work, **with no final report**. You are the replacement for one of them. The owner has said to resume.
+
+## How to pick up
+1. Your piece's handoff file was kept current by your predecessor, but its last few edits may be missing or half-done. Read its interface block (top) and its **last** status / next-steps section only.
+2. Before anything else, check the state of your own files: `npx tsc --noEmit -p . 2>&1 | grep <your paths>`, your unit tests, `ls -t` on your source and screenshot folders to see what was touched last. A file may have been cut off mid-edit — repair it first.
+3. Any browser or background run that was in flight is dead. Rerun what you need, foreground, under your lock: `flock /tmp/hg-pw-$((PORT % 3)).lock`.
+4. Work in small confirmed steps, keep the last section of your handoff current after each step, look at every shot you make (downscale to ≤ 1600 px wide, then Read it), and hand off by ~230k tokens of context. Never run git.
+5. Evidence rule (DECISIONS §16.2): every thing in a frame must be nameable at a glance. Do not report 8 otherwise.
+
+## What changed while your predecessor was working (binding)
+- **The theme**: `docs/theme.md` (the wickfolk, the colour code, three building languages, the land). The shared kit is in code: `src/render/theme/` — `palette.ts` (`PAL`, `OWNER`, `UI`, `INK`, `VOID`, `grayOf`, `mix`, `shade`) and `folk.ts` (the wickfolk figure, `drawWick`, `wickLight`, `wickColour`, fins); interface at the top of `handoffs/THEME.md`. Take colours and the figure from it; no local palettes.
+- **The town's target**: `docs/refs/town-target.png` + `DECISIONS.md` §18 (owner: "The mushrooms are too small here and it's too bright but otherwise not bad"): as drawn, but cap-trees as big as houses and the whole picture darker (day median luminance ~45–60). The upper-left open pit with headframes is the pit head.
+- **Daylight**: by day the town and the pit head are evenly lit and read as forms; night keeps forms faintly readable; never dots of light on black.
+- **LIVING is finished** (`src/sim/living/**`, 28 tests): `createSociety(seed, layout)`, `planDay(society, dayIndex, facts)` → calendar, weather, plans, events (105 kinds), feed, effects; 506 people, 54 hearths; `adapter.ts` (`layoutFromSim`, `factsFromSim`, `foldInto`). Interface and event kinds at the top of `handoffs/LIVING.md`.
+- **Sim v3.1 compiles** (171 tests): no `dusk.tribute` (tribute = `offered { tribute: true }` events), no `zones[].depth` (use `depthOf(zone)` / `workDepth(s, zone)`); strikes carry `depth` and `oneIn`. Turn order is being changed to Night → Day → Dusk (v3.2 block in `handoffs/P4.md` when it lands).
+- **Ruling [Design]**: Sensed persists along every stop and route of followers' day plans (lift, pit head, their hearth, tavern…) from the first follower's first day; a follower's hearth carries a seed of violet.
+- **Play scene**: FEEL's world effects now reach VFX (`src/scenes/play/fx.ts` passes unknown kinds straight through); one shared list of the Day's mining events in `src/scenes/play/shift.ts`.
+- **Cap-trees (owner, later the same day)**: "make shrooms big but occluded from view above the trunk until you zoom out more, fade in effect." Stalk always drawn; the cap is a separate top layer that is invisible when zoomed in (only a soft shade on the ground) and fades in as you zoom out — shared `capAlpha(figurePx)` in `src/render/theme/props.ts` (0 at figure ≥ ~40 px, 1 at ≤ ~16 px, eased). See `DECISIONS.md` §18.
+- **The town's light (owner, later still)**: "Mine shot's mood, 2's detailing for a town in a sense." Mood and light from `mine.png` (low-key; broad pools of cold white / gold / violet light with soft falloff; deep teal-black shadow; lit-pixel luminance median ~53, quartiles 37–71, highlights ~115), detail density from `town-target.png`. Not a bright map and not dots on black. See `DECISIONS.md` §18.
+- **Order of work (owner, latest; DECISIONS §19)**: "You also don't have to work too hard on the visuals until that agent is done. Just get something in place for now." Visual pieces: get it in place, right in kind and colour, wired into the integrated build, zero console errors — then report; no polish rounds for now. The playable loop end to end is the priority. Only the town engine keeps pushing the look.

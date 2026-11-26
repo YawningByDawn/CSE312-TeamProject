@@ -182,13 +182,14 @@ function watershed(c: Ctx): void {
 }
 
 
-/** Dusk, the god's part: Nether comes in (half the rest carries, at most a day's income), the deal; the Ember flares. */
+/** Dusk, the god's part: the action points refill, Nether comes in (half the rest carries, at most a day's income), the deal; the Ember flares. */
 export function godDusk(c: Ctx): void {
   const s = c.s;
   const g = s.god;
   const income = netherIncome(s);
   const carried = Math.min(round1(g.nether * BALANCE.carryRate), round1(income * BALANCE.carryCapTurns));
   addNether(c, round1(carried + income - g.nether));
+  g.ap = g.apMax;
   g.free = bonus(s, 'freeWhispers');
   g.boost = 0;
   deal(c);

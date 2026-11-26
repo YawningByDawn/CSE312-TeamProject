@@ -4,17 +4,18 @@ import { THREAT_SLOTS } from '../../content/threats';
 import { uiText } from '../../content/text';
 import { line } from '../panels/art';
 import { BLOOD, INK, PALE, Words, attr, div, surface } from '../kit';
-import { GOD_H } from './god';
-import { POWERS_H, POWERS_W } from './powers';
+import { CLOCK_H } from './clock';
 
 // The feed (inventory #92, 103). The day's notes one at a time, each over where it happened (the view's point of the
-// person or place, followed as it moves), or on a line under the goal when that is not on screen; replaced by the next,
+// person or place, followed as it moves), or on a line under the clock when that is not on screen; replaced by the next,
 // never a list: a heavier note stands longer and waits its turn (at most three wait), a light one is dropped while
-// others wait; a click looks at where it happened. Under the powers, a strip for each move a power has announced and the hours
+// others wait; a click looks at where it happened. Top right under the cog, a strip for each move a power has announced and the hours
 // until it lands, nearest first; a click looks at its target. Each writes only when what it shows changes.
 
-/** Under the god's corner and the goal. */
-const FEED_Y = GOD_H + 12 + 42 + 12;
+/** Under the clock. */
+const FEED_Y = CLOCK_H + 12;
+/** The announced moves' strips, top right under the cog. */
+const WARN_W = 336, WARN_Y = 56;
 const FEED_W = 560;
 /** A note standing over a thing clears its head by this much. */
 const LIFT = 6;
@@ -48,7 +49,7 @@ export class Feed {
   constructor(anchor: HTMLElement, right: HTMLElement, private readonly send: (i: Intent) => void, private readonly where: (at: Focus, out: { x: number; y: number }) => boolean) {
     this.box = div(anchor, 'hg-b hg-hit', 0, FEED_Y);
     this.box.addEventListener('click', () => { if (this.cur?.at) this.send({ kind: 'focus', focus: this.cur.at }); });
-    this.warns = div(right, 'hg-b', -POWERS_W, POWERS_H + 12);
+    this.warns = div(right, 'hg-b', -WARN_W, WARN_Y);
   }
 
   frame(vm: ViewModel): void {
@@ -71,7 +72,7 @@ export class Feed {
     this.warnings(vm);
   }
 
-  /** The note stands over where it happened while that is on screen, else on its line under the goal. */
+  /** The note stands over where it happened while that is on screen, else on its line under the clock. */
   private place(at: Focus): void {
     const on = at !== null && this.where(at, this.pt);
     const x = on ? Math.round(this.pt.x - this.size.w / 2) : 0, y = on ? Math.round(this.pt.y - this.size.h - LIFT) : FEED_Y;
@@ -106,8 +107,8 @@ export class Feed {
     this.warnKey = key;
     this.warns.replaceChildren();
     ts.forEach((t, i) => {
-      const strip = surface(this.warns, 'slab', 0, i * 46, POWERS_W, 40, 'hg-hit');
-      new Words(strip, 0, 10, 18, hours[i]! <= 3 ? BLOOD : PALE, 'center', POWERS_W).set(uiText('warn.lands', { name: uiText(`threat.${t.kind}.name`), h: hours[i]! }));
+      const strip = surface(this.warns, 'slab', 0, i * 46, WARN_W, 40, 'hg-hit');
+      new Words(strip, 0, 10, 18, hours[i]! <= 3 ? BLOOD : PALE, 'center', WARN_W).set(uiText('warn.lands', { name: uiText(`threat.${t.kind}.name`), h: hours[i]! }));
       attr(strip, 'title', uiText(`threat.${t.kind}.lands`, THREAT_SLOTS[`threat.${t.kind}.lands`]));
       const at: Focus = s.people[t.target] ? { unit: t.target } : { place: t.target };
       strip.addEventListener('click', () => this.send({ kind: 'focus', focus: at }));

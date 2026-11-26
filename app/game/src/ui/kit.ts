@@ -42,7 +42,6 @@ export function installCss(sheets: readonly Sheet[]): void {
     '.hg-row > .hg-t { position: static; }',
     '.hg-n { font-family: "Bitstream Charter", Georgia, serif; font-weight: 600; }',
     `.hg-ink { color: ${INK}; text-shadow: none; }`,
-    `.hg-veil { position: absolute; inset: 0; background: rgba(8, 6, 12, 0.55); pointer-events: none; }`,
     // the cards: a hand card rests small and rises from its foot on hover, and a touch drags it rather than pans; the
     // deal's cards come in, the kept one flies to the hand and the rest fall away
     '.hg-card { transform: scale(var(--k)); transform-origin: 50% 100%; transition: transform 0.16s ease-out; touch-action: none; }',
