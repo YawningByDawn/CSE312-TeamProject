@@ -1,6 +1,6 @@
 import { installDebug } from './app/debug';
 import { Input } from './app/input';
-import { connectAccount, connectNet } from './app/net';
+import { connectFramework } from './app/net';
 import { Pump } from './app/pump';
 import { flag } from './content/flags';
 import { SOUNDS } from './content/sounds';
@@ -14,7 +14,7 @@ import { world } from './sim/world';
 
 // Boot: the tracks behind their interfaces, one pump, one rAF frame. `?scene=play` begins a run at once (no title, no
 // opening); `?seed=N` fixes the seed; `?mute=1` mutes this load; `?fast=1` plays films eight times faster. A build
-// with `VITE_HG_NET` (the course framework's) joins its multiplayer hub, and its title logs in and out.
+// with `VITE_HG_NET` (the course framework's) logs in and out from its title, and joins the hub when logged in.
 
 const FAST_FILMS = 8;
 
@@ -23,14 +23,15 @@ const uiRoot = document.getElementById('ui') as HTMLElement;
 const seedFlag = Number(flag('seed'));
 const seed = Number.isInteger(seedFlag) && seedFlag > 0 ? seedFlag : Math.floor(Math.random() * 0x7fffffff);
 const netPath = import.meta.env.VITE_HG_NET as string | undefined;
+const framework = netPath ? connectFramework(netPath) : null;
 
 const { sim, query } = makeSim(world);
 const view = createView(canvas, window.devicePixelRatio || 1, query);
-const ui = createUi(mountPanels(netPath ? connectAccount() : null));
+const ui = createUi(mountPanels(framework?.account ?? null));
 const audio = createAudio(query, SOUNDS, flag('mute') === '1');
 const pump = new Pump({ sim, query, view, ui, audio, tickHz: TICK_HZ }, seed, flag('fast') === '1' ? FAST_FILMS : 1);
 const input = new Input(pump, view, canvas);
-installDebug(pump, sim, input, netPath ? connectNet(netPath) : null);
+installDebug(pump, sim, input, framework?.net ?? null);
 
 function resize(): void {
   const w = uiRoot.parentElement!.clientWidth;

@@ -1,13 +1,14 @@
 import type { Account, Net } from '../types';
 
-// Multiplayer: one socket to the host's hub, when the build names its path (`VITE_HG_NET`: the course framework's
-// `/ws`, authorised by its login cookie). The hub relays a `game` message to every other player, stamped with its
-// sender, and sends who is on in its `state` messages. A socket the hub refuses (not logged in) leaves the game solo;
-// one that drops after opening reconnects, unless a newer tab took the player over (`kicked`).
+// The course framework, when the build names its hub (`VITE_HG_NET`: `/ws`): its login and its multiplayer socket.
+// `/api/me` names who is logged in (`username` null: nobody); its page `/account` logs in, and `/logout` logs out.
+// Only a logged-in player opens the socket, which the login cookie authorises. The hub relays a `game` message to
+// every other player, stamped with its sender, and sends who is on in its `state` messages. A socket that drops after
+// opening reconnects, unless a newer tab took the player over (`kicked`).
 
 const RECONNECT_MS = 1000;
 
-export function connectNet(path: string): Net {
+export function connectFramework(path: string): { account: Account; net: Net } {
   const listeners: ((from: string, data: unknown) => void)[] = [];
   const net: Net = {
     players: [],
@@ -38,12 +39,6 @@ export function connectNet(path: string): Net {
       if (was && !kicked) setTimeout(connect, RECONNECT_MS);
     };
   };
-  connect();
-  return net;
-}
-
-/** The framework's login: `/api/me` names who is logged in (`username` null: nobody), its page `/account` logs in, and `/logout` logs out. */
-export function connectAccount(): Account {
   const account: Account = {
     name: null,
     logIn: () => location.assign('/account'),
@@ -51,6 +46,7 @@ export function connectAccount(): Account {
   };
   void fetch('/api/me').then(async (r) => {
     account.name = ((await r.json()) as { username: string | null }).username;
+    if (account.name !== null) connect();
   });
-  return account;
+  return { account, net };
 }
