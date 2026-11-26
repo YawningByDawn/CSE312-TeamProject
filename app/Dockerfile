@@ -7,7 +7,7 @@ RUN npm ci
 COPY game/ .
 RUN npm run build
 
-FROM golang:1.26
+FROM golang:1.26 AS build
 
 WORKDIR /app
 
@@ -15,9 +15,15 @@ COPY go.mod main.go ./
 COPY router router
 COPY token token
 COPY websocket websocket
+RUN go mod tidy && CGO_ENABLED=0 go build -o server
+
+# The image keeps only the server and the pages it serves, not the Go or Node toolchains.
+FROM debian:bookworm-slim
+
+WORKDIR /app
+COPY --from=build /app/server .
 COPY public public
 COPY --from=game /game/dist public/game
-RUN go mod tidy && go build -o server
 
 RUN useradd --system app
 USER app
