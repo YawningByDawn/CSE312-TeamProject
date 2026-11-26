@@ -22,7 +22,7 @@ function rich(): Ctx {
   const c = begin();
   const s = c.s;
   const all = Object.values(s.people);
-  for (const p of all.filter((x) => x.role === 'digger').slice(0, 9)) {
+  for (const p of all.slice(0, 9)) {
     Object.assign(p, { follower: true, routine: 'pray' });
     p.stats.devotion = 40;
     p.stats.intelligence = 20;

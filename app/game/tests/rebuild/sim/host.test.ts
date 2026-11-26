@@ -3,14 +3,18 @@
 import { describe, expect, it } from 'vitest';
 import { AT, NIGHT_TICKS, isDay, nextAt } from '../../../src/content/clock';
 import { FIRST_MINER, HOST, STATS } from '../../../src/content/stats';
+import { areaAt } from '../../../src/content/mine';
+import { DRESS } from '../../../src/content/map';
 import { makeSim } from '../../../src/sim';
 import { everyone, here, type Ctx } from '../../../src/sim/core';
 import { maxHp } from '../../../src/sim/formulas';
 import { hurt, mend } from '../../../src/sim/host';
+import { clear } from '../../../src/sim/walk';
 import { xyOf } from '../../../src/sim/world/xy';
 import type { GameEvent, GameState, Person } from '../../../src/types';
 
 const { sim, query } = makeSim();
+const AT_GRAVE = DRESS.points.graveEye;
 
 /** A run opened: the day of the first dawn begun in the first miner. */
 function begin(seed = 7): GameState {
@@ -58,23 +62,26 @@ const follower = (s: GameState): Person => {
 
 describe('the body stats', () => {
   it('everyone has the four at 1..20 averaging 10, Devotion 0 and full HP; the first miner has his table', () => {
-    const s = sim.create(7);
-    const all = everyone(s);
-    const rest = all.filter((p) => p.id !== FIRST_MINER.id);
-    const body = [(p: Person) => p.stats.dexterity, (p: Person) => p.stats.intelligence, (p: Person) => p.stats.strength, (p: Person) => p.stats.endurance];
-    for (const p of all) {
-      for (const f of body) {
-        expect(f(p)).toBeGreaterThanOrEqual(STATS.min);
-        expect(f(p)).toBeLessThanOrEqual(STATS.max);
+    const seeds = [1, 2, 3, 4, 5, 6, 7, 8];
+    const rest: Person[] = [];
+    for (const seed of seeds) {
+      const s = sim.create(seed);
+      const all = everyone(s);
+      rest.push(...all.filter((p) => p.id !== FIRST_MINER.id));
+      for (const p of all) {
+        for (const f of [p.stats.dexterity, p.stats.intelligence, p.stats.strength, p.stats.endurance]) {
+          expect(f).toBeGreaterThanOrEqual(STATS.min);
+          expect(f).toBeLessThanOrEqual(STATS.max);
+        }
+        expect([p.stats.devotion, p.stats.hp]).toEqual([0, maxHp(p.stats)]);
       }
-      expect([p.stats.devotion, p.stats.hp]).toEqual([0, maxHp(p.stats)]);
+      expect(s.people[FIRST_MINER.id]!.stats).toMatchObject(FIRST_MINER.stats);
     }
-    for (const f of body) {
+    for (const f of [(p: Person) => p.stats.dexterity, (p: Person) => p.stats.intelligence, (p: Person) => p.stats.strength, (p: Person) => p.stats.endurance]) {
       const mean = rest.reduce((n, p) => n + f(p), 0) / rest.length;
       expect(mean).toBeGreaterThan(9.5);
       expect(mean).toBeLessThan(11.5);
     }
-    expect(s.people[FIRST_MINER.id]!.stats).toMatchObject(FIRST_MINER.stats);
   });
 
   it('max HP is a base plus Strength and Endurance; Endurance mends an hour at a time', () => {
@@ -105,6 +112,19 @@ describe('the turn', () => {
     const kinds = run(s).map((e) => e.kind);
     expect(kinds).toContain('release');
     expect([s.host, s.body, isDay(s.tick)]).toEqual([FIRST_MINER.id, null, false]); // the body is let go; the plate keeps the host
+  });
+
+  it('the first miner wakes at the grave every day and after a fall; the mine holds three diggers besides him', () => {
+    const s = begin();
+    const grave = (): [string | null, boolean, number] => [areaAt(s.body!.x, s.body!.y), clear(s.body!.x, s.body!.y), Math.hypot(s.body!.x - AT_GRAVE.x, s.body!.y - AT_GRAVE.y)];
+    expect(grave().slice(0, 2)).toEqual(['grave', true]);
+    expect(grave()[2]).toBeLessThan(120);
+    hurt(ctx(s), s.people[FIRST_MINER.id]!, 1000);
+    sim.step(s);
+    expect(grave().slice(0, 2)).toEqual(['grave', true]);
+    nextDawn(s);
+    expect(grave().slice(0, 2)).toEqual(['grave', true]);
+    expect(everyone(s).filter((p) => p.role === 'digger' && p.id !== FIRST_MINER.id)).toHaveLength(3);
   });
 
   it('at a dawn with followers the clock waits for the pick: the first miner and the followers are on the list', () => {

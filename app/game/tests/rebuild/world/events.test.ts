@@ -144,7 +144,7 @@ describe('the rules echo, and the doors work', () => {
     const s = fresh(5);
     run(s, DAY_TICKS);
     const went = dayOf(s.tick);
-    const diggers = Object.values(s.people).filter((x) => x.role === 'digger').slice(0, 24);
+    const diggers = Object.values(s.people).filter((x) => x.role === 'digger');
     diggers.forEach((p, i) => Object.assign(p, { gone: i % 2 ? 'taken' : 'devoured', goneDay: went }));
     const stories = run(s, s.tick + 6 * DAY_TICKS).filter((e): e is Extract<GameEvent, { kind: 'story' }> => e.kind === 'story');
     // the burning waits out a storm
@@ -158,7 +158,7 @@ describe('the rules echo, and the doors work', () => {
         expect(dayOf(e.tick) - went, id).toBeLessThanOrEqual(hi);
       }
     }
-    expect(stories.filter((e) => e.story === 'emptyBurning').length).toBe(12);
+    expect(stories.filter((e) => e.story === 'emptyBurning').length).toBe(diggers.length / 2);
   });
 
   it('a devoured person goes missing in the talk of the rows, once while it lasts', () => {
@@ -185,7 +185,7 @@ describe('the rules echo, and the doors work', () => {
     const before = atFace();
     for (const f of faces) s.effects.push({ kind: 'crew', on: f, until: t + DAY_TICKS, value: 0 });
     run(s, t + 100);
-    expect(before).toBeGreaterThan(5);
+    expect(before).toBeGreaterThan(2);
     expect(atFace()).toBe(0);
   });
 });

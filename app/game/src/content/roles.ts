@@ -1,5 +1,5 @@
 /**
- * Every person's trade (#48): one table for the rules and the days. ~80 mine hands in 23 trades. `count` is the
+ * Every person's trade (#48): one table for the rules and the days. ~60 mine hands in 23 trades. `count` is the
  * trade's headcount in the society, the named people included.
  * Words: `role.<id>.name`, `.plural`, `.line`.
  */
@@ -37,7 +37,7 @@ const FACES: PlaceId[] = ['heartvein', 'eastworks', 'westdrift', 'lowgallery', '
 const MINE_ROUND: PlaceId[] = ['westdrift', 'cartway', 'heartvein', 'eastworks', 'sorting', 'lowgallery'];
 
 export const ROLES: Readonly<Record<RoleId, RoleDef>> = {
-  digger: r(0, [0, 0, 0, 0], FACES, 24, { labour: 'dig', quota: 3 }),
+  digger: r(0, [0, 0, 0, 0], FACES, 4, { labour: 'dig', quota: 3 }),
   hauler: r(5, [2, 2, 0, 2], ['cartway', 'lowgallery', 'eastworks'], 9, { labour: 'haul', reach: 1 }),
   sorter: r(5, [-3, 3, 3, -2], ['sorting'], 4, { labour: 'sort' }),
   timberman: r(0, [0, 0, 0, 0], ['westdrift'], 4, { rounds: ['westdrift', 'heartvein', 'eastworks', 'lowgallery', 'sump'], reach: 1 }),

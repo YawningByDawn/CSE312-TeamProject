@@ -41,7 +41,6 @@ describe('the people', () => {
 
   it('every trade at its headcount, named people in place, each with a name and a home', () => {
     expect(ps.length).toBe(Object.values(ROLES).reduce((n, r) => n + r.count, 0));
-    expect(ps.length).toBeGreaterThan(70);
     expect(new Set(ps.map((p) => p.name)).size).toBe(ps.length);
     for (const p of ps) {
       expect(p.home, p.id).toBeTruthy();
