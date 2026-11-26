@@ -110,3 +110,4 @@ One entry per solved queue row: date, row, the owner's words, what solved it, co
 - 2026-11-26 · WTGATE (rows-wtgate) · A gate on merge for you to decide whether to drop a worktree or not, combined with a schematized response to all existing worktrees like the comms meter · the WTGATE row · b06a57d
 - 2026-11-26 · WTGATE (wtgate) · A gate on merge for you to decide whether to drop a worktree or not, combined with a schematized response to all existing worktrees like the comms meter · the wt-verdicts spec; the row's State names its agent · 9b5a5bc
 - 2026-11-26 · WTGATE (rows-unwtgate) · Uh this is not game code why'd you put it in queue. Delegate the job to the host · the WTGATE row and its wt-verdicts item leave the game's queue · 1183f87
+- 2026-11-26 · - (host-rule) · Contractize what I said too. Generally. What goes where · one rule in docs/contracts/session.md, Agents · 8a89443
