@@ -8,7 +8,7 @@ import (
 
 const (
 	gracePeriod = 10 * time.Second
-	speed       = 5.0
+	speed       = 100.0 // px a second, whatever the tick rate
 )
 
 type client struct {
@@ -36,7 +36,8 @@ var (
 // RunHub owns all live state. Everything else talks to it through the channels above.
 func RunHub() {
 	players := map[string]*player{}
-	ticker := time.NewTicker(time.Second / time.Duration(tickRate()))
+	rate := tickRate()
+	ticker := time.NewTicker(time.Second / time.Duration(rate))
 	for {
 		select {
 		case c := <-joinChan:
@@ -68,12 +69,12 @@ func RunHub() {
 				p.dx, p.dy = clamp(in.msg.DX), clamp(in.msg.DY)
 			}
 		case <-ticker.C:
-			tick(players)
+			tick(players, speed/float64(rate))
 		}
 	}
 }
 
-func tick(players map[string]*player) {
+func tick(players map[string]*player, step float64) {
 	states := []playerState{}
 	for name, p := range players {
 		if p.client == nil {
@@ -82,8 +83,8 @@ func tick(players map[string]*player) {
 			}
 			continue
 		}
-		p.x += p.dx * speed
-		p.y += p.dy * speed
+		p.x += p.dx * step
+		p.y += p.dy * step
 		states = append(states, playerState{Name: name, X: p.x, Y: p.y})
 	}
 
@@ -120,5 +121,5 @@ func tickRate() int {
 	if n, err := strconv.Atoi(os.Getenv("TICK_RATE")); err == nil && n > 0 {
 		return n
 	}
-	return 20
+	return 10
 }
