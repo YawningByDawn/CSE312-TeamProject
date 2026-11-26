@@ -48,7 +48,7 @@ export class Look {
   hi: Texture | null = null;
   private asked = false;
   constructor(readonly d: LookData, private readonly pages: readonly (Texture | undefined)[], readonly loAt: readonly [number, number, number], extra: number[]) {
-    this.body = { hk: d.hk, hunch: extra[0]!, tilt: extra[1]!, seed: extra[2]!, kit: d.kit, rest: d.rest, rainHood: d.rainHood };
+    this.body = { hk: d.hk, hunch: extra[0]!, tilt: extra[1]!, seed: extra[2]!, kit: d.kit, rest: d.rest, rainHood: d.rainHood, outline: 'o:tr' in d.parts };
     for (const [name, vs] of Object.entries(d.parts)) this.variants[nameId(name)] = vs;
   }
   /** its page of low-detail pictures, once loaded */

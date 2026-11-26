@@ -28,6 +28,9 @@ export function holdIds(h: Hold): HoldIds {
   return { near: h.near ? P('pn:' + h.near) : -1, far: h.far ? P('pf:' + h.far) : -1, back: h.back ? P('ld:' + h.back) : -1, ground: h.ground ? P('pg:' + h.ground) : -1 };
 }
 export const LANTERN = P('pn:lantern');
+const OUTLINE: number[] = [];
+/** part `id`'s outline, `o:<name>` (an outlined look's: its silhouette grown, drawn behind the whole figure) */
+export const outlineId = (id: number): number => (OUTLINE[id] ??= nameId('o:' + NAME_LIST[id]!));
 
 /** Bins of up to five, packed (each -6..57) into one small integer (under 2^30): a part's variant key. */
 export const pack = (a = 0, b = 0, c = 0, d = 0, e = 0): number => ((((a + 6) * 64 + b + 6) * 64 + c + 6) * 64 + d + 6) * 64 + e + 6;
