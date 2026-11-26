@@ -48,7 +48,9 @@ Host nginx terminates HTTPS and forwards to the compose stack on `127.0.0.1:8080
    sudo rm /etc/nginx/sites-enabled/default
    sudo nginx -t && sudo systemctl reload nginx
    ```
-6. Start the app, and run the same command to redeploy after pushing changes:
+6. Link the deploy command once, from the repo's folder, then run `deploy` from anywhere to start the app and to redeploy main after pushing changes:
    ```
-   sh deploy/deploy.sh
+   chmod +x deploy/deploy.sh
+   sudo ln -sf "$PWD/deploy/deploy.sh" /usr/local/bin/deploy
+   deploy
    ```
