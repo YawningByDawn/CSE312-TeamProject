@@ -1,4 +1,4 @@
-import type { CardId, GameState, Intent, ViewModel } from '../../types';
+import type { CardId, GameState, Intent, Query, ViewModel } from '../../types';
 import { CARDS, cardSlots } from '../../content/cards';
 import { uiText } from '../../content/text';
 import { cardFee, evilBonus } from '../../sim/cards';
@@ -11,8 +11,9 @@ import { POUCH_W } from './pouch';
 // The cards (inventory #113, DECISIONS §43). The hand, bottom centre: up to five plates resting small, a card rising on
 // hover; after the first card of a night each carries the Nether fee, and a card you cannot pay for rests dim. A card
 // dragged follows the pointer and the discard zone shows on the right: dropped on the field it plays through the pay
-// slab (rb-panels), as 1..9 does; dropped back on the hand it returns; dropped on the zone it is discarded. The deal,
-// dealt at dusk once the panels close: its cards large over the dimmed world; take one (1..3) into the hand, or none
+// slab (rb-panels), as 1..9 does; dropped back on the hand it returns; dropped on the zone it is discarded. By day the hand rests dim
+// whole (the day passes by itself: the sim refuses every card until dusk), no card can be pressed, and the plate says why.
+// The deal, dealt at dusk once the panels close: its cards large over the dimmed world; take one (1..3) into the hand, or none
 // (Esc, 0), or redraw them.
 // Each rebuilds only when its key changes; at rest neither writes.
 
@@ -44,8 +45,18 @@ function plate(parent: HTMLElement, s: Readonly<GameState>, id: CardId, x: numbe
   return box;
 }
 
-/** A card's tip: its name and line, then its details. */
-const tipOf = (id: CardId): string => ['name', 'line', 'details'].map((k) => uiText(`card.${id}.${k}`, cardSlots(id))).join('\n');
+/** A card's tip: its name and line, then its details; a resting hand's reason comes second. */
+function tipOf(id: CardId, idle: string | null): string {
+  const [name, line, details] = ['name', 'line', 'details'].map((k) => uiText(`card.${id}.${k}`, cardSlots(id)));
+  return (idle ? [name, idle, line, details] : [name, line, details]).join('\n');
+}
+
+/** Why no card can be acted on now, in the sim's words (null: the hand is the player's). Its answer to a discard stands for the hand. */
+export function handIdle(q: Query, s: Readonly<GameState>): string | null {
+  const card = s.god.hand[0];
+  const why = card ? q.check(s, { type: 'discard', card }).why[0] : undefined;
+  return why ? uiText(why.key, why.slots) : null;
+}
 
 const inside = (r: DOMRect, e: PointerEvent): boolean => e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
 
@@ -62,6 +73,8 @@ export class Hand {
   private ids: CardId[] = [];
   private live = false;
   private nether = -1;
+  /** Why the hand rests (null: it does not). */
+  private idle: string | null = null;
   private malice = -1;
   private phase = '';
 
@@ -71,7 +84,7 @@ export class Hand {
   private readonly trash: HTMLDivElement;
 
   /** `half`: design px from the screen's centre to the margin at its side; `k`: screen px per design px. */
-  constructor(anchor: HTMLElement, private readonly send: (i: Intent) => void, private readonly pay: (card: CardId) => void, private readonly half: () => number, private readonly k: () => number) {
+  constructor(anchor: HTMLElement, private readonly send: (i: Intent) => void, private readonly q: Query, private readonly pay: (card: CardId) => void, private readonly half: () => number, private readonly k: () => number) {
     this.el = div(anchor, 'hg-b');
     this.trash = surface(anchor, 'violet', 0, TRASH_Y, TRASH_W, TRASH_H);
     new Words(this.trash, 0, 30, 28, PALE, 'center', TRASH_W).set(uiText('hand.trash'));
@@ -88,16 +101,19 @@ export class Hand {
 
   frame(vm: ViewModel): void {
     const s = vm.state, g = s.god;
-    this.live = s.phase === 'live' && !g.deal && !vm.menu && !vm.title && !vm.film;
-    // the hand, the fee, Malice's multiplier and the band move with events, Nether and the screen; the key is read only then
+    // the hand, the fee, Malice's multiplier, whether the sim lets a card move and the band change with events, Nether and the screen; read only then
     const band = Math.floor(2 * (this.half() - Math.max(CLOCK_W, POUCH_W) - CLEAR));
-    if (vm.fresh.length === 0 && g.nether === this.nether && g.malice === this.malice && s.phase === this.phase && band === this.band) return;
+    const moved = vm.fresh.length > 0 || g.nether !== this.nether || g.malice !== this.malice || s.phase !== this.phase || band !== this.band;
+    if (moved) this.idle = handIdle(this.q, s);
+    const idle = this.idle;
+    this.live = s.phase === 'live' && !g.deal && !vm.menu && !vm.title && !vm.film && idle === null;
+    if (!moved) return;
     this.nether = g.nether;
     this.malice = g.malice;
     this.phase = s.phase;
     this.band = band;
     const fee = cardFee(s);
-    const key = `${g.hand.join()}|${fee}|${fee > g.nether}|${evilBonus(g.malice)}|${s.phase}|${band}`;
+    const key = `${g.hand.join()}|${fee}|${fee > g.nether}|${idle}|${evilBonus(g.malice)}|${s.phase}|${band}`;
     if (key === this.key) return;
     this.key = key;
     this.ids = g.hand.slice();
@@ -111,21 +127,21 @@ export class Hand {
       const slot = div(this.el, 'hg-b hg-hit hg-card', x - CARD_W / 2, -CARD_H, CARD_W, CARD_H);
       slot.style.setProperty('--k', String(REST * k));
       plate(slot, s, id, 0, 0);
-      attr(slot, 'title', tipOf(id));
+      attr(slot, 'title', tipOf(id, idle));
       if (fee > 0) {
         const tag = surface(slot, 'inktab', CARD_W - 70, -16, 82, 46, 'hg-hit');
         new Pic(tag, 22, 23, 'nether');
         new Words(tag, 40, 8, 30, PALE).num().set(String(fee));
         attr(tag, 'title', uiText('hand.extraCardTip'));
       }
-      if (fee > g.nether) {
+      if (idle !== null || fee > g.nether) {
         slot.classList.add('hg-rest');
         cell(slot, 'ui', 'card.dim', 0, 0, 0.5);
-        new Words(surface(slot, 'inktab', 12, 88, CARD_W - 24, 30), 0, 6, 17, PALE, 'center', CARD_W - 24).set(uiText('why.nether', { n: fee }));
-        attr(slot, 'title', `${uiText(`card.${id}.name`)}\n${uiText('hand.extraCardCost', { n: fee })}`);
+        new Words(surface(slot, 'inktab', 12, 88, CARD_W - 24, 30), 0, 6, 17, PALE, 'center', CARD_W - 24).set(idle ?? uiText('why.nether', { n: fee }));
+        if (idle === null) attr(slot, 'title', `${uiText(`card.${id}.name`)}\n${uiText('hand.extraCardCost', { n: fee })}`);
       }
       slot.addEventListener('pointerdown', (e) => {
-        if (e.isPrimary && e.button === 0) this.drag = { id, slot, x: e.clientX, y: e.clientY, home: null };
+        if (e.isPrimary && e.button === 0 && idle === null) this.drag = { id, slot, x: e.clientX, y: e.clientY, home: null };
       });
     });
   }
@@ -224,7 +240,7 @@ export class Deal {
     this.deal.forEach((id, i) => {
       const box = div(this.el, 'hg-b hg-hit hg-big hg-dealt', -total / 2 + i * (w + gap), top + 86, w, h);
       box.style.animationDelay = `${i * 110}ms`;
-      attr(box, 'title', tipOf(id));
+      attr(box, 'title', tipOf(id, null));
       const p = plate(box, s, id, 0, 0).style;
       p.transformOrigin = '0 0';
       p.transform = `scale(${BIG})`;

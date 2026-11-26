@@ -102,7 +102,7 @@ export function createUi(mountPanels?: MountPanels): Ui {
       // the hand stays over the deal's veil: a full hand discards before it takes
       at.bc.style.zIndex = '1';
       // the hand's half of the screen, in design px from its centre to the margin
-      const hand = new Hand(at.bc, send, (card) => panels?.pay(card), () => (w / 2 - MARGIN) / k, () => k);
+      const hand = new Hand(at.bc, send, q, (card) => panels?.pay(card), () => (w / 2 - MARGIN) / k, () => k);
       const deal = new Deal(at.c, send, () => open(panelAt.c), () => hand.el);
       if (mountPanels) panels = mountPanels(panelAt, send, q, from('c'));
       const [, menuAt] = layer(hud);
