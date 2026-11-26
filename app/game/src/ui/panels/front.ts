@@ -170,7 +170,7 @@ export class Title implements Panel {
       const corner = new Words(root, 282, -432, 20, 'rgba(236,226,204,0.72)', 'right', 500);
       corner.el.classList.add('hg-hit');
       corner.set(name === null ? uiText('title.logIn') : uiText('title.logOut', { name }));
-      corner.el.addEventListener('click', name === null ? account.logIn : account.logOut);
+      corner.el.addEventListener('click', name === null ? this.c.signIn : account.logOut);
     }
   }
 

@@ -17,12 +17,11 @@ COPY token token
 COPY websocket websocket
 RUN go mod tidy && CGO_ENABLED=0 go build -o server
 
-# The image keeps only the server and the pages it serves, not the Go or Node toolchains.
+# The image keeps only the server and the game it serves, not the Go or Node toolchains.
 FROM debian:bookworm-slim
 
 WORKDIR /app
 COPY --from=build /app/server .
-COPY public public
 COPY --from=game /game/dist public/game
 
 RUN useradd --system app

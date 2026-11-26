@@ -13,6 +13,7 @@ import { Defeat, Ending, Title } from './front';
 import { Grave, Pay } from './grave';
 import { Host } from './host';
 import { Person } from './person';
+import { SignIn } from './sign';
 
 // Each panel says what it shows now as one key, and is built again only when that key changes; its key carries `ctx.rev`, which moves when the
 // state can have moved (fresh events, a whole action point, the hour) or a panel's own choice moved. The first open panel
@@ -34,6 +35,8 @@ export interface Ctx {
   redraw(): void;
   /** The framework's login, in a build that has one. */
   account: Account | null;
+  /** The login popup over whatever stands (a lobby's way in for a player not logged in). */
+  signIn(): void;
 }
 
 export interface Panel {
@@ -52,8 +55,10 @@ export interface Panels extends Part { pay(card: CardId): void }
 export const mountPanels = (account: Account | null): MountPanels => (at, send, q, where) => {
   document.head.appendChild(document.createElement('style')).textContent = panelCss();
   let hour = -1, ap = -1;
+  const sign = account && new SignIn(account, div(at.c, 'hg-b'));
   const ctx: Ctx = {
     send, q, at, where, rev: 0, account,
+    signIn: () => sign?.show(),
     act: (action) => send({ kind: 'act', action }),
     focus: (focus) => send({ kind: 'focus', focus }),
     redraw: () => { ctx.rev += 1; },
@@ -96,7 +101,7 @@ export const mountPanels = (account: Account | null): MountPanels => (at, send, 
 
   window.addEventListener('keydown', (e) => {
     // a menu stands over the panels: its keys are the menu's
-    if (!vmNow || vmNow.menu) return;
+    if (!vmNow || vmNow.menu || sign?.shown) return;
     const i = sync(vmNow);
     if (i >= 0 && list[i]!.press?.(e, vmNow)) {
       e.preventDefault();

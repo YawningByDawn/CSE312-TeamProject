@@ -9,7 +9,6 @@ import (
 )
 
 func Setup(app *fiber.App) {
-	app.Get("/account", func(c fiber.Ctx) error { return c.SendFile("./public/index.html") })
 	app.Get("/api/me", me)
 	// /game and every path under it redirect to the root, where the game is.
 	app.Use("/game", func(c fiber.Ctx) error { return c.Redirect().To("/") })

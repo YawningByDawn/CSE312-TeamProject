@@ -11,8 +11,8 @@ import { mountPanels } from './ui/panels';
 import { createView } from './view';
 
 // Boot: the tracks behind their interfaces, one pump, one rAF frame. `?scene=play` begins a run at once (no title, no
-// opening); `?seed=N` fixes the seed; `?mute=1` mutes this load; `?fast=1` plays films eight times faster. A build
-// with `VITE_HG_NET` (the course framework's) logs in and out from its title, and joins the hub when logged in.
+// opening); `?seed=N` fixes the seed; `?mute=1` mutes this load; `?fast=1` plays films eight times faster. The title logs in and out (the auth service's paths); a build
+// with `VITE_HG_NET` (the course framework's) also asks who is logged in and joins the hub when logged in.
 
 const FAST_FILMS = 8;
 
@@ -21,16 +21,16 @@ const uiRoot = document.getElementById('ui') as HTMLElement;
 const seedFlag = Number(flag('seed'));
 const seed = Number.isInteger(seedFlag) && seedFlag > 0 ? seedFlag : Math.floor(Math.random() * 0x7fffffff);
 const netPath = import.meta.env.VITE_HG_NET as string | undefined;
-const framework = netPath ? connectFramework(netPath) : null;
+const framework = connectFramework(netPath);
 
 const { sim, query } = makeSim();
 const muted = flag('mute') === '1';
 const view = createView(canvas, window.devicePixelRatio || 1, query, muted);
-const ui = createUi(mountPanels(framework?.account ?? null));
+const ui = createUi(mountPanels(framework.account));
 const audio = createAudio(query, SOUNDS, muted);
 const pump = new Pump({ sim, query, view, ui, audio }, seed, flag('fast') === '1' ? FAST_FILMS : 1);
 const input = new Input(pump, view, canvas);
-installDebug(pump, sim, input, framework?.net ?? null);
+installDebug(pump, sim, input, framework.net);
 
 function resize(): void {
   const w = uiRoot.parentElement!.clientWidth;
