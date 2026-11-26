@@ -13,14 +13,13 @@
     <button data-path="/register">Register</button>
   </form>
   <button id="logout" hidden>Logout</button>
-  <p><a id="play" href="/game/" hidden>Play Hungry God Inc.</a></p>
+  <p><a href="/game/">Back to the game</a></p>
   <canvas id="world" width="800" height="600" style="border: 1px solid #ccc" hidden></canvas>
 
   <script>
     const statusText = document.getElementById("status");
     const form = document.getElementById("auth-form");
     const logoutButton = document.getElementById("logout");
-    const playLink = document.getElementById("play");
     const canvas = document.getElementById("world");
     const ctx = canvas.getContext("2d");
     const keys = {};
@@ -37,14 +36,14 @@
     }
 
     async function refresh() {
-      const res = await fetch("/api/me");
-      statusText.textContent = res.ok ? "Logged in as " + (await res.json()).username : "Not logged in";
-      form.hidden = res.ok;
-      logoutButton.hidden = !res.ok;
-      playLink.hidden = !res.ok;
-      canvas.hidden = !res.ok;
-      if (res.ok && !socket) connect();
-      if (!res.ok && socket) socket.close();
+      const { username } = await (await fetch("/api/me")).json();
+      const loggedIn = username !== null;
+      statusText.textContent = loggedIn ? "Logged in as " + username : "Not logged in";
+      form.hidden = loggedIn;
+      logoutButton.hidden = !loggedIn;
+      canvas.hidden = !loggedIn;
+      if (loggedIn && !socket) connect();
+      if (!loggedIn && socket) socket.close();
     }
 
     function connect() {
@@ -104,7 +103,7 @@
         statusText.textContent = result.data.error || "Request failed";
         return;
       }
-      refresh();
+      location.assign("/game/");
     });
 
     logoutButton.addEventListener("click", async () => {

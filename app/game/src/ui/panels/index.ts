@@ -1,4 +1,4 @@
-import type { Action, CardId, Focus, Intent, Query, ViewModel } from '../../types';
+import type { Account, Action, CardId, Focus, Intent, Query, ViewModel } from '../../types';
 import type { Anchors, MountPanels, Part, Where } from '../index';
 import { div } from '../kit';
 import { panelCss } from './art';
@@ -27,6 +27,8 @@ export interface Ctx {
   rev: number;
   /** A panel's own choice moved (a stone picked, a mode): build again. */
   redraw(): void;
+  /** The framework's login, in a build that has one. */
+  account: Account | null;
 }
 
 export interface Panel {
@@ -42,11 +44,11 @@ export interface Panel {
 /** The panels' frame, and the miracle a card plate asks to pay for (rb-hud's hand calls it). */
 export interface Panels extends Part { pay(card: CardId): void }
 
-export const mountPanels: MountPanels = (at, send, q, where) => {
+export const mountPanels = (account: Account | null): MountPanels => (at, send, q, where) => {
   document.head.appendChild(document.createElement('style')).textContent = panelCss();
   let hour = -1, ap = -1;
   const ctx: Ctx = {
-    send, q, at, where, rev: 0,
+    send, q, at, where, rev: 0, account,
     act: (action) => send({ kind: 'act', action }),
     focus: (focus) => send({ kind: 'focus', focus }),
     redraw: () => { ctx.rev += 1; },

@@ -253,6 +253,13 @@ export interface Net {
   onGame(f: (from: string, data: unknown) => void): void;
 }
 
+/** The framework's login: who is logged in (null until it answers, or nobody), and the ways in and out. */
+export interface Account {
+  name: string | null;
+  logIn(): void;
+  logOut(): void;
+}
+
 /** One function's cost, per frame (or per sim tick): mean over the window, its worst frame, its share of the callback. */
 export interface ProfRow {
   /** `name (file:line)`, file relative to src. */

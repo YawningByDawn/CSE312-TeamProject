@@ -9,15 +9,17 @@ import (
 )
 
 func Setup(app *fiber.App) {
-	app.Get("/", func(c fiber.Ctx) error { return c.SendFile("./public/index.html") })
+	app.Get("/", func(c fiber.Ctx) error { return c.Redirect().To("/game/") })
+	app.Get("/account", func(c fiber.Ctx) error { return c.SendFile("./public/index.html") })
 	app.Get("/api/me", me)
 	app.Use("/game", static.New("./public/game"))
 }
 
+// me names who is logged in; a username of null means nobody.
 func me(c fiber.Ctx) error {
 	username, err := token.Verify(c.Cookies("authToken"))
 	if err != nil {
-		return c.SendStatus(fiber.StatusUnauthorized)
+		return c.JSON(fiber.Map{"username": nil})
 	}
 	return c.JSON(fiber.Map{"username": html.EscapeString(username)})
 }

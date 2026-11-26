@@ -16,6 +16,8 @@ export const PANEL_WORDS: Readonly<Record<string, string>> = {
   'title.soundOff': 'Sound is off. Click to turn it on.',
   'title.soundOn': 'Sound is on. Click to mute.',
   'title.quiet': 'Best with headphones, in the dark.',
+  'title.logIn': 'Log in',
+  'title.logOut': '{name} · Log out',
 
   'defeat.kicker': 'Day {n} · the god is gone',
   'defeat.kickerBare': 'The god is gone',

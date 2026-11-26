@@ -94,7 +94,7 @@ export class Title implements Panel {
   }
 
   key(vm: ViewModel): string | null {
-    return vm.title ? `title|${vm.saved}|${vm.settings.master > 0}` : null;
+    return vm.title ? `title|${vm.saved}|${vm.settings.master > 0}|${this.c.account?.name}` : null;
   }
 
   build(root: HTMLElement, vm: ViewModel): void {
@@ -162,6 +162,15 @@ export class Title implements Panel {
     const on = vm.settings.master > 0;
     const sound = item(foot, 0, -6, 22, on ? '♪' : '–', '', () => send({ kind: 'settings', patch: { master: on ? 0 : 1 } }));
     attr(sound, 'title', uiText(on ? 'title.soundOn' : 'title.soundOff'));
+
+    const account = this.c.account;
+    if (account) {
+      const name = account.name;
+      const corner = new Words(root, 282, -432, 20, 'rgba(236,226,204,0.72)', 'right', 500);
+      corner.el.classList.add('hg-hit');
+      corner.set(name === null ? uiText('title.logIn') : uiText('title.logOut', { name }));
+      corner.el.addEventListener('click', name === null ? account.logIn : account.logOut);
+    }
   }
 
   press(e: KeyboardEvent): boolean {

@@ -1,4 +1,4 @@
-import type { Net } from '../types';
+import type { Account, Net } from '../types';
 
 // Multiplayer: one socket to the host's hub, when the build names its path (`VITE_HG_NET`: the course framework's
 // `/ws`, authorised by its login cookie). The hub relays a `game` message to every other player, stamped with its
@@ -40,4 +40,17 @@ export function connectNet(path: string): Net {
   };
   connect();
   return net;
+}
+
+/** The framework's login: `/api/me` names who is logged in (`username` null: nobody), its page `/account` logs in, and `/logout` logs out. */
+export function connectAccount(): Account {
+  const account: Account = {
+    name: null,
+    logIn: () => location.assign('/account'),
+    logOut: () => void fetch('/logout', { method: 'POST' }).then(() => location.reload()),
+  };
+  void fetch('/api/me').then(async (r) => {
+    account.name = ((await r.json()) as { username: string | null }).username;
+  });
+  return account;
 }
