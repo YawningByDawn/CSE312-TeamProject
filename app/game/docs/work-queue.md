@@ -12,3 +12,6 @@ The specs for the owner's open orders: each item is one task an agent starts wit
 
 | Item | Row | Open |
 |---|---|---|
+| cards-fix | PLAY | Playing and discarding a card does nothing on current main: find why (input, the hand's drag/click, the sim's play and discard, the night's action points) and fix it at the root. A test that plays and discards through the same path the UI uses, red before and green after; a browser run that plays and discards a card at night, its shots looked at. A bug fix: lands without a card. |
+| miners | PLAY | The mine holds 3 miners besides the possessed host (today far more). The first host (the first miner) spawns near the grave each day, not elsewhere. Numbers in the sim's tables (DECISIONS.md). Bots `python tools/bots.py --timeout 7200 -- 500 all --md` before and after, reported, no retune. Shots of the mine at dawn looked at; a card `miners`. |
+| enemy-outline | PLAY | Enemies (skeletons) carry a thin red outline. Baked into their frames offline (nothing draws live), every frame and facing. Shots in the mine beside a miner, looked at; a card `enemy-outline`. |
