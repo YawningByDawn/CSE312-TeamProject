@@ -2,14 +2,15 @@
 // a quiet tick allocates nothing; the god's day formulas exactly as the spec states them.
 import { describe, expect, it } from 'vitest';
 import { BALANCE, PROFANE, TIES } from '../../../src/content/balance';
-import { area, remove, type Ctx } from '../../../src/sim/core';
+import { area, everyone, here, remove, type Ctx } from '../../../src/sim/core';
+import { xyOf } from '../../../src/sim/world/xy';
 import { AT, DAY_TICKS, NIGHT_TICKS, dayOf, isDay, tod } from '../../../src/content/clock';
 import { cardFee, evilShare } from '../../../src/sim/cards';
 import { decayAt, emberAt, hungerRise, maliceRise, netherIncome } from '../../../src/sim/god';
 import { makeSim } from '../../../src/sim';
 import type { Action, GameEvent, GameState, Sim } from '../../../src/types';
 
-/** The script: pass each deal, then try the first whisper the rules allow each fiftieth step; sleep whenever the clock stands. */
+/** The script: pass each deal, then try the first mark (by day) or whisper (by night) the rules allow each fiftieth step; sleep whenever the clock stands. */
 function play(sim: Sim, s: GameState, ticks: number, log: Action[]): void {
   for (let i = 0; i < ticks && s.phase === 'live'; i++) {
     if (s.pending?.kind === 'blessing') act(sim, s, { type: 'pickBlessing', blessing: s.pending.offers[0]! }, log);
@@ -17,6 +18,9 @@ function play(sim: Sim, s: GameState, ticks: number, log: Action[]): void {
     if (s.god.deal) act(sim, s, { type: 'take', card: null }, log);
     if (s.body === null && isDay(s.tick)) act(sim, s, sim.legal(s).find((a) => a.type === 'possess')!, log);
     if (i % 50 === 0) {
+      // the first miner wakes at the grave: the script walks him to the first stranger so a mark is in reach
+      const near = everyone(s).find((p) => !p.follower && p.id !== s.host && here(p));
+      if (s.body && near) Object.assign(s.body, xyOf(near, s.tick));
       const w = sim.legal(s).find((a) => a.type === (isDay(s.tick) ? 'mark' : 'whisper'));
       if (w) act(sim, s, w, log);
     }
@@ -227,7 +231,7 @@ describe('the turn: the night is the player\'s, the day passes by itself', () =>
     const { sim, s } = night(9);
     sim.act(s, { type: 'sleep' });
     run(sim, s);
-    expect(sim.legal(s).every((a) => a.type === 'mark' || a.type === 'work')).toBe(true);
+    expect(sim.legal(s).every((a) => a.type === 'mark' || a.type === 'work' || a.type === 'possess')).toBe(true);
     expect(sim.act(s, { type: 'whisper', target: Object.keys(s.people)[0]! }).why).toEqual([{ key: 'why.day' }]);
   });
 
@@ -307,7 +311,8 @@ describe("a going's ties notice (TIES)", () => {
   const setup = (seed: number) => {
     const { sim } = makeSim();
     const s = begin(sim, seed);
-    const p = Object.values(s.people).find((x) => x.ties.length >= 2)!;
+    const p = Object.values(s.people).find((x) => !x.follower && x.ties.filter((id) => !s.people[id]!.follower).length >= 2)!;
+    p.ties = p.ties.filter((id) => !s.people[id]!.follower);
     const [mine, theirs] = p.ties.map((id) => s.people[id]!);
     Object.assign(mine!, { follower: true, routine: 'pray', trait: 'curious' });
     mine!.stats.devotion = 50;

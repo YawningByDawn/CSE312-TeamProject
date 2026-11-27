@@ -157,12 +157,11 @@ export const FAMILIES: readonly string[] = ['digger', 'hauler', 'sorter', 'keepe
 export const MOB_FAMILY = 'skeleton';
 
 /** The look family a trade is drawn from. */
-export function familyOf(role: RoleId, id: UnitId): string {
+export function familyOf(role: RoleId): string {
   const r = ROLES[role]!;
   if (r.labour === 'dig') return 'digger';
   if (r.labour === 'haul') return 'hauler';
   if (r.labour === 'sort') return 'sorter';
   if (r.serves === 'temple') return 'keeper';
-  if (r.serves === 'council') return r.standing === 'elite' ? 'overseer' : 'guard';
-  return (['digger', 'hauler', 'sorter'] as const)[Math.floor(hash(id) * 3)]!;
+  return r.standing === 'elite' ? 'overseer' : 'guard';
 }

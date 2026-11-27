@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { DAY_TICKS, sinceDawn, dayOf } from '../../../src/content/clock';
 import { DAY } from '../../../src/content/day';
-import { BAD, WORLD_WORDS } from '../../../src/content/names';
+import { PEOPLE } from '../../../src/content/people';
 import { ROLES } from '../../../src/content/roles';
 import { NEIGHBOURS, PLACES } from '../../../src/content/world';
 import { area } from '../../../src/sim/core';
@@ -39,18 +39,10 @@ describe('the people', () => {
   const s = fresh(7);
   const ps = Object.values(s.people);
 
-  it('every trade at its headcount, named people in place, each with a name and a home', () => {
-    expect(ps.length).toBe(Object.values(ROLES).reduce((n, r) => n + r.count, 0));
-    expect(ps.length).toBeGreaterThan(70);
+  it('the named people only, each in their trade and place with a name and a home', () => {
+    expect(ps.map((p) => p.id).sort()).toEqual(PEOPLE.map((p) => p.id).sort());
     expect(new Set(ps.map((p) => p.name)).size).toBe(ps.length);
-    for (const p of ps) {
-      expect(p.home, p.id).toBeTruthy();
-      if (p.id.startsWith('u')) {
-        expect(ROLES[p.role]!.work, p.id).toContain(p.work);
-        expect(BAD.has(p.name) || WORLD_WORDS.has(p.name.toLowerCase()), p.name).toBe(false);
-        expect(p.name.length >= 3 && p.name.length <= 7, p.name).toBe(true);
-      }
-    }
+    for (const p of ps) expect(p.home, p.id).toBeTruthy();
     expect(s.people.g17!.work).toBe('overseer');
   });
 
@@ -66,7 +58,7 @@ describe('the people', () => {
 describe('a seeded week', () => {
   const s = fresh(7);
   const ps = Object.values(s.people);
-  const dayHands = ps.filter((p) => !ROLES[p.role]!.rounds && ROLES[p.role]!.labour === 'dig');
+  const dayHands = ps.filter((p) => ROLES[p.role]!.labour === 'dig');
   const sleepers = ps.filter((p) => !ROLES[p.role]!.watches);
   const abed: Person[][] = [];
   const faces = new Map<number, number>();
@@ -104,16 +96,16 @@ describe('a seeded week', () => {
   });
 
   it('every walk is a route on the world graph', () => {
-    expect(walks).toBeGreaterThan(1000);
+    expect(walks).toBeGreaterThan(ps.length * 15);
     expect(badHops).toBe(0);
   });
 
   it('each weekday has its rhythm: rest empties the faces, the Flame fills the shrine', () => {
     expect(calendarOf(7).kind).toBe('rest');
-    // a rest day keeps `restCrew` of the diggers at the face: about half of 24, give or take a sampling sigma
+    // a rest day keeps `restCrew` of the diggers at the face: about half of the four, give or take a sampling sigma
     expect(faces.get(7)!).toBeLessThanOrEqual(DAY.restCrew + 0.1);
     expect(calendarOf(6).kind).toBe('flame');
-    expect(pray.get(6)!).toBeGreaterThan(pray.get(1)! * 3);
+    expect(pray.get(6)!).toBeGreaterThan(pray.get(1)! * 2);
   });
 
   it('a dawn save continues identically', () => {

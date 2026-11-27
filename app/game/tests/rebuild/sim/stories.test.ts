@@ -22,7 +22,8 @@ function rich(): Ctx {
   const c = begin();
   const s = c.s;
   const all = Object.values(s.people);
-  for (const p of all.filter((x) => x.role === 'digger').slice(0, 9)) {
+  // every other hand: a follower and a stranger share a face (g03, g04), and four strangers are left
+  for (const p of all.filter((_, i) => i % 2 === 0)) {
     Object.assign(p, { follower: true, routine: 'pray' });
     p.stats.devotion = 40;
     p.stats.intelligence = 20;
@@ -53,6 +54,14 @@ describe('story events', () => {
       }
     }
     expect(TOLD.filter((id) => !told.has(id))).toEqual([]);
+  });
+
+  it('no story casts the god\'s own host: the first miner, the weakest and not yours, is spared', () => {
+    const c = rich();
+    const host = c.s.people[c.s.host!]!;
+    host.follower = false;
+    for (const id of ['caveIn', 'deathInTunnels', 'informer', 'railAccident', 'lettersFromFront', 'beggedBlessing'] as const)
+      for (let i = 0; i < 30; i++) expect(RULES[id]!.cast(c.s)?.unit, id).not.toBe(host.id);
   });
 
   it('a told story rests its cooldown; a once-a-run story never comes back', () => {

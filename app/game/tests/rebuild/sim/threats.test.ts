@@ -24,7 +24,7 @@ function temple(c: Ctx, heat: number): void {
 describe("the powers' moves", () => {
   it('the Temple crossing into level 3 calls the purge: at dusk it burns a follower, their ties soften, it spends its heat', () => {
     const c = begin();
-    const ids = Object.keys(c.s.people).slice(0, 6);
+    const ids = Object.keys(c.s.people).filter((_, i) => i % 5 === 0);
     turn(c.s, ids);
     temple(c, 80);
     const t = c.s.threats.find((x) => x.kind === 'purge')!;

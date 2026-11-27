@@ -8,6 +8,7 @@ import { DAY_TICK_S, dayOf } from '../content/clock';
 import { GRADE_VALUE, GRADES } from '../content/crystals';
 import { DROP, MINING, ORE_SITES, POCKET, areaAt } from '../content/mine';
 import { ROLES } from '../content/roles';
+import { FIRST_MINER } from '../content/stats';
 import { addHeat, area, cash, digs, ev, type Ctx } from './core';
 import { act } from './colour';
 import { newCrystal, tierOf } from './crystals';
@@ -17,9 +18,9 @@ import { walk } from './walk';
 import { xyOf } from './world/xy';
 import type { Body, GameState, Person, Reason } from '../types';
 
-/** A body for `p` where they stand now, resting. */
+/** A body for `p` resting: the first miner's at the grave, a follower's where they stand now. */
 export function spawn(s: Readonly<GameState>, p: Readonly<Person>): Body {
-  const { x, y } = xyOf(p, s.tick);
+  const { x, y } = p.id === FIRST_MINER.id ? FIRST_MINER.wakes : xyOf(p, s.tick);
   return { x, y, face: 1, dx: 0, dy: 0, walked: 0, ore: null, work: 0, dug: 0, delivered: 0, swing: -1, ax: 1, ay: 0 };
 }
 

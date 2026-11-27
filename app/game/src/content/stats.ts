@@ -22,10 +22,12 @@ export const STATS = {
 
 /**
  * The miner who digs the god out: the one the run opens on. He is always on the dawn's list; when he falls he is back
- * at the next dawn at full HP, free, and his stats are these for good.
+ * at the next dawn at full HP, free, and his stats are these for good. His body always wakes at `wakes`: the south rim of
+ * the grave's pit, clear ground in the grave's area.
  */
-export const FIRST_MINER: { id: UnitId; stats: BodyStats } = {
+export const FIRST_MINER: { id: UnitId; stats: BodyStats; wakes: { x: number; y: number } } = {
   id: 'g01',
+  wakes: { x: 1190, y: 895 },
   stats: { dexterity: 6, intelligence: 8, strength: 6, endurance: 6 },
 };
 

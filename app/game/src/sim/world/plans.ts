@@ -91,12 +91,6 @@ const lt = (a: number): boolean => {
   return true;
 };
 const ge = (a: number): boolean => !lt(a);
-/** The whole hours `h` hours into a stretch: the plan holds until the next one. */
-const hours = (h: number): number => {
-  const n = Math.max(0, Math.floor(h));
-  lt(now.x + n + 1 - h);
-  return n;
-};
 
 /**
  * Where `p` (key `k`) means to be now and what they are doing (one shared result: copy it before the next call);
@@ -139,13 +133,13 @@ function grownDay(): Target {
   const own = DAY.hours[p.role] ?? NONE;
   for (let i = 0; i < own.length; i++) {
     const st = own[i]!;
-    if ((!st.days || st.days.includes(wd)) && ge(st.from) && lt(st.to)) return stretch(st, now.x - st.from);
+    if ((!st.days || st.days.includes(wd)) && ge(st.from) && lt(st.to)) return stretch(st);
   }
   const D = DAY.day;
   if (lt(D.leave)) return set(p.home, 'eat');
   if (lt(D.off)) {
     if (ge(D.meal) && lt(D.meal + D.mealFor)) return set(keyed(seed, K.meal, k, day) < DAY.pitKitchen ? 'pitkitchen' : p.work, 'eat');
-    return atWork(now.x - D.leave);
+    return atWork();
   }
   let off = D.off;
   if (wd === 'payday') {
@@ -162,23 +156,21 @@ function bed(): Target {
 }
 const NONE: readonly Stretch[] = [];
 
-/** Where a stretch of a trade's own hours has them, `h` hours into it. */
-function stretch(st: Stretch, h: number): Target {
+/** Where a stretch of a trade's own hours has them. */
+function stretch(st: Stretch): Target {
   const { p, r } = now;
   const doing = st.doing ?? workDoing(r);
   switch (st.at) {
-    case 'work': return atWork(h);
-    case 'rounds': return set(r.rounds![hours(h) % (st.stops ?? r.rounds!.length)]!, doing);
+    case 'work': return atWork();
     case 'home': return set(p.home, st.doing ?? 'talk');
     case 'evening': return evening();
     default: return set(st.at, doing);
   }
 }
 
-/** At work `h` hours into the shift: at their place, or walking their rounds an hour a stop. */
-function atWork(h: number): Target {
-  const { p, r } = now;
-  return set(r.rounds ? r.rounds[hours(h) % r.rounds.length]! : p.work, workDoing(r));
+/** At work: at their place. */
+function atWork(): Target {
+  return set(now.p.work, workDoing(now.r));
 }
 
 function goesToService(): boolean {

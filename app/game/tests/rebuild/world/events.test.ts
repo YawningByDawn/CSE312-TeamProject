@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { CARDS } from '../../../src/content/cards';
 import { DAY_TICKS, dayOf, sinceDawn } from '../../../src/content/clock';
+import { BAD, WORLD_WORDS } from '../../../src/content/names';
 import { ROLES } from '../../../src/content/roles';
 import { hasText, uiText } from '../../../src/content/text';
 import { AREAS, PLACES } from '../../../src/content/world';
@@ -74,7 +75,7 @@ describe('a month of the world', () => {
 
   it('events happen in their window, chains follow their openers, the dead and the levied are gone', () => {
     const stories = events.filter((e): e is Extract<GameEvent, { kind: 'story' }> => e.kind === 'story' && e.story !== 'day' && e.story !== 'life');
-    expect(new Set(stories.map((e) => e.story)).size).toBeGreaterThan(30);
+    expect(new Set(stories.map((e) => e.story)).size).toBeGreaterThan(12);
     for (const e of stories) {
       const def = WORLD_EVENTS.find((x) => x.id === e.story)!;
       if (def.echo) continue;
@@ -130,6 +131,8 @@ describe('newcomers', () => {
     expect([wen.name, wen.role, wen.home, wen.resistance]).toEqual(['Wen', 'digger', 'westdrift', 5]);
     const hand = spawn(s, 'fresh', 'bunks');
     expect(hand.role).toBe('digger');
+    expect(BAD.has(hand.name) || WORLD_WORDS.has(hand.name.toLowerCase())).toBe(false);
+    expect(hand.name.length >= 3 && hand.name.length <= 7, hand.name).toBe(true);
     expect(new Set(Object.values(s.people).map((p) => p.name)).size).toBe(Object.keys(s.people).length);
     let dug = 0;
     run(s, 2 * DAY_TICKS, () => { if ('place' in hand.at && hand.at.place === hand.work && hand.at.doing === 'dig') dug++; });
@@ -144,7 +147,7 @@ describe('the rules echo, and the doors work', () => {
     const s = fresh(5);
     run(s, DAY_TICKS);
     const went = dayOf(s.tick);
-    const diggers = Object.values(s.people).filter((x) => x.role === 'digger').slice(0, 24);
+    const diggers = Object.values(s.people).filter((x) => x.role === 'digger');
     diggers.forEach((p, i) => Object.assign(p, { gone: i % 2 ? 'taken' : 'devoured', goneDay: went }));
     const stories = run(s, s.tick + 6 * DAY_TICKS).filter((e): e is Extract<GameEvent, { kind: 'story' }> => e.kind === 'story');
     // the burning waits out a storm
@@ -158,7 +161,7 @@ describe('the rules echo, and the doors work', () => {
         expect(dayOf(e.tick) - went, id).toBeLessThanOrEqual(hi);
       }
     }
-    expect(stories.filter((e) => e.story === 'emptyBurning').length).toBe(12);
+    expect(stories.filter((e) => e.story === 'emptyBurning').length).toBe(diggers.length / 2);
   });
 
   it('a devoured person goes missing in the talk of the rows, once while it lasts', () => {
@@ -185,7 +188,7 @@ describe('the rules echo, and the doors work', () => {
     const before = atFace();
     for (const f of faces) s.effects.push({ kind: 'crew', on: f, until: t + DAY_TICKS, value: 0 });
     run(s, t + 100);
-    expect(before).toBeGreaterThan(5);
+    expect(before).toBeGreaterThan(2);
     expect(atFace()).toBe(0);
   });
 });
@@ -210,7 +213,7 @@ describe('trades with hours of their own, and the kinds of ties', () => {
         expect(k === 'owes' ? back === 'owed' : k === 'owed' ? back === 'owes' : back === k, `${p.id}-${id}`).toBe(true);
         kinds.set(k, (kinds.get(k) ?? 0) + 1);
       }
-    for (const k of ['kin', 'owes', 'owed', 'rival', 'lover', 'friend']) expect(kinds.get(k), k).toBeGreaterThan(5);
+    for (const k of ['kin', 'owes', 'owed', 'rival', 'lover', 'friend']) expect(kinds.get(k), k).toBeGreaterThan(0);
   });
 
   it('a tie keeps its kind when someone takes other work and when newcomers come', () => {

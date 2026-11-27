@@ -59,16 +59,12 @@ describe('content ids', () => {
     }
   });
 
-  it('roles work and walk at places', () => {
-    for (const r of Object.values(ROLES)) expect(missing([...r.work, ...(r.rounds ?? [])], PLACES)).toEqual([]);
-  });
-
-  it('named people hold a role, a trait and a work place, and fit their trade’s headcount', () => {
+  it('named people hold a role, a trait and a work place', () => {
     expect(new Set(PEOPLE.map((p) => p.id)).size).toBe(PEOPLE.length);
     expect(missing(PEOPLE.map((p) => p.role), ROLES)).toEqual([]);
     expect(missing(PEOPLE.map((p) => p.trait), TRAITS)).toEqual([]);
     expect(missing(PEOPLE.map((p) => p.work), PLACES)).toEqual([]);
-    for (const [id, r] of Object.entries(ROLES)) expect(PEOPLE.filter((p) => p.role === id).length, id).toBeLessThanOrEqual(r.count);
+    for (const id of Object.keys(ROLES)) expect(PEOPLE.some((p) => p.role === id), id).toBe(true);
   });
 
   it('the calendar, the weather and the discoveries name areas (or a power, for notice)', () => {
