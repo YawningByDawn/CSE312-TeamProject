@@ -243,15 +243,200 @@ code {
   pointer-events: none;
 }
 
-#boost-btn {
+#touch {
   position: absolute;
-  left: 18px;
+  left: 14px;
   bottom: 120px;
-  width: 84px;
-  height: 84px;
+  display: grid;
+  gap: 12px;
+}
+
+#touch button {
+  width: 76px;
+  height: 76px;
   border-radius: 50%;
+  font-size: 14px;
+  touch-action: none;
+}
+
+#boost-btn {
   background: rgba(143, 211, 255, 0.85);
   color: #16324a;
-  font-size: 15px;
-  touch-action: none;
+}
+
+#ability-btn {
+  background: rgba(255, 177, 74, 0.88);
+  color: #4a2a08;
+}
+
+.or {
+  margin: 14px 0 0;
+  color: var(--soft);
+  font-weight: 700;
+  font-size: 14px;
+}
+
+kbd {
+  display: inline-block;
+  min-width: 1.4em;
+  padding: 1px 5px;
+  border-radius: 6px;
+  background: rgba(35, 63, 39, 0.12);
+  color: var(--ink);
+  font: 800 12px var(--font);
+}
+
+/* the evolution choice: cards in a row above the bars */
+#evolve {
+  position: absolute;
+  left: 50%;
+  bottom: 126px;
+  transform: translateX(-50%);
+  width: min(640px, calc(100% - 24px));
+}
+
+.evolve-box {
+  padding: 10px 12px 12px;
+  border-radius: 18px;
+  background: rgba(255, 250, 240, 0.94);
+  box-shadow: 0 4px 0 rgba(35, 63, 39, 0.25), 0 10px 30px rgba(0, 0, 0, 0.25);
+  text-align: center;
+}
+
+.evolve-title {
+  margin: 0 0 8px;
+  font-weight: 900;
+  font-size: 17px;
+}
+
+.evolve-row {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.evolve-opt {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 6px;
+  background: #fff;
+  border: 2px solid var(--line);
+  box-shadow: 0 3px 0 rgba(35, 63, 39, 0.15);
+  font-size: 14px;
+}
+
+.evolve-opt small {
+  font-weight: 600;
+  font-size: 11px;
+  color: var(--soft);
+  line-height: 1.25;
+}
+
+.evolve-opt small.habitat {
+  font-weight: 800;
+  -webkit-text-stroke: 0.2px rgba(35, 63, 39, 0.6);
+}
+
+.evolve-opt.stay {
+  background: #f3ecda;
+}
+
+.evolve-opt:hover {
+  border-color: var(--accent);
+}
+
+/* stat points: under the species card */
+#stats {
+  position: absolute;
+  left: 12px;
+  top: 100px;
+}
+
+.stats-box {
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+  border-radius: 14px;
+  background: rgba(255, 250, 240, 0.92);
+  box-shadow: 0 3px 0 rgba(35, 63, 39, 0.2);
+}
+
+.stats-title {
+  margin: 0;
+  font-weight: 900;
+  font-size: 14px;
+  text-align: center;
+}
+
+.stat-btn {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  font-size: 14px;
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 0 3px 0 var(--accent-dark);
+}
+
+.stat-btn:disabled {
+  background: #d8d0bc;
+  color: var(--soft);
+  box-shadow: none;
+  cursor: default;
+}
+
+/* the evolution tree */
+.card.wide {
+  width: min(1100px, 100%);
+}
+
+.scroller {
+  overflow-x: auto;
+  margin: 0 -10px 14px;
+  padding: 0 10px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.scroller canvas {
+  display: block;
+}
+
+.land {
+  color: #5f9f3a;
+  font-weight: 800;
+}
+
+.sea {
+  color: #3d8fc8;
+  font-weight: 800;
+}
+
+.amph {
+  color: #2fa88c;
+  font-weight: 800;
+}
+
+.air {
+  color: #c8951a;
+  font-weight: 800;
+}
+
+@media (max-width: 560px) {
+  #evolve {
+    bottom: 118px;
+  }
+
+  .evolve-opt:not(.stay) small:not(.habitat) {
+    display: none;
+  }
+
+  #stats {
+    top: 150px;
+  }
 }

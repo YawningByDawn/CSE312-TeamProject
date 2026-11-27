@@ -1,6 +1,7 @@
 import type { Circle, World } from './types';
 
-// The meadow: grass, the ponds and bushes of the map, and food. All in world units, on a context the view has moved.
+// The world: grass, the beach and the sea, the ponds, ferns and kelp of the map, and food. All in world units, on a
+// context the view has moved.
 
 type Ctx = CanvasRenderingContext2D;
 const TAU = Math.PI * 2;
@@ -72,7 +73,12 @@ export interface Rect {
 
 const touches = (o: Circle, v: Rect, pad = 0): boolean => o.x + o.r + pad > v.x0 && o.x - o.r - pad < v.x1 && o.y + o.r + pad > v.y0 && o.y - o.r - pad < v.y1;
 
-export function drawGround(c: Ctx, w: World | null, v: Rect): void {
+/** The coastline's points, x east at y, from the top of the world to the bottom. */
+function coastPoints(w: World): [number, number][] {
+  return w.coast.map((x, i) => [x, i * w.coastStep]);
+}
+
+export function drawGround(c: Ctx, w: World | null, v: Rect, t: number): void {
   c.fillStyle = '#4f7d45';
   c.fillRect(v.x0, v.y0, v.x1 - v.x0, v.y1 - v.y0);
   const W = w?.w ?? 1e6;
@@ -81,13 +87,47 @@ export function drawGround(c: Ctx, w: World | null, v: Rect): void {
   const y0 = Math.max(0, v.y0);
   c.fillStyle = grassPattern(c);
   c.fillRect(x0, y0, Math.min(W, v.x1) - x0, Math.min(H, v.y1) - y0);
-  if (w) {
-    c.strokeStyle = '#3f6b37';
-    c.lineWidth = 18;
-    c.setLineDash([26, 18]);
-    c.strokeRect(-9, -9, W + 18, H + 18);
-    c.setLineDash([]);
+  if (!w) return;
+  const pts = coastPoints(w);
+  if (Math.max(...w.coast) - 160 < v.x1) {
+    // the beach, a band of sand west of the waterline, then the sea
+    const band = (shift: number, fill: string | CanvasGradient): void => {
+      c.beginPath();
+      for (const [x, y] of pts) c.lineTo(x - shift, y);
+      c.lineTo(W, H + w.coastStep);
+      c.lineTo(W, 0);
+      c.closePath();
+      c.fillStyle = fill;
+      c.fill();
+    };
+    band(130, '#e8d6a2');
+    band(40, '#d8c287');
+    const deep = c.createLinearGradient(Math.min(...w.coast), 0, W, 0);
+    deep.addColorStop(0, '#6cc2dc');
+    deep.addColorStop(0.25, '#3c93c0');
+    deep.addColorStop(1, '#1d5f8f');
+    band(0, deep);
+    // surf: lines that roll in to the shore
+    c.lineWidth = 5;
+    c.lineCap = 'round';
+    for (let k = 0; k < 3; k++) {
+      const phase = (t * 0.22 + k / 3) % 1;
+      c.strokeStyle = `rgba(255,255,255,${0.55 * (1 - phase)})`;
+      c.beginPath();
+      for (const [x, y] of pts) c.lineTo(x + 18 + (1 - phase) * 70 + Math.sin(y / 80 + t) * 6, y);
+      c.stroke();
+    }
+    c.strokeStyle = 'rgba(255,255,255,0.75)';
+    c.lineWidth = 4;
+    c.beginPath();
+    for (const [x, y] of pts) c.lineTo(x + 2, y);
+    c.stroke();
   }
+  c.strokeStyle = '#3f6b37';
+  c.lineWidth = 18;
+  c.setLineDash([26, 18]);
+  c.strokeRect(-9, -9, W + 18, H + 18);
+  c.setLineDash([]);
 }
 
 export function drawPonds(c: Ctx, ponds: Circle[], v: Rect, t: number): void {
@@ -138,8 +178,8 @@ export function drawPonds(c: Ctx, ponds: Circle[], v: Rect, t: number): void {
   }
 }
 
-/** Bushes go over the creatures, so whatever hides in one is out of sight. */
-export function drawBushes(c: Ctx, bushes: Circle[], v: Rect): void {
+/** Ferns and kelp go over the creatures, so whatever hides in them is out of sight. */
+export function drawCover(c: Ctx, bushes: Circle[], kelp: Circle[], v: Rect, t: number): void {
   for (const [i, b] of bushes.entries()) {
     if (!touches(b, v, 20)) continue;
     const rnd = seeded(50 + i);
@@ -147,63 +187,101 @@ export function drawBushes(c: Ctx, bushes: Circle[], v: Rect): void {
     c.ellipse(b.x + 8, b.y + 12, b.r * 1.02, b.r * 0.95, 0, 0, TAU);
     c.fillStyle = 'rgba(20,50,20,0.22)';
     c.fill();
-    const lobes = 7;
+    c.beginPath();
+    c.arc(b.x, b.y, b.r * 0.82, 0, TAU);
+    c.fillStyle = '#356f31';
+    c.fill();
+    // fronds: long leaves from the middle, each with its leaflets
+    const n = 9;
     const base = rnd() * TAU;
-    for (const [shade, k, off] of [['#3c8238', 1, 0.42], ['#4f9b44', 0.82, 0.36], ['#64b153', 0.55, 0.3]] as const) {
-      c.fillStyle = shade;
-      c.beginPath();
-      c.arc(b.x, b.y, b.r * 0.62 * k, 0, TAU);
-      c.fill();
-      for (let l = 0; l < lobes; l++) {
-        const a = base + (l * TAU) / lobes + (rnd() - 0.5) * 0.4;
-        const d = b.r * off * k + b.r * 0.08;
+    for (const [shade, len, off] of [['#3f8a3a', 1.02, 0], ['#5aa74b', 0.85, 0.5]] as const) {
+      for (let f = 0; f < n; f++) {
+        const a = base + ((f + off) * TAU) / n + (rnd() - 0.5) * 0.2;
+        const L = b.r * len;
+        const cx = b.x + Math.cos(a) * L * 0.5;
+        const cy = b.y + Math.sin(a) * L * 0.5;
         c.beginPath();
-        c.arc(b.x + Math.cos(a) * d - (1 - k) * b.r * 0.1, b.y + Math.sin(a) * d - (1 - k) * b.r * 0.12, b.r * (0.42 + rnd() * 0.08) * k, 0, TAU);
+        c.ellipse(cx, cy, L * 0.52, b.r * 0.17, a, 0, TAU);
+        c.fillStyle = shade;
         c.fill();
+        c.strokeStyle = 'rgba(30,70,30,0.55)';
+        c.lineWidth = 1.5;
+        c.beginPath();
+        c.moveTo(b.x, b.y);
+        c.lineTo(b.x + Math.cos(a) * L, b.y + Math.sin(a) * L);
+        for (let k = 1; k < 5; k++) {
+          const px = b.x + Math.cos(a) * L * (k / 5);
+          const py = b.y + Math.sin(a) * L * (k / 5);
+          for (const s of [-1, 1]) {
+            c.moveTo(px, py);
+            c.lineTo(px + Math.cos(a + s * 1.1) * b.r * 0.13, py + Math.sin(a + s * 1.1) * b.r * 0.13);
+          }
+        }
+        c.stroke();
       }
     }
-    if (i % 3 === 0) {
-      for (let k = 0; k < 6; k++) {
-        const a = rnd() * TAU;
-        const d = rnd() * b.r * 0.7;
-        c.beginPath();
-        c.arc(b.x + Math.cos(a) * d, b.y + Math.sin(a) * d, 4, 0, TAU);
-        c.fillStyle = '#d6465a';
-        c.fill();
-      }
+    c.beginPath();
+    c.arc(b.x, b.y, b.r * 0.16, 0, TAU);
+    c.fillStyle = '#6fbf5a';
+    c.fill();
+  }
+  for (const [i, k] of kelp.entries()) {
+    if (!touches(k, v, 30)) continue;
+    const rnd = seeded(900 + i);
+    c.beginPath();
+    c.arc(k.x, k.y, k.r * 0.85, 0, TAU);
+    c.fillStyle = 'rgba(28,78,58,0.96)';
+    c.fill();
+    for (let f = 0; f < 18; f++) {
+      const a = (f / 18) * TAU + rnd() * 0.5;
+      const L = k.r * (0.8 + rnd() * 0.35);
+      const sway = Math.sin(t * 1.6 + f + i) * 0.25;
+      c.beginPath();
+      c.moveTo(k.x, k.y);
+      c.quadraticCurveTo(k.x + Math.cos(a + sway) * L * 0.6, k.y + Math.sin(a + sway) * L * 0.6, k.x + Math.cos(a - sway) * L, k.y + Math.sin(a - sway) * L);
+      c.strokeStyle = f % 2 ? '#5f8f34' : '#7f8f2e';
+      c.lineWidth = k.r * 0.18;
+      c.lineCap = 'round';
+      c.stroke();
+    }
+    for (let b = 0; b < 6; b++) {
+      const a = rnd() * TAU;
+      const d = rnd() * k.r * 0.7;
+      c.beginPath();
+      c.arc(k.x + Math.cos(a) * d, k.y + Math.sin(a) * d, 4, 0, TAU);
+      c.fillStyle = '#c9b84a';
+      c.fill();
     }
   }
 }
 
-export function drawFood(c: Ctx, kind: number, x: number, y: number, r: number, t: number, id: number): void {
+export function drawFood(c: Ctx, name: string, x: number, y: number, r: number, t: number, id: number): void {
   const pulse = 1 + Math.sin(t * 3 + id) * 0.06;
   c.save();
   c.translate(x, y);
   c.scale(r * pulse, r * pulse);
   c.rotate((id % 12) * 0.5);
   c.lineWidth = 0.12;
-  switch (kind) {
-    case 0: // berries
+  const blob = (bx: number, by: number, br: number, fill: string, stroke: string): void => {
+    c.beginPath();
+    c.arc(bx, by, br, 0, TAU);
+    c.fillStyle = fill;
+    c.fill();
+    c.strokeStyle = stroke;
+    c.stroke();
+  };
+  switch (name) {
+    case 'berry':
       for (const [bx, by] of [[-0.35, 0.25], [0.4, 0.2], [0, -0.4]] as const) {
-        c.beginPath();
-        c.arc(bx, by, 0.58, 0, TAU);
-        c.fillStyle = '#6f4bc4';
-        c.fill();
-        c.strokeStyle = '#4a2f8a';
-        c.stroke();
+        blob(bx, by, 0.58, '#6f4bc4', '#4a2f8a');
         c.beginPath();
         c.arc(bx - 0.2, by - 0.2, 0.16, 0, TAU);
         c.fillStyle = 'rgba(255,255,255,0.7)';
         c.fill();
       }
       break;
-    case 1: // mushroom cap
-      c.beginPath();
-      c.arc(0, 0, 1, 0, TAU);
-      c.fillStyle = '#df5a40';
-      c.fill();
-      c.strokeStyle = '#9c3423';
-      c.stroke();
+    case 'mushroom':
+      blob(0, 0, 1, '#df5a40', '#9c3423');
       for (const [mx, my, mr] of [[-0.35, -0.3, 0.2], [0.35, -0.1, 0.16], [0, 0.4, 0.18], [-0.45, 0.3, 0.12], [0.3, 0.5, 0.1]] as const) {
         c.beginPath();
         c.arc(mx, my, mr, 0, TAU);
@@ -211,20 +289,71 @@ export function drawFood(c: Ctx, kind: number, x: number, y: number, r: number, 
         c.fill();
       }
       break;
-    case 2: // apple
+    case 'egg':
       c.beginPath();
-      c.arc(0, 0, 1, 0, TAU);
-      c.fillStyle = '#e4483a';
+      c.ellipse(0, 0, 0.8, 1, 0, 0, TAU);
+      c.fillStyle = '#f4ead2';
       c.fill();
-      c.strokeStyle = '#992a20';
+      c.strokeStyle = '#b8a67a';
+      c.stroke();
+      for (const [ex, ey, er] of [[-0.3, -0.3, 0.12], [0.25, 0.1, 0.1], [-0.1, 0.45, 0.13], [0.35, -0.5, 0.08]] as const) {
+        c.beginPath();
+        c.arc(ex, ey, er, 0, TAU);
+        c.fillStyle = '#8fae6a';
+        c.fill();
+      }
+      break;
+    case 'krill':
+      c.beginPath();
+      c.arc(0, 0, 0.8, -2.4, 1.2);
+      c.lineWidth = 0.55;
+      c.lineCap = 'round';
+      c.strokeStyle = '#f08f7a';
+      c.stroke();
+      c.lineWidth = 0.12;
+      c.strokeStyle = '#ffd0c0';
+      c.beginPath();
+      c.moveTo(0.4, 0.75);
+      c.lineTo(0.9, 1.2);
+      c.moveTo(0.2, 0.8);
+      c.lineTo(0.5, 1.35);
+      c.stroke();
+      break;
+    case 'clam':
+      c.beginPath();
+      c.moveTo(0, 0.7);
+      c.arc(0, 0.3, 1, Math.PI * 1.15, Math.PI * 1.85);
+      c.closePath();
+      c.fillStyle = '#e8dccb';
+      c.fill();
+      c.strokeStyle = '#9a8a72';
       c.stroke();
       c.beginPath();
-      c.arc(-0.35, -0.35, 0.25, 0, TAU);
-      c.fillStyle = 'rgba(255,255,255,0.45)';
-      c.fill();
+      for (let k = -2; k <= 2; k++) {
+        c.moveTo(0, 0.7);
+        c.lineTo(Math.cos(Math.PI * 1.5 + k * 0.28) * 0.95, 0.3 + Math.sin(Math.PI * 1.5 + k * 0.28) * 0.95);
+      }
+      c.stroke();
+      break;
+    case 'fish':
       c.beginPath();
-      c.ellipse(0.25, -0.75, 0.32, 0.15, -0.6, 0, TAU);
-      c.fillStyle = '#4f9b44';
+      c.moveTo(1, 0);
+      c.quadraticCurveTo(0.2, -0.65, -0.55, 0);
+      c.quadraticCurveTo(0.2, 0.65, 1, 0);
+      c.fillStyle = '#f0a83a';
+      c.fill();
+      c.strokeStyle = '#a8681a';
+      c.stroke();
+      c.beginPath();
+      c.moveTo(-0.45, 0);
+      c.lineTo(-1, -0.45);
+      c.lineTo(-1, 0.45);
+      c.closePath();
+      c.fill();
+      c.stroke();
+      c.beginPath();
+      c.arc(0.55, -0.12, 0.1, 0, TAU);
+      c.fillStyle = '#1a1208';
       c.fill();
       break;
     default: // meat

@@ -19,18 +19,23 @@ func Setup(app *fiber.App) {
 	app.Get("/ws", checkUpgrade, fiberws.New(handleConn))
 }
 
-// checkUpgrade rejects the handshake before upgrading: wrong Origin, no valid JWT, or not a WebSocket request.
+// checkUpgrade rejects the handshake before upgrading: wrong Origin, neither a valid JWT nor a guest key, or not a
+// WebSocket request. A valid login wins over a guest key.
 func checkUpgrade(c fiber.Ctx) error {
 	origin, err := url.Parse(c.Get("Origin"))
 	if err != nil || origin.Host != c.Host() {
 		return c.SendStatus(fiber.StatusForbidden)
 	}
 	username, err := token.Verify(c.Cookies("authToken"))
-	if err != nil {
+	key := c.Query("guest")
+	if err != nil && !guestKey.MatchString(key) {
 		return c.SendStatus(fiber.StatusUnauthorized)
 	}
 	if !fiberws.IsWebSocketUpgrade(c) {
 		return fiber.ErrUpgradeRequired
+	}
+	if err != nil {
+		username = guests.name(key) // only now, so a request that is not an upgrade takes no name
 	}
 	c.Locals("username", username)
 	return c.Next()

@@ -161,19 +161,25 @@ func TestADroppedConnectionLeavesItsLobby(t *testing.T) {
 
 func TestDecodeLobbyMessages(t *testing.T) {
 	for in, ok := range map[string]bool{
-		`{"type":"host"}`:                true,
-		`{"type":"search"}`:              true,
-		`{"type":"leave"}`:               true,
-		`{"type":"start"}`:               true,
-		`{"type":"join","host":"ann"}`:   true,
-		`{"type":"join"}`:                false,
-		`{"type":"input","dx":1}`:        true,
-		`{"type":"spawn"}`:               true,
-		`{"type":"boost"}`:               true,
-		`{"type":"game"}`:                false,
-		`{"type":"game","data":{"a":1}}`: true,
-		`{"type":"nonsense"}`:            false,
-		`not json`:                       false,
+		`{"type":"host"}`:                  true,
+		`{"type":"search"}`:                true,
+		`{"type":"leave"}`:                 true,
+		`{"type":"start"}`:                 true,
+		`{"type":"join","host":"ann"}`:     true,
+		`{"type":"join"}`:                  false,
+		`{"type":"input","dx":1}`:          true,
+		`{"type":"spawn"}`:                 true,
+		`{"type":"boost"}`:                 true,
+		`{"type":"ability"}`:               true,
+		`{"type":"evolve","to":3}`:         true,
+		`{"type":"evolve","to":-1}`:        true,
+		`{"type":"evolve"}`:                false,
+		`{"type":"upgrade","stat":"bite"}`: true,
+		`{"type":"upgrade","stat":"hp"}`:   false,
+		`{"type":"game"}`:                  false,
+		`{"type":"game","data":{"a":1}}`:   true,
+		`{"type":"nonsense"}`:              false,
+		`not json`:                         false,
 	} {
 		if _, got := decode([]byte(in)); got != ok {
 			t.Errorf("decode(%s) = %v, want %v", in, got, ok)

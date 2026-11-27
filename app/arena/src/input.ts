@@ -1,14 +1,15 @@
 import type { Frame } from './view';
 
-// Steering and boosting. The mouse steers: the creature heads for the pointer, slower the closer it is. WASD or the
-// arrows steer instead while held. A click, Space or the touch button boosts; on a touch screen, a finger steers.
+// Steering, boosting and skills. The mouse steers: the creature heads for the pointer, slower the closer it is. WASD
+// or the arrows steer instead while held. A click or Space boosts; a right-click, E or Shift uses the species' skill.
+// On a touch screen a finger steers, and buttons boost and use the skill.
 
 const KEYS: Record<string, [number, number]> = {
   KeyW: [0, -1], ArrowUp: [0, -1], KeyS: [0, 1], ArrowDown: [0, 1],
   KeyA: [-1, 0], ArrowLeft: [-1, 0], KeyD: [1, 0], ArrowRight: [1, 0],
 };
 
-const typing = (e: Event): boolean => e.target instanceof HTMLInputElement || e.target instanceof HTMLButtonElement;
+const typing = (e: Event): boolean => e.target instanceof HTMLInputElement;
 
 export class Input {
   private px = NaN;
@@ -17,8 +18,9 @@ export class Input {
   private touchy = false;
   private held = new Set<string>();
   private boost = false;
+  private skill = false;
 
-  constructor(canvas: HTMLCanvasElement, boostButton: HTMLButtonElement) {
+  constructor(canvas: HTMLCanvasElement, touchButtons: HTMLElement, boostButton: HTMLButtonElement, abilityButton: HTMLButtonElement) {
     window.addEventListener('pointermove', (e) => {
       if (e.pointerType === 'touch' && !this.touching) return;
       this.px = e.clientX;
@@ -32,24 +34,29 @@ export class Input {
         this.touching = true;
         if (!this.touchy) {
           this.touchy = true;
-          boostButton.hidden = false;
+          touchButtons.hidden = false;
         }
       } else if (e.button === 0) this.boost = true;
+      else if (e.button === 2) this.skill = true;
     });
     window.addEventListener('pointerup', (e) => {
       if (e.pointerType === 'touch') this.touching = false;
     });
     canvas.addEventListener('contextmenu', (e) => e.preventDefault());
-    boostButton.addEventListener('pointerdown', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      this.boost = true;
-    });
+    for (const [button, press] of [[boostButton, () => (this.boost = true)], [abilityButton, () => (this.skill = true)]] as const) {
+      button.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        press();
+      });
+    }
     window.addEventListener('keydown', (e) => {
       if (typing(e)) return;
       if (e.code === 'Space') {
         e.preventDefault();
         if (!e.repeat) this.boost = true;
+      } else if (e.code === 'KeyE' || e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
+        if (!e.repeat) this.skill = true;
       } else if (KEYS[e.code]) {
         this.held.add(e.code);
       }
@@ -86,6 +93,13 @@ export class Input {
   takeBoost(): boolean {
     const b = this.boost;
     this.boost = false;
+    return b;
+  }
+
+  /** Whether the skill was asked for since the last call. */
+  takeSkill(): boolean {
+    const b = this.skill;
+    this.skill = false;
     return b;
   }
 }

@@ -2,11 +2,15 @@ import { drawAnimal } from './animals';
 import type { Frame } from './view';
 import type { World } from './types';
 
-// The heads-up display, drawn on the canvas over the world in CSS pixels: the food chain, the leaderboard, the
-// minimap, the player's bars, and the messages that come and go.
+// The heads-up display, drawn on the canvas over the world in CSS pixels: what the player is, the leaderboard, the
+// minimap, the bars and dials, and the messages that come and go. The evolution choice and the stat buttons are DOM
+// (main.ts), since they are clicked.
 
 const FONT = 'ui-rounded, "Nunito", "Segoe UI", system-ui, sans-serif';
 const TAU = Math.PI * 2;
+
+export const HABITAT_LABEL: Record<string, string> = { land: 'Land', sea: 'Sea', amph: 'Land & water', air: 'Flies' };
+export const HABITAT_COLOR: Record<string, string> = { land: '#8fcf6a', sea: '#6cc2f0', amph: '#6adcc0', air: '#f2c45a' };
 
 interface Toast {
   text: string;
@@ -38,6 +42,29 @@ function bar(c: CanvasRenderingContext2D, x: number, y: number, w: number, h: nu
   c.fillText(label, x + w / 2, y + h / 2 + 1);
 }
 
+/** A round dial that fills as something cools down. */
+function dial(c: CanvasRenderingContext2D, x: number, y: number, ready: number, color: string, label: string, key: string): void {
+  c.beginPath();
+  c.arc(x, y, 21, 0, TAU);
+  c.fillStyle = 'rgba(28,44,26,0.62)';
+  c.fill();
+  c.beginPath();
+  c.moveTo(x, y);
+  c.arc(x, y, 18, -Math.PI / 2, -Math.PI / 2 + TAU * Math.max(0, Math.min(1, ready)));
+  c.closePath();
+  c.globalAlpha = ready >= 1 ? 1 : 0.45;
+  c.fillStyle = color;
+  c.fill();
+  c.globalAlpha = 1;
+  c.font = `800 10px ${FONT}`;
+  c.textAlign = 'center';
+  c.textBaseline = 'middle';
+  c.fillStyle = '#1a2a1a';
+  c.fillText(label, x, y - 2);
+  c.font = `700 9px ${FONT}`;
+  c.fillText(key, x, y + 8);
+}
+
 export class Hud {
   private toasts: Toast[] = [];
   private banner: { title: string; sub: string; t0: number } | null = null;
@@ -51,10 +78,12 @@ export class Hud {
     this.banner = { title, sub, t0: performance.now() / 1000 };
   }
 
-  draw(c: CanvasRenderingContext2D, w: number, h: number, dpr: number, f: Frame, world: World | null, myName: string | null, playing: boolean): void {
+  /** `bottom` is how much of the screen's foot the DOM panels take, so the bars sit above them. */
+  draw(c: CanvasRenderingContext2D, w: number, h: number, dpr: number, f: Frame, world: World | null, myName: string | null, playing: boolean, bottom: number): void {
     c.setTransform(dpr, 0, 0, dpr, 0, 0);
     const t = performance.now() / 1000;
     const small = w < 700;
+    const narrow = w < 560;
     const me = f.me?.alive ? f.me : null;
 
     if (me && f.threat > 0.05) {
@@ -67,41 +96,23 @@ export class Hud {
     if (!world) return;
 
     if (me && playing) {
-      this.chain(c, world, me.sp, small);
       const sp = world.species[me.sp]!;
-      const next = world.species[me.sp + 1];
+      this.card(c, world, me.sp, me.bite, me.ability, small);
+      const need = world.needs[sp.tier] ?? 1;
       const bw = Math.min(560, w - 32);
       const x = (w - bw) / 2;
-      const y = h - 44;
-      const share = next ? (me.xp - sp.xp) / (next.xp - sp.xp) : 1;
-      bar(c, x, y, bw, 26, share, '#f2b84b', next ? `${sp.name}  ·  ${me.xp} / ${next.xp} XP  →  ${next.name}` : `${sp.name}  ·  ${me.xp} XP  ·  top of the food chain`);
+      const y = h - 44 - bottom;
+      const top = sp.next.length === 0;
+      const label = me.offer ? `${sp.name}  ·  ready to evolve!` : `${sp.name}  ·  ${me.progress} / ${need} XP  →  ${top ? 'stat point' : 'evolve'}`;
+      bar(c, x, y, bw, 26, me.offer ? 1 : me.progress / need, me.offer ? '#8fe05a' : '#f2b84b', label);
       const half = (bw - 8) / 2;
       bar(c, x, y - 26, half, 20, me.hunger / 100, '#e98a3c', `Hunger ${me.hunger}`);
-      bar(c, x + half + 8, y - 26, half, 20, me.hp / 100, me.hp > 35 ? '#6cc24a' : '#e2533f', `Health ${me.hp}`);
-      // the boost, a dial that fills as it cools down
-      const bx = x + bw - 24;
-      const by = y - 58;
-      const ready = me.cooldown <= 0 && me.hunger >= 4;
-      c.beginPath();
-      c.arc(bx, by, 18, 0, TAU);
-      c.fillStyle = 'rgba(28,44,26,0.62)';
-      c.fill();
-      c.beginPath();
-      c.moveTo(bx, by);
-      c.arc(bx, by, 15, -Math.PI / 2, -Math.PI / 2 + TAU * (1 - me.cooldown / world.boost));
-      c.closePath();
-      c.fillStyle = ready ? '#8fd3ff' : 'rgba(143,211,255,0.45)';
-      c.fill();
-      c.font = `700 11px ${FONT}`;
-      c.textAlign = 'center';
-      c.textBaseline = 'middle';
-      c.fillStyle = '#16324a';
-      c.fillText('BOOST', bx, by + 1);
+      bar(c, x + half + 8, y - 26, half, 20, me.hp / me.maxHp, me.hp > me.maxHp * 0.35 ? '#6cc24a' : '#e2533f', `Health ${me.hp}`);
+      dial(c, x + bw - 22, y - 58, 1 - me.cooldown / world.boost, '#8fd3ff', 'BOOST', small ? '' : 'Space');
+      dial(c, x + bw - 72, y - 58, 1 - me.abilityCd / sp.ability.cooldown, '#ffb14a', 'SKILL', small ? '' : 'E');
     }
 
-    // on a narrow screen the leaderboard goes under the food chain, and there is no room for the minimap
-    const narrow = w < 560;
-    this.leaderboard(c, w, narrow && me && playing ? 54 : 12, f, myName, small);
+    this.leaderboard(c, w, narrow && me && playing ? 80 : 12, f, myName, small);
     if (!narrow) this.minimap(c, w, h, world, f, small);
 
     // toasts, top middle
@@ -112,7 +123,7 @@ export class Hud {
     for (const [i, m] of this.toasts.entries()) {
       const age = t - m.t0;
       c.globalAlpha = Math.min(1, age * 6, (3.2 - age) * 2);
-      const y = (small ? 92 : 70) + i * 28;
+      const y = (small ? 140 : 70) + i * 28;
       const tw = c.measureText(m.text).width + 28;
       rounded(c, w / 2 - tw / 2, y - 13, tw, 26, 13);
       c.fillStyle = 'rgba(28,44,26,0.62)';
@@ -147,36 +158,35 @@ export class Hud {
     }
   }
 
-  /** The whole food chain, top left: green is food, red is danger. */
-  private chain(c: CanvasRenderingContext2D, world: World, mine: number, small: boolean): void {
-    const size = small ? 24 : 34;
-    const n = world.species.length;
-    const x0 = 12;
-    const y0 = 12;
-    rounded(c, x0 - 6, y0 - 6, n * size + 12, size + (small ? 12 : 30), 12);
-    c.fillStyle = 'rgba(28,44,26,0.45)';
+  /** What the player is, top left: its picture, name, home and ability, and the levels bought with stat points. */
+  private card(c: CanvasRenderingContext2D, world: World, spIndex: number, bite: number, ability: number, small: boolean): void {
+    const sp = world.species[spIndex]!;
+    const x = 12;
+    const y = 12;
+    const size = small ? 46 : 56;
+    const bw = small ? 190 : 260;
+    rounded(c, x, y, bw, size + 12, 14);
+    c.fillStyle = 'rgba(28,44,26,0.55)';
     c.fill();
-    for (let i = 0; i < n; i++) {
-      const cx = x0 + i * size + size / 2;
-      const cy = y0 + size / 2;
-      c.beginPath();
-      c.arc(cx, cy, size / 2 - 2, 0, TAU);
-      c.fillStyle = i < mine ? 'rgba(130,210,100,0.55)' : i === mine ? 'rgba(255,243,168,0.95)' : 'rgba(235,110,90,0.5)';
-      c.fill();
-      if (i === mine) {
-        c.strokeStyle = '#fff';
-        c.lineWidth = 2;
-        c.stroke();
-      }
-      drawAnimal(c, i, cx - size * 0.06, cy, size * 0.27, 0, 0, 0);
-    }
-    if (!small) {
-      c.font = `600 12px ${FONT}`;
-      c.textAlign = 'left';
-      c.textBaseline = 'middle';
-      c.fillStyle = '#fff';
-      c.fillText('Eat the green · flee the red · bite your own size with a boost', x0, y0 + size + 11);
-    }
+    c.beginPath();
+    c.arc(x + 6 + size / 2, y + 6 + size / 2, size / 2, 0, TAU);
+    c.fillStyle = 'rgba(255,243,168,0.9)';
+    c.fill();
+    c.strokeStyle = HABITAT_COLOR[sp.habitat] ?? '#fff';
+    c.lineWidth = 3;
+    c.stroke();
+    drawAnimal(c, sp.name, x + 6 + size / 2 - size * 0.06, y + 6 + size / 2, size * 0.3, 0, 0, 0);
+    const tx = x + size + 16;
+    c.textAlign = 'left';
+    c.textBaseline = 'alphabetic';
+    c.fillStyle = '#fff';
+    c.font = `800 ${small ? 15 : 17}px ${FONT}`;
+    c.fillText(sp.name, tx, y + (small ? 24 : 26));
+    c.font = `600 ${small ? 11 : 12}px ${FONT}`;
+    c.fillStyle = HABITAT_COLOR[sp.habitat] ?? '#fff';
+    c.fillText(`Tier ${sp.tier + 1} · ${HABITAT_LABEL[sp.habitat] ?? ''}`, tx, y + (small ? 39 : 43));
+    c.fillStyle = 'rgba(255,255,255,0.9)';
+    c.fillText(small ? `${sp.ability.name}` : `${sp.ability.name}  ·  Bite ${bite} · Skill ${ability}`, tx, y + (small ? 53 : 60));
   }
 
   private leaderboard(c: CanvasRenderingContext2D, w: number, y: number, f: Frame, myName: string | null, small: boolean): void {
@@ -207,15 +217,23 @@ export class Hud {
   }
 
   private minimap(c: CanvasRenderingContext2D, w: number, h: number, world: World, f: Frame, small: boolean): void {
-    const size = small ? 90 : 140;
-    const x = w - size - 12;
-    const y = h - size - 12;
-    const k = size / world.w;
-    rounded(c, x, y, size, size, 10);
-    c.fillStyle = 'rgba(28,44,26,0.5)';
+    const mw = small ? 110 : 168;
+    const k = mw / world.w;
+    const mh = world.h * k;
+    const x = w - mw - 12;
+    const y = h - mh - 12;
+    rounded(c, x, y, mw, mh, 10);
+    c.fillStyle = 'rgba(40,70,36,0.6)';
     c.fill();
     c.save();
     c.clip();
+    c.beginPath();
+    for (const [i, cx] of world.coast.entries()) c.lineTo(x + cx * k, y + i * world.coastStep * k);
+    c.lineTo(x + mw, y + mh + 10);
+    c.lineTo(x + mw, y);
+    c.closePath();
+    c.fillStyle = 'rgba(60,140,200,0.75)';
+    c.fill();
     c.fillStyle = 'rgba(120,190,230,0.75)';
     for (const p of world.ponds) {
       c.beginPath();
@@ -225,7 +243,13 @@ export class Hud {
     c.fillStyle = 'rgba(110,180,90,0.7)';
     for (const b of world.bushes) {
       c.beginPath();
-      c.arc(x + b.x * k, y + b.y * k, Math.max(1.5, b.r * k), 0, TAU);
+      c.arc(x + b.x * k, y + b.y * k, Math.max(1.2, b.r * k), 0, TAU);
+      c.fill();
+    }
+    c.fillStyle = 'rgba(60,120,70,0.8)';
+    for (const b of world.kelp) {
+      c.beginPath();
+      c.arc(x + b.x * k, y + b.y * k, Math.max(1.2, b.r * k), 0, TAU);
       c.fill();
     }
     c.restore();

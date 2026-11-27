@@ -17,6 +17,7 @@ type client struct {
 type player struct {
 	dx, dy     float64   // where they steer, each in [-1, 1]
 	boost      bool      // they asked for a boost since the last tick
+	ability    bool      // and for their ability
 	cr         *creature // theirs in the arena; nil before they first spawn and while they are dead
 	died       *death    // how their last creature died; nil until it has
 	camX, camY float64   // where their view stays while they are dead
@@ -58,6 +59,7 @@ func RunHub() {
 				close(p.client.send)
 			}
 			p.client = c
+			deliver(players, c.username, encodeHello(c.username))
 			deliver(players, c.username, ar.world)
 			if host, ok := lb.of[c.username]; ok { // a takeover tab picks up the lobby
 				lb.show(lb.byHost[host])
@@ -82,6 +84,16 @@ func RunHub() {
 				}
 			case "boost":
 				p.boost = true
+			case "ability":
+				p.ability = true
+			case "evolve":
+				if p.cr != nil {
+					ar.evolve(p.cr, *in.msg.To)
+				}
+			case "upgrade":
+				if p.cr != nil {
+					ar.upgrade(p.cr, in.msg.Stat)
+				}
 			default:
 				lb.handle(in.username, in.msg)
 			}
@@ -102,6 +114,7 @@ func tick(players map[string]*player, lb *lobbies, ar *arena, dt float64) {
 					ar.remove(p.cr)
 				}
 				delete(players, name)
+				guests.release(name)
 				continue
 			}
 		}
@@ -110,8 +123,11 @@ func tick(players map[string]*player, lb *lobbies, ar *arena, dt float64) {
 			if p.boost {
 				ar.boost(p.cr)
 			}
+			if p.ability {
+				ar.useAbility(p.cr)
+			}
 		}
-		p.boost = false
+		p.boost, p.ability = false, false
 	}
 	ar.step(dt)
 	for name, p := range players {

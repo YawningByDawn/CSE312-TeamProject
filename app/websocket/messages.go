@@ -15,27 +15,35 @@ var kickedMessage = []byte(`{"type":"kicked"}`)
 // startMessage tells the members of a lobby that its host started it.
 var startMessage = []byte(`{"type":"start"}`)
 
-// inMessage is the arena's "input" (dx, dy: where to steer), "spawn" and "boost"; "game" (data, relayed as it came to
-// every other player); or a lobby's "host", "search", "join" (host), "leave" and, from a lobby's host, "start".
+// inMessage is the arena's "input" (dx, dy: where to steer), "spawn", "boost", "ability", "evolve" (to: a species, or
+// -1 to stay for a stat point) and "upgrade" (stat: "bite" or "ability"); "game" (data, relayed as it came to every
+// other player); or a lobby's "host", "search", "join" (host), "leave" and, from a lobby's host, "start".
 type inMessage struct {
 	Type string          `json:"type"`
 	Host string          `json:"host"`
 	DX   float64         `json:"dx"`
 	DY   float64         `json:"dy"`
+	To   *int            `json:"to"`
+	Stat string          `json:"stat"`
 	Data json.RawMessage `json:"data"`
 }
 
 // worldMessage is the arena's map and rules, sent once to each connection; the "state" messages that follow refer to it.
 type worldMessage struct {
-	Type    string     `json:"type"`
-	W       float64    `json:"w"`
-	H       float64    `json:"h"`
-	Tick    int        `json:"tick"`  // state messages a second
-	Boost   float64    `json:"boost"` // seconds between boosts
-	Species []species  `json:"species"`
-	Foods   []foodKind `json:"foods"`
-	Ponds   []circle   `json:"ponds"`
-	Bushes  []circle   `json:"bushes"`
+	Type      string     `json:"type"`
+	W         float64    `json:"w"`
+	H         float64    `json:"h"`
+	Tick      int        `json:"tick"`  // state messages a second
+	Boost     float64    `json:"boost"` // seconds between boosts
+	Coast     []float64  `json:"coast"` // the sea starts coast[i] px from the west, at y = i*coastStep
+	CoastStep float64    `json:"coastStep"`
+	Needs     []float64  `json:"needs"`    // xp to gain at each tier before evolving
+	MaxLevel  int        `json:"maxLevel"` // the most a stat can be raised
+	Species   []species  `json:"species"`
+	Foods     []foodKind `json:"foods"`
+	Ponds     []circle   `json:"ponds"`
+	Bushes    []circle   `json:"bushes"`
+	Kelp      []circle   `json:"kelp"`
 }
 
 // boardEntry is one row of the leaderboard.
@@ -48,14 +56,21 @@ type boardEntry struct {
 
 // meAlive and meDead are a player's own numbers in their state messages; null before their first spawn.
 type meAlive struct {
-	Alive    bool    `json:"alive"`
-	ID       int     `json:"id"`
-	Sp       int     `json:"sp"`
-	XP       int     `json:"xp"`
-	HP       int     `json:"hp"`
-	Hunger   int     `json:"hunger"`
-	Cooldown float64 `json:"cooldown"` // seconds until it can boost
-	Kills    int     `json:"kills"`
+	Alive     bool    `json:"alive"`
+	ID        int     `json:"id"`
+	Sp        int     `json:"sp"`
+	XP        int     `json:"xp"`
+	Progress  int     `json:"progress"` // xp toward the next evolution
+	HP        int     `json:"hp"`
+	MaxHP     int     `json:"maxHp"`
+	Hunger    int     `json:"hunger"`
+	Cooldown  float64 `json:"cooldown"`  // seconds until it can boost
+	AbilityCd float64 `json:"abilityCd"` // seconds until its ability is ready
+	Kills     int     `json:"kills"`
+	Offer     []int   `json:"offer"` // the species it may evolve into now; null when it may not
+	Points    int     `json:"points"`
+	Bite      int     `json:"bite"`    // its bite's level
+	Ability   int     `json:"ability"` // its ability's level
 }
 
 type meDead struct {
@@ -100,8 +115,12 @@ func decode(data []byte) (inMessage, bool) {
 		return msg, false
 	}
 	switch msg.Type {
-	case "input", "spawn", "boost", "host", "search", "leave", "start":
+	case "input", "spawn", "boost", "ability", "host", "search", "leave", "start":
 		return msg, true
+	case "evolve":
+		return msg, msg.To != nil
+	case "upgrade":
+		return msg, msg.Stat == "bite" || msg.Stat == "ability"
 	case "game":
 		return msg, msg.Data != nil
 	case "join":
@@ -138,7 +157,10 @@ func encodeLobbies(list []*lobby, refused string) []byte {
 }
 
 func encodeWorld(a *arena) []byte {
-	data, _ := json.Marshal(worldMessage{Type: "world", W: worldW, H: worldH, Tick: a.rate, Boost: boostCooldown, Species: speciesList, Foods: foodKinds, Ponds: a.ponds, Bushes: a.bushes})
+	data, _ := json.Marshal(worldMessage{
+		Type: "world", W: worldW, H: worldH, Tick: a.rate, Boost: boostCooldown, Coast: a.coast, CoastStep: coastStep,
+		Needs: tierNeed, MaxLevel: maxLevel, Species: speciesList, Foods: foodKinds, Ponds: a.ponds, Bushes: a.bushes, Kelp: a.kelp,
+	})
 	return data
 }
 
@@ -160,7 +182,15 @@ func encodeMe(b []byte, v viewer) []byte {
 	switch {
 	case v.cr != nil:
 		c := v.cr
-		data, _ = json.Marshal(meAlive{Alive: true, ID: c.id, Sp: c.sp, XP: int(c.xp), HP: int(math.Ceil(c.hp)), Hunger: int(math.Ceil(c.hunger)), Cooldown: math.Round(c.cooldown*100) / 100, Kills: c.kills})
+		me := meAlive{
+			Alive: true, ID: c.id, Sp: c.sp, XP: int(c.xp), Progress: int(c.progress), HP: int(math.Ceil(max(0, c.hp))), MaxHP: int(c.maxHP()),
+			Hunger: int(math.Ceil(c.hunger)), Cooldown: math.Round(c.cooldown*100) / 100, AbilityCd: math.Round(c.abilityCd*100) / 100,
+			Kills: c.kills, Points: c.points, Bite: c.biteLv, Ability: c.abilityLv,
+		}
+		if c.offer {
+			me.Offer = c.kind().Next
+		}
+		data, _ = json.Marshal(me)
 	case v.died != nil:
 		d := v.died
 		data, _ = json.Marshal(meDead{By: html.EscapeString(d.By), BySp: d.BySp, Sp: d.Sp, XP: int(d.XP), Kills: d.Kills, Secs: int(d.Secs)})
@@ -168,6 +198,15 @@ func encodeMe(b []byte, v viewer) []byte {
 		data = []byte("null")
 	}
 	return append(b, data...)
+}
+
+// encodeHello tells a new connection the name it plays under: a guest's is made up for it.
+func encodeHello(name string) []byte {
+	data, _ := json.Marshal(struct {
+		Type string `json:"type"`
+		Name string `json:"name"`
+	}{"hello", html.EscapeString(name)})
+	return data
 }
 
 func encodeGame(from string, payload json.RawMessage) []byte {

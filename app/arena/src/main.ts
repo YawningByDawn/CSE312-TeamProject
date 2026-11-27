@@ -2,12 +2,14 @@ import './style.css';
 import { Hud } from './hud';
 import { Input } from './input';
 import { Net } from './net';
+import { drawTree, Panels } from './panels';
 import type { MeDead } from './types';
 import { View } from './view';
 
-// Gobble Grove's page: the menu (log in or register, then play), the canvas, and the loop that draws a frame and
-// sends the player's steering. Logging in uses the auth service (`/login`, `/register`, `/logout`); `/api/me` says
-// who is logged in; the arena runs on the app's hub at `/ws`.
+// Gobble Grove's page: the menu (play as a guest, or log in or register to keep a name), the canvas, the panels, and
+// the loop that draws a frame and sends the player's steering. Logging in uses the auth service (`/login`,
+// `/register`, `/logout`); `/api/me` says who is logged in; the arena runs on the app's hub at `/ws`, opened with the
+// login cookie or, for a guest, a random key this tab keeps.
 
 const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
 
@@ -15,6 +17,7 @@ const canvas = $<HTMLCanvasElement>('view');
 const ctx = canvas.getContext('2d')!;
 const menu = $('menu');
 const dead = $('dead');
+const tree = $('tree');
 const auth = $<HTMLFormElement>('auth');
 const authError = $('auth-error');
 const ready = $('ready');
@@ -25,25 +28,47 @@ const net = new Net();
 // for scripts that drive the game in a browser, as the old game's `window.__hg`
 (window as unknown as { __gg: { net: Net } }).__gg = { net };
 const hud = new Hud();
-const input = new Input(canvas, $<HTMLButtonElement>('boost-btn'));
-let myName: string | null = null;
+const input = new Input(canvas, $('touch'), $<HTMLButtonElement>('boost-btn'), $<HTMLButtonElement>('ability-btn'));
+const panels = new Panels($('evolve'), $('stats'), {
+  evolve: (to) => net.send({ type: 'evolve', to }),
+  upgrade: (stat) => net.send({ type: 'upgrade', stat }),
+});
+let account: string | null = null; // the logged-in username; null for a guest
 let playing = false;
 let deathTimer = 0;
 
 const TIPS = [
-  'Bushes hide beetles, frogs, hares and hedgehogs from everything bigger.',
-  'Frogs swim fast, and nothing can see them under water.',
-  'A boost bites a creature your size, and a smaller one bites a creature a tier up.',
+  'Ferns hide the small ones on land, and kelp at sea.',
+  'Devil Frogs hide under water, and lead to the sea.',
+  'A boost bites a creature your size; a smaller one can bite a creature one tier up.',
+  'Skills hurt creatures up to one tier above you. Stay a tier for a point, and make yours hurt more.',
   'The bigger you are, the faster you get hungry: big creatures have to hunt.',
-  'A creature that starves leaves meat behind.',
-  'Boosting costs a little hunger, so keep your belly full.',
+  'Land creatures crawl in the sea, and sea creatures flop on land. Fliers go anywhere.',
+  'Bots never grow past tier 7: the mythical tiers are for players.',
 ];
+
+/** This tab's guest key: random, kept for the tab so a reload is the same guest. */
+function guestKey(): string {
+  try {
+    const kept = sessionStorage.getItem('gg-guest');
+    if (kept && /^[0-9a-f]{32}$/.test(kept)) return kept;
+  } catch {
+    // no storage: a fresh key each load
+  }
+  const key = [...crypto.getRandomValues(new Uint8Array(16))].map((b) => b.toString(16).padStart(2, '0')).join('');
+  try {
+    sessionStorage.setItem('gg-guest', key);
+  } catch {
+    // as above
+  }
+  return key;
+}
 
 const view = new View({
   spawned: () => {
     playing = true;
     clearTimeout(deathTimer);
-    menu.hidden = dead.hidden = true;
+    menu.hidden = dead.hidden = tree.hidden = true;
   },
   died: (me) => {
     playing = false;
@@ -52,8 +77,9 @@ const view = new View({
   evolved: (sp) => {
     const s = net.world?.species[sp];
     if (!s) return;
-    const top = sp === (net.world?.species.length ?? 0) - 1;
-    hud.announce(`You're a ${s.name}!`, top ? 'Top of the food chain' : s.swims ? 'Swim fast, and hide under water' : s.hides ? 'Still small enough to hide in bushes' : 'Too big for bushes: hunt, or be hunted');
+    const top = s.next.length === 0;
+    const home = s.habitat === 'sea' ? 'The sea is yours' : s.habitat === 'air' ? 'You fly over land and sea' : s.habitat === 'amph' ? 'At home on land and in water' : 'A creature of the land';
+    hud.announce(`You're a ${s.name}!`, top ? 'The top of the chain: more xp now earns stat points' : `${home} · Skill: ${s.ability.name}`);
   },
   ate: (name, sp) => hud.toast(`You ate ${name} the ${net.world?.species[sp]?.name ?? 'creature'}`, '#c9ffb0'),
 });
@@ -72,15 +98,27 @@ function showDeath(me: MeDead): void {
   $('again').focus();
 }
 
-function showMenu(): void {
+function showMenu(reachable: boolean): void {
   dead.hidden = true;
   menu.hidden = false;
-  auth.hidden = myName !== null;
-  ready.hidden = myName === null;
-  if (myName !== null) {
-    $('who').textContent = myName;
-    $('play').focus();
+  ready.hidden = !reachable;
+  auth.hidden = !reachable || account !== null;
+  offline.hidden = reachable;
+  const who = $('who');
+  who.replaceChildren();
+  if (account !== null) {
+    const out = document.createElement('button');
+    out.type = 'button';
+    out.className = 'link';
+    out.textContent = 'Log out';
+    out.addEventListener('click', logOut);
+    const b = document.createElement('b');
+    b.textContent = account;
+    who.append('Playing as ', b, ' · ', out);
+  } else {
+    who.textContent = "You'll play as a guest.";
   }
+  $('play').textContent = account === null ? 'Play as guest' : 'Play';
 }
 
 /** The logged-in username, null for nobody, undefined when the server cannot be reached. */
@@ -95,21 +133,34 @@ async function whoAmI(): Promise<string | null | undefined> {
   }
 }
 
+/** Finds out who is playing and opens the socket for them: logged in, or as this tab's guest. */
 async function start(): Promise<void> {
   const name = await whoAmI();
-  offline.hidden = name !== undefined;
-  myName = name ?? null;
-  showMenu();
-  if (name === undefined) auth.hidden = true;
-  if (myName !== null) net.connect();
+  account = name ?? null;
+  showMenu(name !== undefined);
+  if (name === undefined) return;
+  net.close();
+  net.connect(account === null ? guestKey() : null);
+}
+
+async function logOut(): Promise<void> {
+  await fetch('/logout', { method: 'POST' }).catch(() => undefined);
+  playing = false;
+  await start();
 }
 
 function play(): void {
   if (net.status !== 'open') return;
   net.send({ type: 'spawn' });
   playing = true;
-  menu.hidden = dead.hidden = true;
-  canvas.focus();
+  menu.hidden = dead.hidden = tree.hidden = true;
+}
+
+function openTree(): void {
+  if (!net.world) return;
+  const me = net.snaps.at(-1)?.me;
+  drawTree($<HTMLCanvasElement>('tree-canvas'), net.world, me?.alive ? me.sp : -1);
+  tree.hidden = false;
 }
 
 auth.addEventListener('submit', async (e) => {
@@ -135,16 +186,14 @@ auth.addEventListener('submit', async (e) => {
 
 $('play').addEventListener('click', play);
 $('again').addEventListener('click', play);
-$('to-menu').addEventListener('click', showMenu);
-$('logout').addEventListener('click', async () => {
-  await fetch('/logout', { method: 'POST' }).catch(() => undefined);
-  net.close();
-  myName = null;
-  playing = false;
-  showMenu();
-});
+$('to-menu').addEventListener('click', () => showMenu(true));
+$('tree-open').addEventListener('click', openTree);
+$('tree-close').addEventListener('click', () => (tree.hidden = true));
 window.addEventListener('keydown', (e) => {
+  if (e.target instanceof HTMLInputElement) return;
   if (e.code === 'Enter' && !dead.hidden) play();
+  if (e.code === 'KeyT') tree.hidden ? openTree() : (tree.hidden = true);
+  if (e.code === 'Escape') tree.hidden = true;
 });
 
 // the loop
@@ -162,9 +211,11 @@ function frame(now: number): void {
     canvas.height = Math.round(h * dpr);
   }
   const f = view.frame(ctx, w, h, dpr, net, now / 1000, dt);
-  hud.draw(ctx, w, h, dpr, f, net.world, myName, playing);
+  hud.draw(ctx, w, h, dpr, f, net.world, net.name, playing, 0);
+  const alive = f.me?.alive && playing ? f.me : null;
+  panels.update(alive, net.world);
 
-  if (f.me?.alive && playing) {
+  if (alive) {
     const s = input.steer(f, w, h);
     const dx = Math.round(s.dx * 100) / 100;
     const dy = Math.round(s.dy * 100) / 100;
@@ -173,11 +224,13 @@ function frame(now: number): void {
       sent = { dx, dy, at: now };
     }
     if (input.takeBoost()) net.send({ type: 'boost' });
+    if (input.takeSkill()) net.send({ type: 'ability' });
   } else {
     input.takeBoost();
+    input.takeSkill();
   }
 
-  const says = net.status === 'lost' ? 'Connection lost, reconnecting…' : net.status === 'kicked' ? 'You opened the game in another tab.' : net.status === 'connecting' && myName ? 'Connecting…' : '';
+  const says = net.status === 'lost' ? 'Connection lost, reconnecting…' : net.status === 'kicked' ? 'You opened the game in another tab.' : net.status === 'connecting' ? 'Connecting…' : '';
   status.hidden = says === '';
   if (status.textContent !== says) status.textContent = says;
   requestAnimationFrame(frame);
