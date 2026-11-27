@@ -165,3 +165,13 @@ def test_main_writes_the_card_into_the_main_checkouts_workshop(tmp_path, monkeyp
     assert [c["id"] for c in items(main / "data" / "workshop" / "approvals.json")] == ["r-m2"]
     assert (main / "data" / "workshop" / "media" / "r-m2" / "a.png").is_file()
     assert not (wt / "data").exists()
+
+
+def test_close_marks_only_that_card_and_refuses_an_unknown_one(env):
+    approvals, media, shot = env
+    post_card.post(card(), [shot], approvals, media, bk(approvals))
+    post_card.post(card(id="other"), [shot], approvals, media, bk(approvals))
+    post_card.close(approvals, "r-m2")
+    assert [(c["id"], c["closed"]) for c in items(approvals)] == [("r-m2", True), ("other", False)]
+    with pytest.raises(ValueError, match="no card"):
+        post_card.close(approvals, "nope")
