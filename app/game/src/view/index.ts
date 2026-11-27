@@ -6,7 +6,9 @@
 // The world layers sit in one render group whose matrix is the camera, so pan and zoom are one transform write; each
 // layer places baked sprites and picks frames and says when what it shows changed. A frame renders only on a change of
 // camera, size or a layer; a frame where nothing changed issues no GL call. Pixi's own ticker is stopped: the app's one
-// rAF frame is the only loop. Picking is the scene graph's: the places' disks lie under every layer.
+// rAF frame is the only loop. Picking is the scene graph's: the places' disks lie under every layer. While a match of the
+// shared mine plays (multiplayer, arena.ts) the layers read the rules through `matchRules` (its open zones lit, the rest
+// void, broad day, no ores), the people layer shows its players, and the arena's two layers its shrines and crystals.
 import { Container, Texture, Ticker, WebGLRenderer } from 'pixi.js';
 import type { AtlasManifest, Layer, LayerName, Query, View, ViewModel } from '../types';
 import { frameOf, scale } from './camera';
@@ -31,10 +33,13 @@ import { Sheen } from './sheen';
 import { Fx, GRAVE_AT, anchor, type Anchor } from './life/fx';
 import { Films, filmLength } from './film/films';
 import { Opening } from './film/opening';
+import { Arena, matchRules } from './arena';
 
 const ORDER: readonly LayerName[] = ['ground', 'stain', 'props', 'people', 'fx', 'above', 'weather', 'fog', 'lit', 'notes'];
 
-export function createView(canvas: HTMLCanvasElement, dpr: number, q: Query, muted: boolean): View {
+export function createView(canvas: HTMLCanvasElement, dpr: number, runRules: Query, muted: boolean): View {
+  let now: ViewModel | null = null;
+  const q = matchRules(runRules, () => now);
   const opening = new Opening(canvas, muted);
   const renderer = new WebGLRenderer();
   const stage = new Container();
@@ -84,14 +89,16 @@ export function createView(canvas: HTMLCanvasElement, dpr: number, q: Query, mut
         Atlas.load(renderer, oreManifest as unknown as AtlasManifest, oreUrl), ground.load(renderer), people.load(lifeP),
       ]);
       films = new Films(people, world, screen, renderer);
+      const arena = new Arena(renderer, life);
       // the sheen lies on the mine's ground, over the lit picture
-      add(ground, sheen, gray, new Lights(q, life), (ores = new Ores(q, life, ore)), people, new Fx(q, life, people), new Weather(q, sky, fog, life, renderer), fog, films);
+      add(ground, sheen, gray, new Lights(q, life), (ores = new Ores(q, life, ore)), arena.under, people, new Fx(q, life, people), arena.over, new Weather(q, sky, fog, life, renderer), fog, films);
       ready = true;
       opening.load();
     },
 
     frame(live: ViewModel) {
       if (!ready) return;
+      now = live;
       opening.frame(live);
       const vm = films.view(live);
       let changed = dirty;

@@ -190,14 +190,16 @@ class Player implements Audio {
   private mix(vm: ViewModel, day: number): void {
     const st = vm.state;
     const film = vm.film?.kind;
-    const bed = vm.title ? null
+    // the title is silent; a match over it sounds the mine
+    const title = vm.title && !vm.match;
+    const bed = title ? null
       : film === 'opening' ? null : st.phase === 'won' ? 'ending'
       : st.phase === 'lost' ? 'defeat' : 'whisper';
     for (const name in MANIFEST.beds) this.level(`bed.${name}`, MANIFEST.beds[name]!, this.bedIn, name === bed ? 1 : 0, BED_FADE);
 
     const m: Moment = { day, shift: this.q.part(st.tick) === 'shift' ? 1 : 0, weather: st.weather };
     for (const [layer, law] of AMBIENCE) {
-      const v = vm.title || film === 'opening' ? 0 : law(m);
+      const v = title || film === 'opening' ? 0 : law(m);
       this.level(`amb.${layer}.calm`, MANIFEST.amb[layer]!.calm!, this.ambBus, v, AMB_FADE);
     }
   }

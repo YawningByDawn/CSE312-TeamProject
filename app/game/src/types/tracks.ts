@@ -116,6 +116,34 @@ export interface ViewModel {
   menu: Menu;
   /** Events since the last frame, for effects and notes; app clears it after the frame. */
   fresh: readonly GameEvent[];
+  /** The shared mine while a match plays (the title stands behind it), else null; one object for the match's life. */
+  match: MatchView | null;
+}
+
+// ---------- the shared mine (multiplayer; the hub runs it, app/websocket/match.go) ----------
+
+/** A seat of the match's mine: its god's shrine (mine units) and the zones of its domain (the fog's zone names). */
+export interface MatchSeat { shrine: [number, number]; zones: string[] }
+/** What a match is, as the hub sends it when it starts: who sits where (the seat is their god), the seats, the goal, ticks a second. */
+export interface MatchSetup { players: { name: string; seat: number }[]; seats: MatchSeat[]; goal: number; rate: number }
+/** One player as the hub stepped them (mine units; `swing` seconds into one, -1 at rest; `stun` seconds left). */
+export interface MatchBody {
+  name: string; x: number; y: number; dx: number; dy: number; face: number; walked: number; moving: boolean;
+  carry: number; swing: number; ax: number; ay: number; stun: number;
+}
+/** The match as it stood at a tick: the players, the crystals on the ground ([id, x, y]), each seat's score, the winning seat (-1 while it plays). */
+export interface MatchWorld { seq: number; players: MatchBody[]; crystals: [number, number, number][]; score: number[]; winner: number }
+/** A player as shown this frame: their body `alpha` of the way from the last tick to this one, their seat, whether it is this player. */
+export interface MatchShown extends MatchBody { seat: number; me: boolean }
+/** The view model's match: its setup, this player's name, the open zones, and this frame's players, crystals and score. */
+export interface MatchView {
+  setup: MatchSetup;
+  me: string;
+  open: ReadonlySet<string>;
+  shown: MatchShown[];
+  crystals: readonly [number, number, number][];
+  score: readonly number[];
+  winner: number;
 }
 
 // ---------- the seams between tracks ----------
@@ -265,9 +293,12 @@ export interface Net {
   lobbies: Lobby[];
   /** why the last `join` was refused (`full`, `gone`), empty when it was not */
   refused: string;
-  /** the host pressed Start: the hub told this lobby's members (reset when this player is out of the lobby) */
-  started: boolean;
-  /** moves whenever `lobby`, `lobbies`, `refused` or `started` does */
+  /** the match this player is in (the host's Start began it), null for none */
+  match: MatchSetup | null;
+  /** the match as the hub last stepped it, and the step before (null until there are two) */
+  world: MatchWorld | null;
+  was: MatchWorld | null;
+  /** moves whenever `lobby`, `lobbies`, `refused` or `match` does */
   rev: number;
   host(): void;
   search(): void;
@@ -275,6 +306,10 @@ export interface Net {
   leave(): void;
   /** the host's Start; the hub ignores it from anyone else */
   start(): void;
+  /** in a match: the heading held (each -1, 0 or 1) until the next */
+  move(dx: number, dy: number): void;
+  /** in a match: swing the pick toward (dx, dy) */
+  strike(dx: number, dy: number): void;
   /** `data` to every other player; dropped while the socket is not open */
   send(data: unknown): void;
   onGame(f: (from: string, data: unknown) => void): void;

@@ -30,7 +30,7 @@ services:
     depends_on:
       - auth
     environment:
-      TICK_RATE: ${TICK_RATE:-10}
+      TICK_RATE: ${TICK_RATE:-20}
     volumes:
       - jwt_public:/keys/public:ro
   nginx:

@@ -10,8 +10,9 @@ export interface Slots { nav: HTMLElement; stage: HTMLElement; base: HTMLElement
 // Search's scrollable list of the hub's open lobbies, and the lobby the player is in with its members, each a solid slab (the
 // game's own panel: slab, parchment name tab, dark parchment rows, violet for the lit one) centred on the screen, with their
 // buttons as violet plates in one row at the window's bottom (Search: Back, Refresh, Join, dim until one is picked; the lobby:
-// Back and Start, dim for all but the host). The hub says which lobby this player is in (`net.lobby`), so that screen shows
-// whenever there is one. Coordinates are design px: from the title's menu (`nav`), or from the screen's centre (`stage`) and
+// Back and Start, dim for all but the host; Start begins the match in the shared mine, which stands over the title until it
+// ends and the lobby shows again). The hub says which lobby this player is in (`net.lobby`), so that screen shows whenever
+// there is one. Coordinates are design px: from the title's menu (`nav`), or from the screen's centre (`stage`) and
 // from the bottom row's own centre (`base`, which the title keeps at the window's bottom).
 
 const LIST = { w: 520, h: 340 };
@@ -62,29 +63,6 @@ export class Multi {
     return new Menu(items, acts);
   }
 
-  /** A violet plate button in the bottom row, centred at `cx`: dim (and inert in look) until `live(true)`. */
-  private button(base: HTMLElement, cx: number, text: string, act: () => void): { el: HTMLDivElement; live: (on: boolean) => void } {
-    const el = item(base, cx - PLATE.w / 2, 0, 24, text, '', act);
-    el.style.zIndex = '0';
-    // the plates sit behind the label, before the lit mark (Menu reads its first and last child); the label fills the plate
-    // (the click lands on it) and sits centred, the mark inside the plate's left
-    const [label, mark] = [el.firstChild, el.lastChild] as HTMLElement[];
-    const back = div(el, 'hg-b');
-    back.style.zIndex = '-1';
-    el.insertBefore(back, mark!);
-    const on = surface(back, 'violet', 0, -10, PLATE.w, PLATE.h), off = surface(back, 'violetDim', 0, -10, PLATE.w, PLATE.h);
-    Object.assign(label!.style, { top: '-10px', width: `${PLATE.w}px`, height: `${PLATE.h}px`, lineHeight: `${PLATE.h}px`, textAlign: 'center' });
-    mark!.style.left = '12px';
-    mark!.style.top = '9px';
-    const live = (v: boolean): void => {
-      on.hidden = !v;
-      off.hidden = v;
-      el.classList.toggle('hgp-off', !v);
-    };
-    live(true);
-    return { el, live };
-  }
-
   private search({ stage, base }: Slots): Menu {
     const net = this.net;
     if (!net.lobbies.some((l) => l.host === this.picked)) this.picked = '';
@@ -104,7 +82,7 @@ export class Multi {
     });
     new Words(el, 0, LIST.h - 40, 18, BLOOD, 'center', LIST.w).set(net.refused ? uiText(`lobby.refused.${net.refused}`) : '');
     const acts = [() => this.back(), () => net.search(), () => { if (this.picked) net.join(this.picked); }];
-    const [back, refresh, join] = [uiText('btn.back'), uiText('lobby.refresh'), uiText('lobby.join')].map((w, i) => this.button(base, (i - 1) * 170, w, acts[i]!));
+    const [back, refresh, join] = [uiText('btn.back'), uiText('lobby.refresh'), uiText('lobby.join')].map((w, i) => plate(base, (i - 1) * 170, w, acts[i]!));
     const mark = (): void => {
       for (const { lit, name, host } of rows) {
         lit.hidden = host !== this.picked;
@@ -129,14 +107,36 @@ export class Multi {
       if (m === lobby.host) new Words(r, w - 56 - 136, 12, 18, DIM, 'right', 120).set(uiText('lobby.hostTag'));
     });
     const host = me === lobby.host;
-    // what Start starts is a stub until multiplayer play exists: the hub tells every member, and they see it
-    new Words(el, 0, h - 40, 18, PALE, 'center', w).set(net.started ? uiText('lobby.started') : host ? '' : uiText('lobby.waiting'));
-    const acts = [() => this.back(), () => { if (host && !net.started) net.start(); }];
-    const [back, start] = [uiText('btn.back'), uiText('lobby.start')].map((t, i) => this.button(base, (i - 0.5) * 190, t, acts[i]!));
-    if (!host || net.started) {
+    new Words(el, 0, h - 40, 18, PALE, 'center', w).set(host ? '' : uiText('lobby.waiting'));
+    const acts = [() => this.back(), () => { if (host) net.start(); }];
+    const [back, start] = [uiText('btn.back'), uiText('lobby.start')].map((t, i) => plate(base, (i - 0.5) * 190, t, acts[i]!));
+    if (!host) {
       start!.live(false);
       attr(start!.el, 'title', uiText('lobby.waiting'));
     }
     return new Menu([back!.el, start!.el], acts);
   }
+}
+
+/** A violet plate button in the bottom row, centred at `cx`: dim (and inert in look) until `live(true)`. */
+export function plate(base: HTMLElement, cx: number, text: string, act: () => void): { el: HTMLDivElement; live: (on: boolean) => void } {
+  const el = item(base, cx - PLATE.w / 2, 0, 24, text, '', act);
+  el.style.zIndex = '0';
+  // the plates sit behind the label, before the lit mark (Menu reads its first and last child); the label fills the plate
+  // (the click lands on it) and sits centred, the mark inside the plate's left
+  const [label, mark] = [el.firstChild, el.lastChild] as HTMLElement[];
+  const back = div(el, 'hg-b');
+  back.style.zIndex = '-1';
+  el.insertBefore(back, mark!);
+  const on = surface(back, 'violet', 0, -10, PLATE.w, PLATE.h), off = surface(back, 'violetDim', 0, -10, PLATE.w, PLATE.h);
+  Object.assign(label!.style, { top: '-10px', width: `${PLATE.w}px`, height: `${PLATE.h}px`, lineHeight: `${PLATE.h}px`, textAlign: 'center' });
+  mark!.style.left = '12px';
+  mark!.style.top = '9px';
+  const live = (v: boolean): void => {
+    on.hidden = !v;
+    off.hidden = v;
+    el.classList.toggle('hgp-off', !v);
+  };
+  live(true);
+  return { el, live };
 }

@@ -1,5 +1,5 @@
-// src/ui/panels, what opens over the rest layout (inventory #1, 5, 7, 47, 94, 115-123): the title, the defeat and the
-// ending (front), what the clock waits on: a blessing, a story's choice, (choice), a person, the grave and the pay slab
+// src/ui/panels, what opens over the rest layout (inventory #1, 5, 7, 47, 94, 115-123): a match of the shared mine (match),
+// the title, the defeat and the ending (front), what the clock waits on: a blessing, a story's choice, (choice), a person, the grave and the pay slab
 // (grave), the dusk's ledger; art.ts the baked sheets they show (assets/ui, cardart, crystals, crystalmarks, portraits,
 // front, title, defeat). Reads the view model, the sim's Query and card helpers, content's tables
 // and words, the framework's login; sends intents.
@@ -13,6 +13,7 @@ import { Defeat, Ending, Title } from './front';
 import { Grave, Pay } from './grave';
 import { Host } from './host';
 import { Multi } from './lobby';
+import { Match } from './match';
 import { Person } from './person';
 import { SignIn } from './sign';
 
@@ -72,7 +73,7 @@ export const mountPanels = (account: Account | null, net: Net | null): MountPane
   const pay = new Pay(ctx);
   // modal first: the first open one owns the keys
   const list: Panel[] = [
-    new Title(ctx), new Defeat(ctx), new Ending(ctx), new Choice(ctx), new Host(ctx), pay, new Dusk(ctx),
+    new Match(ctx), new Title(ctx), new Defeat(ctx), new Ending(ctx), new Choice(ctx), new Host(ctx), pay, new Dusk(ctx),
     new Person(ctx), new Grave(ctx),
   ];
   // the first in the list stands over the rest, as it owns the keys

@@ -4,6 +4,7 @@
 // map, roles, world and crystals, and assets/people, assets/poses and the life atlas.
 import { Container, Matrix, Rectangle, Sprite, Texture, type Renderer } from 'pixi.js';
 import type { Activity, GameEvent, Layer, Mob, Person, PlaceId, Query, RoleId, UnitId, ViewModel } from '../../types';
+import { placeMatch } from './players';
 import { DAY_TICK_S } from '../../content/clock';
 import { HOST } from '../../content/stats';
 import { MINE_FRAME, spotsOf, way } from '../../content/map';
@@ -32,39 +33,39 @@ export class People implements Layer {
   readonly root = new Container({ isRenderGroup: true });
   private readonly looks = new Map<string, Look>();
   private readonly byFamily = new Map<string, Look[]>();
-  private series: Series[] = [];
+  series: Series[] = [];
   private holds: Hold[] = [];
   private holdIdList: HoldIds[] = [];
-  private roles: Record<string, Record<string, number>> = {};
+  roles: Record<string, Record<string, number>> = {};
   /** the pages of the looks' low-detail pictures as they load */
   private readonly pages: (Texture | undefined)[] = [];
   private pageNames: string[] = [];
-  private readonly shown = new Map<UnitId, Shown>();
+  readonly shown = new Map<UnitId, Shown>();
   private readonly vis = new Map<PlaceId, boolean>();
   private readonly seen = new StateSeen();
   private readonly m = new Matrix();
-  private readonly at = { a: 0, e: 0, f: 0 };
+  readonly at = { a: 0, e: 0, f: 0 };
   /** the figure being placed: where, what it does and is */
-  private readonly spot: Spot = { x: 0, y: 0, facing: 1, doing: 'idle', walking: false, dist: 0, dx: 0, dy: 0, swing: -1, gone: false, lieLow: false, follower: false, devotion: 0, chosen: false, mob: false, marked: 0 };
-  private readonly view = { x0: 0, y0: 0, x1: 0, y1: 0 };
+  readonly spot: Spot = { x: 0, y: 0, facing: 1, doing: 'idle', walking: false, dist: 0, dx: 0, dy: 0, swing: -1, gone: false, lieLow: false, follower: false, devotion: 0, chosen: false, mob: false, marked: 0, paint: 0 };
+  readonly view = { x0: 0, y0: 0, x1: 0, y1: 0 };
   /** what the last frame was placed for: the tick's fraction, camera, the picked and the hovered */
-  private readonly last = { alpha: -1, x: 0, y: 0, zoom: -1, w: 0, h: 0, focus: null as ViewModel['focus'], hover: null as ViewModel['hover'], stamp: 0 };
+  readonly last = { alpha: -1, x: 0, y: 0, zoom: -1, w: 0, h: 0, focus: null as ViewModel['focus'], hover: null as ViewModel['hover'], stamp: 0 };
   /** the people shown at the last full placing */
-  private readonly on: Shown[] = [];
+  readonly on: Shown[] = [];
   /** people shown last frame */
-  private count = 0;
+  count = 0;
   /** the render time at which the first of the shown next changes its picture by time alone (`Shown.until`) */
   private wake = 0;
 
   private life!: Atlas;
-  private stamps!: Stamps;
+  stamps!: Stamps;
 
   /** the marks on the ground under everyone, the figures in depth order, the light on the picked and the hovered: one batch each */
   private readonly ground = new Container();
   private readonly figures = new Container();
   private readonly glow = new Container();
 
-  constructor(private readonly q: Query, private readonly renderer: Renderer, private readonly screen: { w: number; h: number }, private readonly dpr: number) {
+  constructor(private readonly q: Query, private readonly renderer: Renderer, readonly screen: { w: number; h: number }, private readonly dpr: number) {
     this.figures.sortableChildren = true;
     this.root.eventMode = this.figures.eventMode = 'passive';
     this.root.addChild(this.ground, this.figures, this.glow);
@@ -105,6 +106,7 @@ export class People implements Layer {
   frame(vm: ViewModel): boolean {
     const s = vm.state, c = vm.camera, L = this.last, t = vm.time;
     const stateMoved = this.seen.moved(vm);
+    if (vm.match) return placeMatch(this, vm);
     if (stateMoved) {
       this.vis.clear();
       for (const e of vm.fresh) this.react(e, t);
@@ -196,7 +198,7 @@ export class People implements Layer {
     const S = this.spot;
     S.x = x; S.y = y; S.facing = facing; S.doing = doing; S.walking = (routeU >= 0 || host !== null) && doing === 'walk';
     S.dist = dist; S.dx = dx; S.dy = dy; S.swing = swing;
-    S.gone = !!p.gone; S.lieLow = p.routine === 'lieLow'; S.follower = p.follower; S.devotion = p.stats.devotion; S.chosen = host !== null; S.mob = false;
+    S.gone = !!p.gone; S.lieLow = p.routine === 'lieLow'; S.follower = p.follower; S.devotion = p.stats.devotion; S.chosen = host !== null; S.mob = false; S.paint = 0;
     S.marked = this.q.markLeft(vm.state, p.id);
     return this.show(sh, S, vm, a, stamp);
   }
@@ -211,13 +213,13 @@ export class People implements Layer {
     S.doing = S.walking ? 'walk' : 'idle';
     S.dist = (m.walked - moved * (1 - k)) / MINE_FRAME.per; S.dx = m.dx; S.dy = m.dy;
     S.swing = m.swing >= 0 ? m.swing + k * DAY_TICK_S : -1;
-    S.gone = m.down >= 0; S.lieLow = false; S.follower = false; S.devotion = 0; S.chosen = false; S.mob = true; S.marked = 0;
+    S.gone = m.down >= 0; S.lieLow = false; S.follower = false; S.devotion = 0; S.chosen = false; S.mob = true; S.marked = 0; S.paint = 0;
     if (S.gone) sh.fellAt = vm.time - m.down - k * DAY_TICK_S;
     return this.show(sh, S, vm, a, stamp);
   }
 
   /** `sh` shown at its spot: culled off screen, else its pose, its paint, its marks and its parts. */
-  private show(sh: Shown, S: Spot, vm: ViewModel, a: number, stamp: number): Shown | null {
+  show(sh: Shown, S: Spot, vm: ViewModel, a: number, stamp: number): Shown | null {
     const t = vm.time, { x, y, facing } = S;
     const scale = (MINE_RIG / MINE_FRAME.per) * sh.look.body.hk;
     if (x < this.view.x0 || x > this.view.x1 || y < this.view.y0 - 40 * scale || y > this.view.y1 + 40 * scale) return this.hide(sh);
@@ -340,7 +342,7 @@ export class People implements Layer {
     for (let i = n; i < sh.sprites.length; i++) sh.sprites[i]!.visible = false;
   }
 
-  private hide(sh: Shown | undefined): null {
+  hide(sh: Shown | undefined): null {
     if (sh && sh.root.visible) {
       sh.root.visible = sh.pool.visible = sh.ring.visible = sh.beam.visible = false;
       for (const tk of [...sh.ticks, ...sh.pips]) tk.visible = false;
@@ -350,7 +352,7 @@ export class People implements Layer {
   }
 
   /** A figure for `id` of trade `role` (a skeleton: `MOB_FAMILY`, and no one picks it). */
-  private make(id: UnitId, role: RoleId, follower: boolean): Shown {
+  make(id: UnitId, role: RoleId, follower: boolean): Shown {
     const own = this.looks.get(id);
     const look = own ?? (() => {
       const fam = this.byFamily.get(role === MOB_FAMILY ? MOB_FAMILY : familyOf(role))!;

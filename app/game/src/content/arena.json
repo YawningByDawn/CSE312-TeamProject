@@ -1,0 +1,43 @@
+{
+  "note": "The shared mine (multiplayer, DECISIONS 133): the hub (app/websocket/arena.go) and the game (src/content/arena.ts) both read this file. layouts[n-1] is the mine for n players: one seat per player, in lobby order (the host first), each a god's shrine (mine units, where its player spawns and gives crystals) and the three zones of walk.json that are its domain. Only the seats' zones are open; the rest of the mine is rock. rules are the match's numbers: lengths in mine units, times in seconds.",
+  "rules": {
+    "speed": 90,
+    "feet": 5,
+    "pick": 18,
+    "carry": 5,
+    "shrine": 48,
+    "goal": 20,
+    "crystals": 6,
+    "crystalsEach": 3,
+    "spawnEvery": 1.2,
+    "spawnClear": 80,
+    "swing": 0.62,
+    "blow": 0.26,
+    "reach": 40,
+    "arc": 70,
+    "stun": 1.2,
+    "knock": 28,
+    "scatter": 36,
+    "over": 6
+  },
+  "layouts": [
+    [
+      { "shrine": [1190, 895], "zones": ["cartway", "grave", "heartvein"] }
+    ],
+    [
+      { "shrine": [532, 684], "zones": ["westdrift", "cartway", "grave"] },
+      { "shrine": [1996, 684], "zones": ["sorting", "heartvein", "eastworks"] }
+    ],
+    [
+      { "shrine": [868, 676], "zones": ["cartway", "grave", "lowgallery"] },
+      { "shrine": [1940, 236], "zones": ["overseer", "lift", "sorting"] },
+      { "shrine": [1756, 1164], "zones": ["heartvein", "eastworks", "sump"] }
+    ],
+    [
+      { "shrine": [652, 340], "zones": ["kilnshrine", "westdrift", "bunks"] },
+      { "shrine": [1940, 236], "zones": ["overseer", "lift", "sorting"] },
+      { "shrine": [1756, 1164], "zones": ["heartvein", "eastworks", "sump"] },
+      { "shrine": [796, 1116], "zones": ["cartway", "grave", "lowgallery"] }
+    ]
+  ]
+}
