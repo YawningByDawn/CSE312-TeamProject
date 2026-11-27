@@ -28,6 +28,7 @@ What the code in `src/` is. Each system below is a folder, and the folder's entr
 | `src/app` | `boot.ts` (the page), `pump.ts` | the pump (ticks, the clock's holds, films' time, the camera, the view model), input, save, `window.__hg`, the framework's login |
 | `src/app/prof` | `index.ts` | the profiled page (`?prof=1`, F3; `docs/perf.md`) |
 | `src/audio` | `index.ts` `createAudio` | the AudioContext, the buses, the cues, beds and ambience |
+| multiplayer | `src/app/net.ts`, `src/app/match.ts`, `src/view/arena.ts`, `src/ui/panels/match.ts` | the shared mine: the hub's socket, the match as the view model shows it, its layers and its panel; the rules are the hub's (`app/websocket`). Map and how to change it: `docs/multiplayer.md` |
 
 The baked files every system places, folder by folder: `docs/art-pipeline.md`.
 

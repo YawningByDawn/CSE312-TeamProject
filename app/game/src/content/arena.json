@@ -1,5 +1,5 @@
 {
-  "note": "The shared mine (multiplayer, DECISIONS 133): the hub (app/websocket/arena.go) and the game (src/content/arena.ts) both read this file. layouts[n-1] is the mine for n players: one seat per player, in lobby order (the host first), each a god's shrine (mine units, where its player spawns and gives crystals) and the three zones of walk.json that are its domain. Only the seats' zones are open; the rest of the mine is rock. rules are the match's numbers: lengths in mine units, times in seconds.",
+  "note": "The shared mine (multiplayer; how to change it: docs/multiplayer.md; why: DECISIONS 133): the hub (app/websocket/arena.go) and the game (src/content/arena.ts) both read this file. layouts[n-1] is the mine for n players: one seat per player, in lobby order (the host first), each a god's shrine (mine units, where its player spawns and gives crystals) and the three zones of walk.json that are its domain. Only the seats' zones are open; the rest of the mine is rock. rules are the match's numbers: lengths in mine units, times in seconds.",
   "rules": {
     "speed": 90,
     "feet": 5,
