@@ -12,9 +12,10 @@ export interface Spot {
 /**
  * Under the feet: the wick's light pooled (violet for yours, brighter with devotion; gold the Flame's; pale the
  * Council's), the rings of the picked (pulsing, four ticks outward, PICK_TICK screen px long) and the hovered. The host
- * the god is in is picked out as the player's own pick is; a skeleton has no light of its own.
+ * the god is in is picked out as the player's own pick is; a skeleton has no light of its own. True while any of it
+ * pulses with the render time (the picked, the host's diamonds).
  */
-export function marks(sh: Shown, p: Spot, vm: ViewModel, scale: number, x: number, y: number, px: number): void {
+export function marks(sh: Shown, p: Spot, vm: ViewModel, scale: number, x: number, y: number, px: number): boolean {
   const picked = p.chosen || (!!vm.focus && 'unit' in vm.focus && vm.focus.unit === sh.id);
   const hover = !picked && !!vm.hover && 'unit' in vm.hover && vm.hover.unit === sh.id;
   const pool = sh.pool, ring = sh.ring, beam = sh.beam, s = scale, pulse = picked ? 0.85 + 0.15 * Math.sin(vm.time * 3.2) : 1;
@@ -58,4 +59,5 @@ export function marks(sh: Shown, p: Spot, vm: ViewModel, scale: number, x: numbe
     beam.scale.set((24 * s) / 320, (46 * s) / 1000);
     beam.position.set(x, y);
   }
+  return picked || p.marked > 0;
 }

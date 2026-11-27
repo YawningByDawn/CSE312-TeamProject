@@ -129,7 +129,9 @@ export interface Shown {
   lineN: number;
   /** the frame it was last placed in */
   stamp: number;
-  /** a small figure's step and paint, its loop and its stamp's px per rig unit, as last stamped (-1: stamped every frame) */
+  /** the render time before which time alone leaves its picture as drawn (0: it changes each frame) */
+  until: number;
+  /** a calm figure's step and paint, its loop and its px per rig unit, as last drawn (-1: drawn every frame) */
   key: number;
   keyName: string;
   keyPx: number;
