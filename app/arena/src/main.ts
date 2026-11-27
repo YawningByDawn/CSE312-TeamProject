@@ -38,10 +38,13 @@ let playing = false;
 let deathTimer = 0;
 
 const TIPS = [
+  'Bitten? You are thrown clear and run faster for a moment: get away!',
+  'Nothing takes more than half your health in one hit, so keep moving.',
+  'You bite back when bitten, and a boost into a bigger creature bites it too.',
   'Ferns hide the small ones on land, and kelp at sea.',
   'Devil Frogs hide under water, and lead to the sea.',
-  'A boost bites a creature your size; a smaller one can bite a creature one tier up.',
-  'Skills hurt creatures up to one tier above you. Stay a tier for a point, and make yours hurt more.',
+  'Red outlines can eat you; green ones you can eat.',
+  'Skills hurt anything, bigger creatures less. Stay a tier for a point, and make yours hurt more.',
   'The bigger you are, the faster you get hungry: big creatures have to hunt.',
   'Land creatures crawl in the sea, and sea creatures flop on land. Fliers go anywhere.',
   'Bots never grow past tier 7: the mythical tiers are for players.',

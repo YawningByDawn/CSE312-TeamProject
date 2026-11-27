@@ -10,6 +10,8 @@ export interface Ability {
 export interface Species {
   name: string;
   tier: number;
+  hp: number; // health, full
+  atk: number; // what a bite takes, before levels
   r: number;
   speed: number;
   view: number; // the height of the world a player of it sees
@@ -114,6 +116,7 @@ export const GUARDED = 8;
 export const WET = 16;
 export const USING = 32; // its ability
 export const CHARGING = 64;
+export const HURT = 128; // just now
 
 export interface Creature {
   id: number;

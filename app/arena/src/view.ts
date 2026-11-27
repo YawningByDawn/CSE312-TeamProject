@@ -1,7 +1,7 @@
 import { BODY_COLOR, drawAnimal, drawShadow } from './animals';
 import type { Net } from './net';
 import { drawCover, drawFood, drawGround, drawPonds, type Rect } from './scene';
-import { BOOSTING, BOT, CHARGING, GUARDED, HIDDEN, USING, WET, type BoardRow, type Creature, type MeAlive, type MeDead, type Snap, type Species, type World } from './types';
+import { BOOSTING, BOT, CHARGING, GUARDED, HIDDEN, HURT, USING, WET, type BoardRow, type Creature, type MeAlive, type MeDead, type Snap, type Species, type World } from './types';
 
 // The world as one frame sees it: a little in the past, between the two snapshots either side of that moment, so
 // creatures glide at any tick rate. A snapshot's events play as the frame passes it: food and prey slide into
@@ -9,6 +9,9 @@ import { BOOSTING, BOT, CHARGING, GUARDED, HIDDEN, USING, WET, type BoardRow, ty
 
 const TAU = Math.PI * 2;
 const SPECTATOR_VIEW = 1100;
+// outlines while playing: red for what can eat you, green for what you can eat
+const PREDATOR = '#ff3b30';
+const PREY = '#3ddc57';
 const MAX_ASPECT = 2.4; // the hub sends a view up to this many times as wide as it is high
 
 /** The colours of each ability style: its main colour and a lighter one. */
@@ -184,13 +187,15 @@ export class View {
       const lift = d.s.habitat === 'air' ? 0.7 : 0; // fliers cast their shadow further off
       drawShadow(c, d.x + d.s.r * lift, d.y + d.s.r * lift * 1.3, d.s.r * (1 - lift * 0.25));
     }
+    const myTier = mySpecies ? mySpecies.tier : -1;
+    const ring = (d: Drawn): string | null => (myTier < 0 || d === mine || d.s.tier === myTier ? null : d.s.tier > myTier ? PREDATOR : PREY);
     for (const d of drawn) {
       if (!visible(d) || d === mine && d.flags & HIDDEN) continue;
-      this.creature(c, d, t, d.flags & HIDDEN && d.flags & WET && d.s.habitat === 'amph' ? 0.3 : 1);
+      this.creature(c, d, t, d.flags & HIDDEN && d.flags & WET && d.s.habitat === 'amph' ? 0.3 : 1, d.flags & HIDDEN ? null : ring(d), scale);
     }
     drawCover(c, world.bushes, world.kelp, v, t);
     if (mine && mine.flags & HIDDEN) {
-      this.creature(c, mine, t, 0.6);
+      this.creature(c, mine, t, 0.6, null, scale);
       c.beginPath();
       c.arc(mine.x, mine.y, mine.s.r + 6, 0, TAU);
       c.setLineDash([6, 6]);
@@ -204,7 +209,6 @@ export class View {
 
     // names and hp, in screen space
     c.setTransform(dpr, 0, 0, dpr, 0, 0);
-    const myTier = mySpecies ? mySpecies.tier : -1;
     let threat = 0;
     c.textAlign = 'center';
     c.textBaseline = 'middle';
@@ -253,9 +257,22 @@ export class View {
     return v;
   }
 
-  private creature(c: CanvasRenderingContext2D, d: Drawn, t: number, alpha: number): void {
+  /** Draws a creature, outlined in `ring` (red: it can eat me; green: I can eat it) and flashing red when just hurt. */
+  private creature(c: CanvasRenderingContext2D, d: Drawn, t: number, alpha: number, ring: string | null, scale: number): void {
     const r = d.s.r;
     c.globalAlpha = alpha;
+    if (ring) {
+      c.beginPath();
+      c.arc(d.x, d.y, r + 3 / scale, 0, TAU);
+      c.fillStyle = ring;
+      c.globalAlpha = alpha * 0.22;
+      c.fill();
+      c.globalAlpha = alpha * 0.95;
+      c.lineWidth = 3.5 / scale;
+      c.strokeStyle = ring;
+      c.stroke();
+      c.globalAlpha = alpha;
+    }
     if (d.flags & (BOOSTING | CHARGING)) {
       const [main] = STYLE_COLOR[d.flags & CHARGING ? d.s.ability.style : 'wind'] ?? ['#fff'];
       c.strokeStyle = d.flags & CHARGING ? main : 'rgba(255,255,255,0.6)';
@@ -281,6 +298,12 @@ export class View {
       c.stroke();
     }
     drawAnimal(c, d.s.name, d.x, d.y, r, d.a, t + d.id, d.mv, d.flags & (BOOSTING | CHARGING) ? 1.1 : 1);
+    if (d.flags & HURT) {
+      c.beginPath();
+      c.arc(d.x, d.y, r * 0.95, 0, TAU);
+      c.fillStyle = 'rgba(255,40,30,0.38)';
+      c.fill();
+    }
     if (d.flags & GUARDED) {
       c.strokeStyle = `rgba(255,255,255,${0.45 + Math.sin(t * 10) * 0.25})`;
       c.lineWidth = 3;

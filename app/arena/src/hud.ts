@@ -186,7 +186,19 @@ export class Hud {
     c.fillStyle = HABITAT_COLOR[sp.habitat] ?? '#fff';
     c.fillText(`Tier ${sp.tier + 1} · ${HABITAT_LABEL[sp.habitat] ?? ''}`, tx, y + (small ? 39 : 43));
     c.fillStyle = 'rgba(255,255,255,0.9)';
-    c.fillText(small ? `${sp.ability.name}` : `${sp.ability.name}  ·  Bite ${bite} · Skill ${ability}`, tx, y + (small ? 53 : 60));
+    const atk = Math.round(sp.atk * (1 + 0.2 * bite));
+    c.fillText(small ? `HP ${sp.hp} · ATK ${atk}` : `HP ${sp.hp} · ATK ${atk} · ${sp.ability.name}${ability ? ` +${ability}` : ''}`, tx, y + (small ? 53 : 60));
+    if (!small) {
+      // what the outlines mean
+      rounded(c, x, y + size + 16, 196, 22, 11);
+      c.fillStyle = 'rgba(28,44,26,0.55)';
+      c.fill();
+      c.font = `700 12px ${FONT}`;
+      c.fillStyle = '#7dff8f';
+      c.fillText('● green: prey', x + 10, y + size + 31);
+      c.fillStyle = '#ff8a80';
+      c.fillText('● red: predator', x + 98, y + size + 31);
+    }
   }
 
   private leaderboard(c: CanvasRenderingContext2D, w: number, y: number, f: Frame, myName: string | null, small: boolean): void {

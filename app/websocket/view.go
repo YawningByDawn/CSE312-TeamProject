@@ -63,7 +63,7 @@ func (a *arena) view(v viewer) []byte {
 		b = append(b, ',')
 		b = num(b, int(math.Ceil(100*max(0, c.hp)/c.maxHP())))
 		b = append(b, ',')
-		b = num(b, flags(c))
+		b = num(b, a.flags(c))
 		b = append(b, ',')
 		b = append(b, c.nameJSON...)
 		b = append(b, ']')
@@ -131,10 +131,10 @@ func (a *arena) view(v viewer) []byte {
 }
 
 // flags packs a creature's state for the view: 1 hidden, 2 boosting, 4 a bot, 8 spawn-protected, 16 in water,
-// 32 using its ability, 64 charging.
-func flags(c *creature) int {
+// 32 using its ability, 64 charging, 128 hurt just now.
+func (a *arena) flags(c *creature) int {
 	f := 0
-	for i, on := range []bool{c.hidden, c.dash > 0, c.bot != nil, c.guard > 0, c.wet, c.fx > 0, c.charging > 0} {
+	for i, on := range []bool{c.hidden, c.dash > 0, c.bot != nil, c.guard > 0, c.wet, c.fx > 0, c.charging > 0, a.clock-c.hurtAt < 0.2} {
 		if on {
 			f |= 1 << i
 		}

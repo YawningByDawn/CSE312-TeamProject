@@ -63,16 +63,89 @@ func TestTheTreeGrowsOneTierAtATimeAndBothWaysReachTheTop(t *testing.T) {
 	}
 }
 
-func TestABiggerCreatureEatsASmallerOneItCatches(t *testing.T) {
+func TestABiggerCreatureBitesASmallerOneThatBitesBackAndRuns(t *testing.T) {
 	a := newTestArena()
 	rex := put(t, a, "ann", "T-Rex", 1000, 1000)
-	raptor := put(t, a, "bea", "Raptor", 1040, 1000)
+	raptor := put(t, a, "bea", "Raptor", 1060, 1000)
 	a.step(0.05)
-	if raptor.dead == nil || raptor.dead.By != "ann" {
-		t.Fatalf("the raptor is alive, or eaten by the wrong one: %+v", raptor.dead)
+	if raptor.dead != nil || raptor.hp >= raptor.maxHP() {
+		t.Fatalf("after one bite the raptor is dead (%v) or unhurt (%v hp)", raptor.dead, raptor.hp)
 	}
-	if rex.kills != 1 || rex.xp <= 0 {
-		t.Fatalf("the rex got nothing: kills %d, xp %v", rex.kills, rex.xp)
+	if raptor.flee == 0 || raptor.vx <= 0 {
+		t.Fatalf("the raptor was not thrown clear to run: flee %v, vx %v", raptor.flee, raptor.vx)
+	}
+	if rex.hp >= rex.maxHP() {
+		t.Fatal("the raptor did not bite back")
+	}
+	hp := raptor.hp
+	raptor.x, raptor.y = 1060, 1000
+	a.step(0.05)
+	if raptor.hp != hp {
+		t.Fatal("bit again before the bite cooled down")
+	}
+	for i := 0; i < 100 && raptor.dead == nil; i++ { // held against the rex, it is eaten in the end
+		raptor.x, raptor.y, raptor.vx, raptor.vy = rex.x+60, rex.y, 0, 0
+		a.step(0.05)
+	}
+	if raptor.dead == nil || raptor.dead.By != "ann" || rex.kills != 1 || rex.xp <= 0 {
+		t.Fatalf("death %+v, kills %d, xp %v", raptor.dead, rex.kills, rex.xp)
+	}
+}
+
+func TestNoHitTakesMoreThanHalfAHealth(t *testing.T) {
+	a := newTestArena()
+	dragon := put(t, a, "ann", "Dragon", 1000, 1000)
+	dragon.biteLv = maxLevel
+	m := put(t, a, "bea", "Millipede", 1050, 1000)
+	a.step(0.05)
+	if m.dead != nil || m.hp < m.maxHP()*(1-maxHitShare)-0.01 {
+		t.Fatalf("one bite from a dragon left the millipede at %v of %v (dead %v)", m.hp, m.maxHP(), m.dead)
+	}
+}
+
+func TestASmallerCreatureFightsBackWithABoost(t *testing.T) {
+	a := newTestArena()
+	compy := put(t, a, "ann", "Compy", 1000, 1000)
+	compy.angle = 0
+	tooth := put(t, a, "bea", "Sabertooth", 1045, 1000)
+	tooth.biteCd = 10 // so only the compy bites
+	a.boost(compy)
+	a.step(0.05)
+	want := biteDamage(compy) * fightBack(tooth.tier()-compy.tier())
+	if got := tooth.maxHP() - tooth.hp; math.Abs(got-want) > 0.01 || want >= biteDamage(compy) {
+		t.Fatalf("the compy's bite took %v, want %v (its bite is %v)", got, want, biteDamage(compy))
+	}
+	tooth.hp = 1
+	compy.bit, compy.dash = false, boostTime
+	compy.x, compy.y = 1000, 1000
+	tooth.x, tooth.y, tooth.vx = 1045, 1000, 0
+	a.step(0.05)
+	if tooth.dead == nil || tooth.dead.By != "ann" {
+		t.Fatal("a fight-back bite that emptied the sabertooth's hp did not eat it")
+	}
+}
+
+func TestHealthGrowsBackOnlyAWhileAfterAHurt(t *testing.T) {
+	a := newTestArena()
+	c := put(t, a, "ann", "Raptor", 1000, 1000)
+	a.hurt(c, c, 50, 0)
+	hp := c.hp
+	a.step(1)
+	if c.hp != hp {
+		t.Fatalf("healed %v a second after a hurt", c.hp-hp)
+	}
+	for range 3 {
+		a.step(1)
+	}
+	if c.hp <= hp {
+		t.Fatal("never healed")
+	}
+}
+
+func TestSpeciesStatsTradeHealthForBite(t *testing.T) {
+	anky, raptor := speciesList[spOf(t, "Ankylosaurus")], speciesList[spOf(t, "Terror Bird")]
+	if anky.Tier != raptor.Tier || anky.HP <= raptor.HP || anky.ATK >= raptor.ATK {
+		t.Fatalf("ankylosaurus %v hp %v atk, terror bird %v hp %v atk", anky.HP, anky.ATK, raptor.HP, raptor.ATK)
 	}
 }
 
@@ -233,7 +306,7 @@ func TestTheTopOfTheChainEarnsStatPoints(t *testing.T) {
 	}
 }
 
-func TestAStompHurtsWhatIsNearUpToATierAbove(t *testing.T) {
+func TestAStompHurtsWhatIsNearAndBiggerOnesLess(t *testing.T) {
 	a := newTestArena()
 	rex := put(t, a, "ann", "T-Rex", 1000, 1000)
 	near := put(t, a, "bea", "Mosasaur", 1100, 1000)  // its tier
@@ -241,11 +314,18 @@ func TestAStompHurtsWhatIsNearUpToATierAbove(t *testing.T) {
 	huge := put(t, a, "dee", "Kraken", 900, 1000)     // two tiers up
 	far := put(t, a, "eve", "Titanoboa", 1600, 1000)  // out of reach
 	a.useAbility(rex)
-	if near.hp >= near.maxHP() || big.hp >= big.maxHP() {
-		t.Fatalf("near %v, a tier up %v: not hurt", near.hp, big.hp)
+	dmg := abilityDamage(rex)
+	if hit := near.maxHP() - near.hp; math.Abs(hit-dmg) > 0.01 {
+		t.Fatalf("its own tier took %v, want %v", hit, dmg)
 	}
-	if huge.hp != huge.maxHP() || far.hp != far.maxHP() {
-		t.Fatalf("hurt two tiers up (%v) or out of reach (%v)", huge.hp, far.hp)
+	if hit := big.maxHP() - big.hp; math.Abs(hit-dmg) > 0.01 {
+		t.Fatalf("a tier up took %v, want %v", hit, dmg)
+	}
+	if hit := huge.maxHP() - huge.hp; math.Abs(hit-dmg*fightBack(2)) > 0.01 {
+		t.Fatalf("two tiers up took %v, want %v", hit, dmg*fightBack(2))
+	}
+	if far.hp != far.maxHP() {
+		t.Fatalf("hurt out of reach (%v)", far.hp)
 	}
 	if near.vx <= 0 {
 		t.Fatal("not thrown back")
@@ -414,7 +494,7 @@ func TestTheViewIsJSONAndOnlyWhatIsNear(t *testing.T) {
 	if err := json.Unmarshal(data, &got); err != nil {
 		t.Fatalf("%v in %s", err, data)
 	}
-	if got.Type != "state" || !got.Me.Alive || got.Me.ID != c.id || len(got.Me.Offer) != 2 || got.Me.MaxHP != 115 ||
+	if got.Type != "state" || !got.Me.Alive || got.Me.ID != c.id || len(got.Me.Offer) != 2 || got.Me.MaxHP != int(c.maxHP()) ||
 		len(got.C) != 2 || len(got.F) != 1 || len(got.P) != 1 || len(got.LB) != 3 {
 		t.Fatalf("view %s", data)
 	}

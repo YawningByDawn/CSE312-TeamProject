@@ -94,7 +94,7 @@ export class Panels {
         const sp = world.species[to]!;
         const habitat = el('small', 'habitat', HABITAT_LABEL[sp.habitat] ?? '');
         habitat.style.color = HABITAT_COLOR[sp.habitat] ?? '';
-        b.append(icon(sp, 52), el('b', '', sp.name), habitat, el('small', '', `${sp.ability.name}: ${KIND_TEXT[sp.ability.kind] ?? ''}`));
+        b.append(icon(sp, 52), el('b', '', sp.name), habitat, el('small', 'hpatk', `HP ${sp.hp} · ATK ${sp.atk}`), el('small', '', `${sp.ability.name}: ${KIND_TEXT[sp.ability.kind] ?? ''}`));
       }
       b.append(el('kbd', '', `${i + 1}`));
       b.addEventListener('click', () => {
@@ -180,6 +180,6 @@ export function drawTree(cv: HTMLCanvasElement, world: World, current: number): 
     c.fillText(s.name, x, y + 46);
     c.fillStyle = '#5b7a5a';
     c.font = '600 10px ui-rounded, "Nunito", "Segoe UI", system-ui, sans-serif';
-    c.fillText(s.ability.name, x, y + 59);
+    c.fillText(`${s.ability.name} · ${s.hp}/${s.atk}`, x, y + 59);
   }
 }

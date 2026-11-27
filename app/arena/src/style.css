@@ -336,6 +336,11 @@ kbd {
   line-height: 1.25;
 }
 
+.evolve-opt small.hpatk {
+  font-weight: 800;
+  color: var(--ink);
+}
+
 .evolve-opt small.habitat {
   font-weight: 800;
   -webkit-text-stroke: 0.2px rgba(35, 63, 39, 0.6);
@@ -432,7 +437,7 @@ kbd {
     bottom: 118px;
   }
 
-  .evolve-opt:not(.stay) small:not(.habitat) {
+  .evolve-opt:not(.stay) small:not(.habitat):not(.hpatk) {
     display: none;
   }
 

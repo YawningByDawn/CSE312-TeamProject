@@ -4,8 +4,9 @@ import "math"
 
 // Abilities: each species has one, on its own key, with a cooldown (species.go). A charge is a long dash that hurts the
 // first creature it runs into; a stomp hurts everything near and throws it back; a pull hurts everything near and
-// drags it in; a spit fires a shot that hurts the first creature it reaches. An ability can only hurt creatures up to
-// one tier above its user, and a hurt that empties a creature's hp eats it, wherever it is.
+// drags it in; a spit fires a shot that hurts the first creature it reaches. An ability hurts creatures of any size,
+// the ones bigger than its user less the bigger they are (fightBack), and a hurt that empties a creature's hp eats it,
+// wherever it is.
 
 const (
 	chargeTime  = 0.45 // seconds an ability charge lasts
@@ -22,10 +23,12 @@ type shot struct {
 	life                 float64 // seconds before it falls
 }
 
-var abilityShare = map[string]float64{charge: 1.3, stomp: 1, spit: 0.9, pull: 0.6}
+// abilityShare is an ability's damage, as a share of its user's bite: a charge hits hardest, a pull least, for it also
+// drags its targets in.
+var abilityShare = map[string]float64{charge: 1.1, stomp: 0.85, spit: 0.75, pull: 0.5}
 
 func abilityDamage(c *creature) float64 {
-	return (14 + 3.5*float64(c.tier())) * abilityShare[c.kind().Ability.Kind] * (1 + levelBonus*float64(c.abilityLv))
+	return c.kind().ATK * abilityShare[c.kind().Ability.Kind] * (1 + levelBonus*float64(c.abilityLv))
 }
 
 // reach is how far a stomp or a pull reaches from the middle of its user.
@@ -38,7 +41,7 @@ func reach(c *creature) float64 {
 
 // hittable says whether `by`'s ability can hurt o.
 func hittable(by, o *creature) bool {
-	return o != by && o.dead == nil && !o.hidden && o.guard == 0 && o.tier() <= by.tier()+1
+	return o != by && o.dead == nil && !o.hidden && o.guard == 0
 }
 
 // useAbility starts a creature's ability, if it is ready. Using it ends spawn protection.
@@ -59,7 +62,7 @@ func (a *arena) useAbility(c *creature) {
 		}
 		for _, o := range a.creatures {
 			if hittable(c, o) && math.Hypot(o.x-c.x, o.y-c.y) < reach(c)+o.r() {
-				a.hurt(c, o, dmg, knock)
+				a.hurt(c, o, dmg*against(c, o), knock)
 			}
 		}
 	case spit:
@@ -84,7 +87,7 @@ func (a *arena) abilities(dt float64) {
 		for _, o := range a.creatures {
 			if hittable(c, o) && math.Hypot(o.x-c.x, o.y-c.y) < c.r()+o.r()+4 {
 				c.chargeHit = true
-				a.hurt(c, o, abilityDamage(c), 480)
+				a.hurt(c, o, abilityDamage(c)*against(c, o), 480)
 				break
 			}
 		}
@@ -98,12 +101,9 @@ func (a *arena) abilities(dt float64) {
 		for _, o := range a.creatures {
 			if hittable(s.by, o) && math.Hypot(o.x-s.x, o.y-s.y) < o.r()+s.r {
 				hit = true
-				o.hp -= s.dmg
 				o.vx += s.vx / shotSpeed * 160
 				o.vy += s.vy / shotSpeed * 160
-				if o.hp <= 0 {
-					a.eat(s.by, o)
-				}
+				a.hurt(s.by, o, s.dmg*against(s.by, o), 0)
 				break
 			}
 		}

@@ -11,11 +11,15 @@ import (
 // The arena is the game, Gobble Grove: one world that every player (logged in or a guest) shares, topped up with bots
 // so it is never empty. Land runs west to a beach; the sea lies east of it. Creatures eat food to gain xp, and with
 // enough of it a creature may evolve into one of the species its own leads to (species.go), or stay as it is for a
-// stat point that raises its bite or its ability. A creature eats any creature of a lower tier it catches; one of its
-// own tier (or one tier up) it can only hurt, by biting with a boost or with its ability, and a hurt that empties the
-// other's hp eats it. Small creatures hide in bushes and kelp, where nothing can eat them. Hunger falls all the time,
-// faster the bigger the creature is, and an empty belly costs hp. Only the hub goroutine touches an arena; it steps
-// it once a tick.
+// stat point that raises its bite or its ability.
+//
+// Fights are hp against bites. A creature bites any smaller creature it touches, every preyBiteCd; one of its own
+// tier only with a boost. No one hit takes more than maxHitShare of a creature's health, so nothing is eaten in one
+// bite: a bitten creature is thrown clear, gets a burst of speed to run with, and bites back as it goes, and a boost
+// into a bigger creature bites it too, the harder the closer in size they are. A hurt that empties a creature's hp
+// eats it, whichever of the two is bigger. Health grows back only once a creature has not been hurt for a while.
+// Small creatures hide in bushes and kelp, where nothing can bite them. Hunger falls all the time, faster the bigger
+// the creature is, and an empty belly costs hp. Only the hub goroutine touches an arena; it steps it once a tick.
 
 type foodKind struct {
 	Name   string  `json:"name"`
@@ -49,6 +53,13 @@ const (
 	boostSpeed     = 2.1  // times the species' speed
 	maxLevel       = 5    // the most a stat can be raised
 	levelBonus     = 0.2  // damage a level adds, as a share
+	preyBiteCd     = 0.75 // seconds between a creature's bites on smaller ones it touches
+	maxHitShare    = 0.5  // the most of a creature's health one hit can take
+	sameTierBite   = 1.2  // a boosting bite on a creature of one's own tier, times the bite
+	counterShare   = 0.5  // a bitten creature bites back with this share of its bite
+	adrenaline     = 1.0  // seconds a bitten creature runs faster
+	adrenalineMul  = 1.3  // and how much faster
+	healDelay      = 3.0  // seconds after a hurt before health grows back
 	spectatorView  = 1100.0
 )
 
@@ -86,6 +97,9 @@ type creature struct {
 	hp, hunger            float64
 	cooldown, dash, guard float64 // seconds
 	abilityCd             float64 // seconds until its ability is ready
+	biteCd                float64 // seconds until it bites a smaller creature again
+	flee                  float64 // seconds of speed left from being bitten
+	hurtAt                float64 // arena clock when it was last hurt
 	charging              float64 // seconds left of an ability charge
 	fx                    float64 // seconds its ability shows
 	bit, chargeHit        bool    // this boost already bit someone; this charge already hit someone
@@ -101,7 +115,7 @@ type creature struct {
 func (c *creature) kind() *species { return &speciesList[c.sp] }
 func (c *creature) tier() int      { return speciesList[c.sp].Tier }
 func (c *creature) r() float64     { return speciesList[c.sp].R }
-func (c *creature) maxHP() float64 { return maxHP(c.tier()) }
+func (c *creature) maxHP() float64 { return speciesList[c.sp].HP }
 
 // death is how a creature ended; a player's view shows it until they spawn again.
 type death struct {
@@ -329,8 +343,7 @@ func (a *arena) spawnPoint(sp int, inSea bool) (float64, float64) {
 }
 
 func (a *arena) add(name string, sp int, xp float64, bot *brain, inSea bool) *creature {
-	tier := speciesList[sp].Tier
-	c := &creature{id: a.id(), name: name, bot: bot, sp: sp, xp: xp, hp: maxHP(tier), hunger: maxHunger * 0.8, guard: spawnGuard, born: a.clock}
+	c := &creature{id: a.id(), name: name, bot: bot, sp: sp, xp: xp, hp: speciesList[sp].HP, hunger: maxHunger * 0.8, guard: spawnGuard, born: a.clock, hurtAt: -healDelay}
 	c.nameJSON, _ = json.Marshal(html.EscapeString(name))
 	c.x, c.y = a.spawnPoint(sp, inSea)
 	c.angle = a.rng.Float64() * 2 * math.Pi
@@ -428,6 +441,8 @@ func (a *arena) move(c *creature, dt float64) {
 	c.cooldown = max(0, c.cooldown-dt)
 	c.guard = max(0, c.guard-dt)
 	c.dash = max(0, c.dash-dt)
+	c.biteCd = max(0, c.biteCd-dt)
+	c.flee = max(0, c.flee-dt)
 	dx, dy := c.dx, c.dy
 	m := math.Hypot(dx, dy)
 	if m > 1 {
@@ -439,6 +454,9 @@ func (a *arena) move(c *creature, dt float64) {
 	t := a.terrain(c.x, c.y)
 	c.wet = t != ground
 	speed := sp.Speed * pace(sp.Habitat, t)
+	if c.flee > 0 {
+		speed *= adrenalineMul
+	}
 	if t == ground && sp.Habitat == land && !sp.Hides && inBush(a.bushes, c.x, c.y) {
 		speed *= 0.75 // the big ones push through
 	}
@@ -493,7 +511,32 @@ func (a *arena) gain(c *creature, xp float64) {
 }
 
 func biteDamage(c *creature) float64 {
-	return (30 + 4.5*float64(c.tier())) * (1 + levelBonus*float64(c.biteLv))
+	return c.kind().ATK * (1 + levelBonus*float64(c.biteLv))
+}
+
+// fightBack is the share of its damage a creature does to one `gap` tiers bigger: all of it a tier up, less beyond.
+func fightBack(gap int) float64 {
+	return 1 / (1 + 0.35*float64(gap-1))
+}
+
+// against is the share of the damage `by` does that reaches `o`: less the bigger o is.
+func against(by, o *creature) float64 {
+	if gap := o.tier() - by.tier(); gap > 0 {
+		return fightBack(gap)
+	}
+	return 1
+}
+
+// preyBite is a bigger creature's bite on a smaller one it touches: harder the bigger the gap, and the smaller one
+// bites back and runs.
+func (a *arena) preyBite(big, small *creature) {
+	gap := big.tier() - small.tier()
+	big.biteCd = preyBiteCd
+	small.flee = adrenaline
+	a.hurt(big, small, biteDamage(big)*(1+0.3*float64(gap-1)), 380)
+	if small.dead == nil {
+		a.hurt(small, big, biteDamage(small)*counterShare*fightBack(gap), 0)
+	}
 }
 
 // contact settles every pair of creatures that touch: one eats the other, bites it, or they push apart.
@@ -517,23 +560,26 @@ func (a *arena) contact() {
 			}
 			switch {
 			case big.tier() > small.tier():
-				switch {
-				case big.tier() == small.tier()+1 && small.dash > 0 && !small.bit && big.guard == 0:
-					small.bit = true // a boost into the tier above bites before it can be eaten
-					a.hurt(small, big, biteDamage(small)/2, 320)
-				case small.guard == 0 && d < rb+rs*0.3:
-					a.eat(big, small)
-				case small.guard > 0:
+				// a boost into a bigger creature bites it, before it can bite back
+				if small.dash > 0 && !small.bit && big.guard == 0 {
+					small.bit = true
+					small.flee = adrenaline
+					a.hurt(small, big, biteDamage(small)*fightBack(big.tier()-small.tier()), 420)
+				}
+				if big.dead == nil && small.guard == 0 && big.biteCd == 0 {
+					a.preyBite(big, small)
+				}
+				if big.dead == nil && small.dead == nil {
 					push(big, small, d, rb+rs)
 				}
 			default:
 				if p.dash > 0 && !p.bit && q.guard == 0 {
 					p.bit = true
-					a.hurt(p, q, biteDamage(p), 320)
+					a.hurt(p, q, biteDamage(p)*sameTierBite, 320)
 				}
 				if q.dead == nil && q.dash > 0 && !q.bit && p.guard == 0 {
 					q.bit = true
-					a.hurt(q, p, biteDamage(q), 320)
+					a.hurt(q, p, biteDamage(q)*sameTierBite, 320)
 				}
 				if p.dead == nil && q.dead == nil {
 					push(p, q, d, rb+rs)
@@ -556,10 +602,11 @@ func push(p, q *creature, d, reach float64) {
 	q.x, q.y = q.x+nx*overlap*(1-wp), q.y+ny*overlap*(1-wp)
 }
 
-// hurt takes dmg from the victim and knocks it away from `by` (toward it, for a negative knock); a hurt that empties
-// its hp eats it.
+// hurt takes dmg from the victim, never more than maxHitShare of its health, and knocks it away from `by` (toward it,
+// for a negative knock); a hurt that empties its hp eats it.
 func (a *arena) hurt(by, victim *creature, dmg, knock float64) {
-	victim.hp -= dmg
+	victim.hp -= min(dmg, maxHitShare*victim.maxHP())
+	victim.hurtAt = a.clock
 	if d := math.Hypot(victim.x-by.x, victim.y-by.y); d > 0.001 {
 		victim.vx += (victim.x - by.x) / d * knock
 		victim.vy += (victim.y - by.y) / d * knock
@@ -598,8 +645,8 @@ func (a *arena) metabolise(dt float64) {
 		case c.hunger <= 0:
 			c.hunger = 0
 			c.hp -= 0.06 * top * dt
-		case c.hunger > 30:
-			c.hp = min(top, c.hp+0.03*top*dt)
+		case c.hunger > 30 && a.clock-c.hurtAt > healDelay:
+			c.hp = min(top, c.hp+0.04*top*dt)
 		}
 		if c.hp <= 0 || c.bot != nil && a.clock-c.born > c.bot.lifespan {
 			c.dead = &death{Sp: c.sp, XP: c.xp, Kills: c.kills, Secs: a.clock - c.born}
