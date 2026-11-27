@@ -1,11 +1,13 @@
 // The workshop's approvals back end (a Vite dev-server middleware, `npm run workshop` only). Cards live in data/workshop/approvals.json
 // (written by tools/post_card.py); the owner's rulings live in data/workshop/approvals_decisions.json (written only here, atomically);
 // the cards' pictures and videos live in data/workshop/media/<card id>/ (gitignored, never a temp folder) and are served from there.
-// The ping switch lives in approvals_ping.json ({"on": bool}, off by default): with it on, a ruling of approved, rejected or revise
-// notes the card's posting session through the plane's message route; a failed note is returned in the decide answer.
+// The ping switch lives in approvals_ping.json ({"on": bool}, off by default): with it on, the ruling that leaves no card pending
+// (see standing.ts) sends each posting session one message through the plane's message route listing its cards that are ruled and
+// not closed; a card with no session, or a failed send, is returned in the decide answer as pingError.
 import { createReadStream, existsSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { extname, join } from 'node:path';
+import { message, pendingCount, unchecked, type Card, type Ruling } from './standing';
 
 /** Media types the workshop shows (tools/post_card.py TYPES is the same list). */
 const TYPES: Record<string, string> = {
@@ -17,23 +19,32 @@ const IMMUTABLE = 'public, max-age=31536000, immutable';
 /** One plain name: no separators, no leading dot (so no `..`). */
 export const safe = (s: string): boolean => s.length > 0 && s[0] !== '.' && !/[/\\:]/.test(s);
 
-interface Card { id: string; title?: string; session?: string; closed?: boolean; media?: { file: string }[] }
-const PINGED = ['approved', 'rejected', 'revise'];
+interface Posted extends Card { media?: { file: string }[] }
 
-/** Notes the card's session through the plane; resolves to the error text, or '' when the plane took it (2xx). */
-async function ping(card: Card, status: string, note: string): Promise<string> {
+/** Messages `session` through the plane; resolves to the error text, or '' when the plane took it (2xx). */
+async function ping(session: string, text: string): Promise<string> {
   const port = process.env.ZS_PLANE_PORT || 8787;
-  const text = `Workshop approvals: the owner ruled ${status} on "${card.title ?? card.id}" (${card.id})` + (note ? `. Note: ${note}` : '.');
   try {
     const r = await fetch(`http://127.0.0.1:${port}/api/messages`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'X-CP-Token': process.env.CONTROL_PLANE_TOKEN || 'dev-local-token' },
-      body: JSON.stringify({ from_session: 'plane:approvals', from_origin: 'plane', to: card.session, kind: 'note', body: text }),
+      body: JSON.stringify({ from_session: 'plane:approvals', from_origin: 'plane', to: session, kind: 'note', body: text }),
     });
     return r.ok ? '' : `the plane answered ${r.status}: ${(await r.text()).slice(0, 300)}`;
   } catch (e) {
     return `the plane is unreachable: ${e instanceof Error ? e.message : String(e)}`;
   }
+}
+
+/** One message per session; resolves to every problem (a card with no session, a refused send), '' when all went. */
+async function pingUnchecked(cards: Card[], decisions: Record<string, Ruling[]>): Promise<string> {
+  const { sessions, orphans } = unchecked(cards, decisions);
+  const errors = orphans.map((r) => `${r.id} has no session to ping`);
+  for (const [session, lines] of sessions) {
+    const error = await ping(session, message(lines));
+    if (error) errors.push(`session ${session.slice(0, 8)}: ${error}`);
+  }
+  return errors.join('; ');
 }
 
 function readJson<T>(path: string, empty: T): T {
@@ -89,7 +100,7 @@ export function approvals(base: string, dir: string) {
   const decisionsPath = join(dir, 'approvals_decisions.json');
   const pingPath = join(dir, 'approvals_ping.json');
   const pingOn = () => readJson<{ on?: boolean }>(pingPath, {}).on === true;
-  const items = () => readJson<{ items: Card[] }>(itemsPath, { items: [] }).items;
+  const items = () => readJson<{ items: Posted[] }>(itemsPath, { items: [] }).items;
 
   return async (req: IncomingMessage, res: ServerResponse, next: () => void): Promise<void> => {
     const url = new URL(req.url ?? '', 'http://workshop');
@@ -113,11 +124,13 @@ export function approvals(base: string, dir: string) {
         if (!d.status || !STATUSES.includes(d.status)) return send(res, 400, { error: `status is one of ${STATUSES.join(' ')}` });
         const note = (d.status === 'cleared' ? '' : String(d.note ?? '')).trim().slice(0, 2000);
         // read, append, replace: all synchronous after the body is in, so two rulings never interleave
-        const file = readJson<{ decisions: Record<string, object[]> }>(decisionsPath, { decisions: {} });
+        const file = readJson<{ decisions: Record<string, Ruling[]> }>(decisionsPath, { decisions: {} });
+        const before = pendingCount(items(), file.decisions);
         const ruling = { at: new Date().toISOString().replace(/\.\d+Z$/, 'Z'), status: d.status, note };
         (file.decisions[card.id] ??= []).push(ruling);
         writeAtomic(decisionsPath, file);
-        const pingError = PINGED.includes(d.status) && card.session && pingOn() ? await ping(card, d.status, note) : '';
+        // the ruling that leaves no card pending sends the unchecked set
+        const pingError = pingOn() && before > 0 && pendingCount(items(), file.decisions) === 0 ? await pingUnchecked(items(), file.decisions) : '';
         return send(res, 200, pingError ? { ...ruling, pingError } : ruling);
       }
       if (req.method === 'POST' && route === 'api/approvals/ping') {

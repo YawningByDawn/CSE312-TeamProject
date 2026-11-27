@@ -2,12 +2,14 @@
 // Approve / Reject / Revise (with a note) / Clear buttons. Rulings go to the dev server (tools/workshop/approvals.ts), which
 // keeps the history in data/workshop/approvals_decisions.json. Imports nothing from the game.
 
+import { pendingCount as pending, standing as standingOf, type Ruling } from '../../tools/workshop/standing';
+
 interface Media { file: string; caption: string; role: string; v: number | null }
 interface Card {
   id: string; category: string; title: string; notes: string; steps?: string; branch?: string; commit?: string;
   media: Media[]; links: { label: string; url: string }[]; created: string; closed: boolean; session?: string;
 }
-interface Ruling { at: string; status: string; note: string; pingError?: string }
+interface Answer extends Ruling { pingError?: string }
 interface State { items: Card[]; decisions: Record<string, Ruling[]>; ping: boolean }
 
 type Filter = 'pending' | 'decided' | 'closed' | 'all';
@@ -20,25 +22,19 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls = '', text = ''):
   return e;
 }
 
-/** The standing ruling (the newest, unless it is a clear or older than the card: a reposted card is pending again), or undefined while the card is pending. Both times are UTC. */
-function standing(s: State, c: Card): Ruling | undefined {
-  const last = s.decisions[c.id]?.at(-1);
-  return last && last.status !== 'cleared' && last.at.slice(0, 19) >= c.created.slice(0, 19) ? last : undefined;
-}
+const standing = (s: State, c: Card): Ruling | undefined => standingOf(s.decisions[c.id], c.created);
 
 const matches = (s: State, c: Card, f: Filter): boolean =>
   f === 'all' || (f === 'closed' ? c.closed : !c.closed && (f === 'pending') === !standing(s, c));
 
-export function pendingCount(s: State): number {
-  return s.items.filter((c) => matches(s, c, 'pending')).length;
-}
+export const pendingCount = (s: State): number => pending(s.items, s.decisions);
 
 const mediaUrl = (c: Card, m: Media): string => `approvals-media/${encodeURIComponent(c.id)}/${encodeURIComponent(m.file)}?v=${m.v}`;
 
 /** Mounts the view into `root`; `onCount` gets the pending count after every load. Returns a refresh to call when the view is shown. */
 export function mountApprovals(root: HTMLElement, onCount: (n: number) => void): () => Promise<void> {
   let state: State = { items: [], decisions: {}, ping: false };
-  const pingErrors = new Map<string, string>();
+  let pingError = '';
   let filter: Filter = 'pending';
   let category = '';
   const open = new Set<string>();
@@ -59,8 +55,7 @@ export function mountApprovals(root: HTMLElement, onCount: (n: number) => void):
     const r = await fetch('api/approvals/decide', { method: 'POST', body: JSON.stringify({ id: c.id, status, note: drafts.get(c.id) ?? '' }) });
     if (!r.ok) { alert(((await r.json()) as { error: string }).error); return; }
     drafts.delete(c.id);
-    const err = ((await r.json()) as Ruling).pingError;
-    if (err) pingErrors.set(c.id, err); else pingErrors.delete(c.id);
+    pingError = ((await r.json()) as Answer).pingError ?? '';
     await load();
     render();   // the error shows even when the load changed nothing
   };
@@ -156,9 +151,6 @@ export function mountApprovals(root: HTMLElement, onCount: (n: number) => void):
     row.append(button('Approve', 'approved', cur?.status === 'approved'), button('Reject', 'rejected', cur?.status === 'rejected'), note, revise);
     if (cur) row.append(button('Clear', 'cleared', false));
     box.append(row);
-    if (state.ping) box.append(el('div', 'ap-meta', c.session ? `pings session ${c.session.slice(0, 8)}` : 'no session on this card to ping'));
-    const pingError = pingErrors.get(c.id);
-    if (pingError) box.append(el('div', 'ap-meta', `ping failed: ${pingError}`));
 
     const hist = state.decisions[c.id] ?? [];
     if (hist.length) {
@@ -194,6 +186,7 @@ export function mountApprovals(root: HTMLElement, onCount: (n: number) => void):
     pingChip.addEventListener('click', () => void setPing(!state.ping));
     bar.append(pingChip);
     root.append(el('h2', '', 'Pending approval'), bar);
+    if (pingError) root.append(el('div', 'ap-meta', `ping failed: ${pingError}`));
     if (!state.items.length) root.append(el('p', 'ap-meta', 'Nothing in the queue. Post a card with python tools/post_card.py CARD.json MEDIA...'));
     const rank = (c: Card): number => (c.closed ? 2 : standing(state, c) ? 1 : 0);
     const list = el('div', 'ap-list');

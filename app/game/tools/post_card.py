@@ -2,7 +2,7 @@
 """post_card.py -- post one approval card to the workshop.  `python tools/post_card.py CARD.json [MEDIA ...]`
 
 CARD.json holds one item: {"id", "category", "title", "notes", "media": [{"file", "caption", "role"}], "links": [{"label", "url"}]};
-"created" defaults to now in UTC (a ruling older than it no longer stands, so a reposted card is pending again), "closed" to false, "session" to $CLAUDE_CODE_SESSION_ID (the posting session, which the workshop's ping switch notes on a ruling). "role" is "before" / "after" (shown side by side) or empty. Every card but a playtest one
+"created" defaults to now in UTC (a ruling older than it no longer stands, so a reposted card is pending again), "closed" to false, "session" to $CLAUDE_CODE_SESSION_ID (the posting session, which the workshop's ping switch messages with its ruled, unclosed cards once no card is pending). "role" is "before" / "after" (shown side by side) or empty. Every card but a playtest one
 needs media. A playtest card ("category": "playtest", non-visual feel work) carries no media: "notes" is what changed, "steps" how to
 test it (keys, where, what to feel for), "branch" and "commit" what to run. Each MEDIA path is copied into media/<id>/ beside
 approvals.json (data/workshop/media/<id>/: the folder is the card id), and every media "file" must then be there. Types the workshop shows: png, jpg, gif, mp4.
