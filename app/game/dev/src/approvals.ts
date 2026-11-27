@@ -34,7 +34,7 @@ const mediaUrl = (c: Card, m: Media): string => `approvals-media/${encodeURIComp
 /** Mounts the view into `root`; `onCount` gets the pending count after every load. Returns a refresh to call when the view is shown. */
 export function mountApprovals(root: HTMLElement, onCount: (n: number) => void): () => Promise<void> {
   let state: State = { items: [], decisions: {}, ping: false };
-  let pingError = '';
+  let pingLine = '';
   let filter: Filter = 'pending';
   let category = '';
   const open = new Set<string>();
@@ -55,9 +55,18 @@ export function mountApprovals(root: HTMLElement, onCount: (n: number) => void):
     const r = await fetch('api/approvals/decide', { method: 'POST', body: JSON.stringify({ id: c.id, status, note: drafts.get(c.id) ?? '' }) });
     if (!r.ok) { alert(((await r.json()) as { error: string }).error); return; }
     drafts.delete(c.id);
-    pingError = ((await r.json()) as Answer).pingError ?? '';
+    const err = ((await r.json()) as Answer).pingError;
+    pingLine = err ? `ping failed: ${err}` : '';
     await load();
     render();   // the error shows even when the load changed nothing
+  };
+
+  const pingCard = async (c: Card): Promise<void> => {
+    const r = await fetch('api/approvals/ping-card', { method: 'POST', body: JSON.stringify({ id: c.id }) });
+    const a = (await r.json()) as { error?: string; pingError?: string };
+    const err = a.error ?? a.pingError;
+    pingLine = err ? `ping failed: ${err}` : `pinged ${c.id}`;
+    render();
   };
 
   const setPing = async (on: boolean): Promise<void> => {
@@ -150,7 +159,14 @@ export function mountApprovals(root: HTMLElement, onCount: (n: number) => void):
     const row = el('div', 'ap-decide');
     row.append(button('Approve', 'approved', cur?.status === 'approved'), button('Reject', 'rejected', cur?.status === 'rejected'), note, revise);
     if (cur) row.append(button('Clear', 'cleared', false));
-    box.append(row);
+    // Ping sends this card's ruling and note to the posting session now
+    const ping = el('button', '', 'Ping');
+    ping.disabled = !cur || !c.session;
+    ping.title = c.session ? 'send this ruling to the session that posted the card' : 'no session on this card to ping';
+    ping.addEventListener('click', () => void pingCard(c));
+    const pingRow = el('div', 'ap-decide');
+    pingRow.append(ping);
+    box.append(row, pingRow);
 
     const hist = state.decisions[c.id] ?? [];
     if (hist.length) {
@@ -186,7 +202,7 @@ export function mountApprovals(root: HTMLElement, onCount: (n: number) => void):
     pingChip.addEventListener('click', () => void setPing(!state.ping));
     bar.append(pingChip);
     root.append(el('h2', '', 'Pending approval'), bar);
-    if (pingError) root.append(el('div', 'ap-meta', `ping failed: ${pingError}`));
+    if (pingLine) root.append(el('div', 'ap-meta', pingLine));
     if (!state.items.length) root.append(el('p', 'ap-meta', 'Nothing in the queue. Post a card with python tools/post_card.py CARD.json MEDIA...'));
     const rank = (c: Card): number => (c.closed ? 2 : standing(state, c) ? 1 : 0);
     const list = el('div', 'ap-list');

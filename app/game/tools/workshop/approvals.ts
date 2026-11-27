@@ -4,10 +4,11 @@
 // The ping switch lives in approvals_ping.json ({"on": bool}, off by default): with it on, the ruling that leaves no card pending
 // (see standing.ts) sends each posting session one message through the plane's message route listing its cards that are ruled and
 // not closed; a card with no session, or a failed send, is returned in the decide answer as pingError.
+// A card's Ping button (POST api/approvals/ping-card) sends that card's standing ruling and note to its posting session at once.
 import { createReadStream, existsSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { extname, join } from 'node:path';
-import { message, pendingCount, unchecked, type Card, type Ruling } from './standing';
+import { message, pendingCount, standing, unchecked, type Card, type Ruling } from './standing';
 
 /** Media types the workshop shows (tools/post_card.py TYPES is the same list). */
 const TYPES: Record<string, string> = {
@@ -41,7 +42,7 @@ async function pingUnchecked(cards: Card[], decisions: Record<string, Ruling[]>)
   const { sessions, orphans } = unchecked(cards, decisions);
   const errors = orphans.map((r) => `${r.id} has no session to ping`);
   for (const [session, lines] of sessions) {
-    const error = await ping(session, message(lines));
+    const error = await ping(session, message('no card is left pending', lines));
     if (error) errors.push(`session ${session.slice(0, 8)}: ${error}`);
   }
   return errors.join('; ');
@@ -132,6 +133,17 @@ export function approvals(base: string, dir: string) {
         // the ruling that leaves no card pending sends the unchecked set
         const pingError = pingOn() && before > 0 && pendingCount(items(), file.decisions) === 0 ? await pingUnchecked(items(), file.decisions) : '';
         return send(res, 200, pingError ? { ...ruling, pingError } : ruling);
+      }
+      if (req.method === 'POST' && route === 'api/approvals/ping-card') {
+        // the card's Ping button: its standing ruling, now, to its posting session
+        const { id } = JSON.parse(await body(req)) as { id?: string };
+        const card = items().find((c) => c.id === id);
+        if (!card) return send(res, 404, { error: 'no such card' });
+        const r = standing(readJson<{ decisions: Record<string, Ruling[]> }>(decisionsPath, { decisions: {} }).decisions[card.id], card.created);
+        if (!r) return send(res, 400, { error: 'rule the card before pinging it' });
+        if (!card.session) return send(res, 400, { error: `${card.id} has no session to ping` });
+        const pingError = await ping(card.session, message('the owner pinged a ruling', [{ id: card.id, title: card.title ?? card.id, status: r.status, note: r.note }]));
+        return send(res, 200, pingError ? { pingError } : {});
       }
       if (req.method === 'POST' && route === 'api/approvals/ping') {
         const on = (JSON.parse(await body(req)) as { on?: unknown }).on;
