@@ -46,7 +46,9 @@ export type Anchors = Readonly<Record<Corner, HTMLElement>>;
 export type Where = View['where'];
 /** rb-panels' entry: given its layer's anchors, the intents, the rules and where things stand in the centre's frame, it
  * returns its frame and the pay slab. */
-export type MountPanels = (at: Anchors, send: (i: Intent) => void, q: Query, where: Where) => Panels;
+export type MountPanels = (at: Anchors, send: (i: Intent) => void, q: Query, where: Where, half: Half) => Panels;
+/** The window's half extent in design px: a screen that is not 16:9 reaches past the design box, and a panel that fills it pins to these. */
+export type Half = () => { x: number; y: number };
 
 /** A panel is open: one of the panels' roots holds something. */
 function open(roots: HTMLElement): boolean {
@@ -104,7 +106,7 @@ export function createUi(mountPanels?: MountPanels): Ui {
       // the hand's half of the screen, in design px from its centre to the margin
       const hand = new Hand(at.bc, send, q, (card) => panels?.pay(card), () => (w / 2 - MARGIN) / k, () => k);
       const deal = new Deal(at.c, send, () => open(panelAt.c), () => hand.el);
-      if (mountPanels) panels = mountPanels(panelAt, send, q, from('c'));
+      if (mountPanels) panels = mountPanels(panelAt, send, q, from('c'), () => ({ x: w / 2 / k, y: h / 2 / k }));
       const [, menuAt] = layer(hud);
       // a film may be skipped: the prompt bottom right while one plays (inventory #3)
       skip = new Words(menuAt.br, -400, -24, 18, DIM, 'right', 400);

@@ -3,8 +3,8 @@
 // (grave), the dusk's ledger; art.ts the baked sheets they show (assets/ui, cardart, crystals, crystalmarks, portraits,
 // front, title, defeat). Reads the view model, the sim's Query and card helpers, content's tables
 // and words, the framework's login; sends intents.
-import type { Account, Action, CardId, Focus, Intent, Query, ViewModel } from '../../types';
-import type { Anchors, MountPanels, Part, Where } from '../index';
+import type { Account, Action, CardId, Focus, Intent, Net, Query, ViewModel } from '../../types';
+import type { Anchors, Half, MountPanels, Part, Where } from '../index';
 import { div } from '../kit';
 import { panelCss } from './art';
 import { Choice } from './choice';
@@ -12,6 +12,7 @@ import { Dusk } from './dusk';
 import { Defeat, Ending, Title } from './front';
 import { Grave, Pay } from './grave';
 import { Host } from './host';
+import { Multi } from './lobby';
 import { Person } from './person';
 import { SignIn } from './sign';
 
@@ -29,6 +30,8 @@ export interface Ctx {
   at: Anchors;
   /** Where a thing stands on screen, in design px from the centre. */
   where: Where;
+  /** The window's half extent in design px from the centre: what the title pins its menu and corners to. */
+  half: Half;
   /** Moves when what a panel shows may have changed. */
   rev: number;
   /** A panel's own choice moved (a stone picked, a mode): build again. */
@@ -37,6 +40,8 @@ export interface Ctx {
   account: Account | null;
   /** The login popup over whatever stands (a lobby's way in for a player not logged in). */
   signIn(): void;
+  /** The multiplayer screens, in the title's menu, where the build has a hub. */
+  multi: Multi | null;
 }
 
 export interface Panel {
@@ -52,12 +57,13 @@ export interface Panel {
 /** The panels' frame, and the miracle a card plate asks to pay for (rb-hud's hand calls it). */
 export interface Panels extends Part { pay(card: CardId): void }
 
-export const mountPanels = (account: Account | null): MountPanels => (at, send, q, where) => {
+export const mountPanels = (account: Account | null, net: Net | null): MountPanels => (at, send, q, where, half) => {
   document.head.appendChild(document.createElement('style')).textContent = panelCss();
   let hour = -1, ap = -1;
   const sign = account && new SignIn(account, div(at.c, 'hg-b'));
+  const multi = net && new Multi(net);
   const ctx: Ctx = {
-    send, q, at, where, rev: 0, account,
+    send, q, at, where, half, rev: 0, account, multi,
     signIn: () => sign?.show(),
     act: (action) => send({ kind: 'act', action }),
     focus: (focus) => send({ kind: 'focus', focus }),
@@ -103,7 +109,7 @@ export const mountPanels = (account: Account | null): MountPanels => (at, send, 
     // a menu stands over the panels: its keys are the menu's
     if (!vmNow || vmNow.menu || sign?.shown) return;
     const i = sync(vmNow);
-    if (i >= 0 && list[i]!.press?.(e, vmNow)) {
+    if (list[i]?.press?.(e, vmNow)) {
       e.preventDefault();
       e.stopImmediatePropagation();
     }

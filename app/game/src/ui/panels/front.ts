@@ -1,8 +1,9 @@
-import type { Bind, GameEvent, GameState, Reason, Settings, ViewModel } from '../../types';
+import type { GameEvent, GameState, Reason, ViewModel } from '../../types';
 import { AREAS } from '../../content/world';
 import { uiText } from '../../content/text';
 import { bound } from '../../content/keys';
 import { DIM, PALE, VIOLET, Words, atlasMeta, attr, cell, div, line, mask, natural, tinted } from './art';
+import { Menu, item } from './menu';
 import type { Ctx, Panel } from './index';
 
 // The front (inventory #1, 7, 94): the title over its still, with its baked lettering, the eye's glows and motes; the
@@ -12,45 +13,6 @@ import type { Ctx, Panel } from './index';
 const RUST = '#b5543a';
 /** The god's last spark at the eye, at its own scale. */
 const spark = (parent: HTMLElement): HTMLDivElement => cell(parent, 'defeat', 'spark', 0, 0, natural('defeat', 'spark').s);
-
-/** A word of a menu: lit on hover or keys, a sub line under it. */
-function item(parent: HTMLElement, x: number, y: number, size: number, text: string, sub: string, act: () => void): HTMLDivElement {
-  const el = div(parent, 'hg-b hg-hit', x, y);
-  el.style.transition = 'transform 0.15s, color 0.15s';
-  new Words(el, 0, 0, size, 'rgba(236,226,204,0.72)').set(text);
-  if (sub) new Words(el, 2, size + 4, 16, DIM).set(sub);
-  // the lit word's mark (Menu shows it on the lit one): always the last child
-  const mark = new Words(el, -18, size * 0.28, size * 0.6, VIOLET);
-  mark.set('•');
-  mark.el.hidden = true;
-  el.addEventListener('click', act);
-  el.addEventListener('mouseenter', () => el.dispatchEvent(new Event('hgp-focus')));
-  return el;
-}
-
-/** Its two binds move the lit word; confirm takes it. */
-class Menu {
-  private i = 0;
-  constructor(private readonly items: HTMLDivElement[], private readonly acts: (() => void)[]) {
-    items.forEach((el, k) => el.addEventListener('hgp-focus', () => this.light(k)));
-    this.light(0);
-  }
-  light(k: number): void {
-    this.i = (k + this.items.length) % this.items.length;
-    this.items.forEach((el, j) => {
-      el.style.transform = j === this.i ? 'translateX(3px)' : '';
-      (el.firstChild as HTMLElement).style.color = j === this.i ? '#f4ecdb' : 'rgba(236,226,204,0.72)';
-      (el.lastChild as HTMLElement).hidden = j !== this.i;
-    });
-  }
-  press(e: KeyboardEvent, set: Readonly<Settings>, back: Bind, next: Bind): boolean {
-    if (bound(set, back, e)) this.light(this.i - 1);
-    else if (bound(set, next, e)) this.light(this.i + 1);
-    else if (bound(set, 'confirm', e)) this.acts[this.i]!();
-    else return false;
-    return true;
-  }
-}
 
 /** The eye's glows: [cell, radius, from the eye, squash, faintest, brightest]. */
 const GLOWS: readonly [string, number, number, number, number, number][] = [['glow.deep', 260, -30, 0.75, 0.1, 0.18], ['glow.eye', 60, 0, 0.5, 0.12, 0.22]];
@@ -73,6 +35,14 @@ function embers(parent: HTMLElement): void {
 
 export class Title implements Panel {
   private menu: Menu | null = null;
+  private nav: HTMLElement | null = null;
+  private stage: HTMLElement | null = null;
+  private base: HTMLElement | null = null;
+  private vm: ViewModel | null = null;
+  private shown = '';
+  private foot: HTMLElement | null = null;
+  private corner: HTMLElement | null = null;
+  private at = { x: NaN, y: NaN };
   constructor(private readonly c: Ctx) {}
 
   /** The name in its baked lettering, over its breathing underglow; the ink bleeds in left to right. */
@@ -94,13 +64,84 @@ export class Title implements Panel {
     cell(ink, 'title', 'name.ink', 0, 0, natural('title', 'name.ink').s);
   }
 
+  /** The nav's entries for the screen the player is on: the main ones, or Multiplayer's (Host, Search, Back; Search's list; the lobby). */
+  private fill(): void {
+    const at = { nav: this.nav!, stage: this.stage!, base: this.base! };
+    const multi = this.c.multi;
+    this.shown = multi?.key() ?? 'main';
+    for (const el of Object.values(at)) el.replaceChildren();
+    this.menu = multi && multi.view !== 'main' ? multi.build(at, this.c.account?.name ?? null) : this.main(at.nav, this.vm!);
+  }
+
+  private main(nav: HTMLElement, vm: ViewModel): Menu {
+    const send = this.c.send;
+    const seedOf = (): number | undefined => (field.value.trim() ? Number(field.value.trim()) >>> 0 : undefined);
+    const acts: (() => void)[] = [];
+    if (vm.saved !== null) acts.push(() => send({ kind: 'continue' }));
+    const multi = this.c.multi;
+    const multiplayer = multi && (() => (this.c.account?.name ? multi.open() : this.c.signIn()));
+    acts.push(() => send({ kind: 'newRun', ...(seedOf() !== undefined ? { seed: seedOf()! } : {}) }));
+    if (multiplayer) acts.push(multiplayer);
+    acts.push(() => send({ kind: 'menu', menu: 'settings' }));
+    const words = vm.saved !== null
+      ? [[uiText('btn.proceed'), uiText('title.continueSub', { n: vm.saved })], [uiText('title.beginAnew'), '']]
+      : [[uiText('title.begin'), '']];
+    let y = 0;
+    const items = words.map(([w, sub], k) => {
+      const el = item(nav, 0, y, 34, w!, sub!, acts[k]!);
+      y += sub ? 70 : 50;
+      return el;
+    });
+    if (multiplayer) {
+      items.push(item(nav, 0, y + 6, 24, uiText('title.multiplayer'), '', multiplayer));
+      y += 40;
+    }
+    items.push(item(nav, 0, y + 6, 24, uiText('title.settings'), '', acts[acts.length - 1]!));
+    const menu = new Menu(items, acts);
+
+    const row = div(nav, 'hg-b', 230, words.length * 50 - 44);
+    new Words(row, 0, 0, 12, DIM).set(uiText('title.seed').toUpperCase());
+    const field = row.appendChild(document.createElement('input'));
+    field.className = 'hgp-seed';
+    Object.assign(field.style, { left: '0px', top: '18px', width: '86px', fontSize: '16px' });
+    field.inputMode = 'numeric';
+    field.maxLength = 9;
+    field.placeholder = uiText('title.seedRandom');
+    field.title = `${uiText('title.seed')}: ${uiText('title.seedTip')}`;
+    field.addEventListener('keydown', (e) => {
+      e.stopPropagation();
+      if (e.key === 'Enter') acts[vm.saved !== null ? 1 : 0]!();
+    });
+    const dice = item(row, 104, 18, 17, uiText('title.rollWord'), '', () => { field.value = String(1 + Math.floor(Math.random() * 999999998)); });
+    attr(dice, 'title', uiText('title.roll'));
+    return menu;
+  }
+
+  /** The menu, the login corner and the footer sit at their offsets from the window's own edges. */
+  private place(): void {
+    const { x, y } = this.c.half();
+    if (x === this.at.x && y === this.at.y) return;
+    this.at = { x, y };
+    const to = (el: HTMLElement | null, left: number, top: number): void => { if (el) Object.assign(el.style, { left: `${left}px`, top: `${top}px` }); };
+    to(this.nav, 118 - x, y - 300);
+    to(this.base, 0, y - 84);
+    to(this.foot, x - 18, y - 38);
+    to(this.corner, x - 518, 18 - y);
+  }
+
+  tick(): void {
+    this.place();
+    if ((this.c.multi?.key() ?? 'main') !== this.shown) this.fill();
+  }
+
   key(vm: ViewModel): string | null {
     return vm.title ? `title|${vm.saved}|${vm.settings.master > 0}|${this.c.account?.name}` : null;
   }
 
   build(root: HTMLElement, vm: ViewModel): void {
     const send = this.c.send;
-    const ground = div(root, 'hg-b', -1200, -700, 2400, 1400);
+    // black past any window's edge (at most 2000 design px from the centre)
+    const ground = div(root, 'hg-b', -4000, -4000, 8000, 8000);
     ground.style.background = '#000';
     // before the still is up, the spark alone in the black where the eye will be
     const alone = div(root, 'hg-b', EYE.x, EYE.y);
@@ -121,42 +162,19 @@ export class Title implements Panel {
     embers(lit);
     this.name(root);
 
-    const nav = div(root, 'hg-b', -682, 150);
+    const nav = div(root, 'hg-b');
     nav.style.animation = 'hgp-fade 1.1s 0.9s both';
     attr(nav, 'aria-label', uiText('title.menu'));
-    const seedOf = (): number | undefined => (field.value.trim() ? Number(field.value.trim()) >>> 0 : undefined);
-    const acts: (() => void)[] = [];
-    if (vm.saved !== null) acts.push(() => send({ kind: 'continue' }));
-    acts.push(() => send({ kind: 'newRun', ...(seedOf() !== undefined ? { seed: seedOf()! } : {}) }), () => send({ kind: 'menu', menu: 'settings' }));
-    const words = vm.saved !== null
-      ? [[uiText('btn.proceed'), uiText('title.continueSub', { n: vm.saved })], [uiText('title.beginAnew'), '']]
-      : [[uiText('title.begin'), '']];
-    let y = 0;
-    const items = words.map(([w, sub], k) => {
-      const el = item(nav, 0, y, 34, w!, sub!, acts[k]!);
-      y += sub ? 70 : 50;
-      return el;
-    });
-    items.push(item(nav, 0, y + 6, 24, uiText('title.settings'), '', acts[acts.length - 1]!));
-    this.menu = new Menu(items, acts);
+    this.nav = nav;
+    // the multiplayer screens' centre (the screen's) and bottom row, in with the menu
+    this.stage = div(root, 'hg-b');
+    this.base = div(root, 'hg-b');
+    for (const el of [this.stage, this.base]) el.style.animation = nav.style.animation;
+    this.vm = vm;
+    this.c.multi?.close();
+    this.fill();
 
-    const row = div(nav, 'hg-b', 230, words.length * 50 - 44);
-    new Words(row, 0, 0, 12, DIM).set(uiText('title.seed').toUpperCase());
-    const field = row.appendChild(document.createElement('input'));
-    field.className = 'hgp-seed';
-    Object.assign(field.style, { left: '0px', top: '18px', width: '86px', fontSize: '16px' });
-    field.inputMode = 'numeric';
-    field.maxLength = 9;
-    field.placeholder = uiText('title.seedRandom');
-    field.title = `${uiText('title.seed')}: ${uiText('title.seedTip')}`;
-    field.addEventListener('keydown', (e) => {
-      e.stopPropagation();
-      if (e.key === 'Enter') acts[vm.saved !== null ? 1 : 0]!();
-    });
-    const dice = item(row, 104, 18, 17, uiText('title.rollWord'), '', () => { field.value = String(1 + Math.floor(Math.random() * 999999998)); });
-    attr(dice, 'title', uiText('title.roll'));
-
-    const foot = div(root, 'hg-b', 782, 412);
+    const foot = (this.foot = div(root, 'hg-b'));
     const quiet = new Words(foot, -540, 0, 13, 'rgba(236,226,204,0.38)', 'right', 500);
     quiet.el.style.fontStyle = 'italic';
     quiet.set(uiText('title.quiet'));
@@ -167,15 +185,21 @@ export class Title implements Panel {
     const account = this.c.account;
     if (account) {
       const name = account.name;
-      const corner = new Words(root, 282, -432, 20, 'rgba(236,226,204,0.72)', 'right', 500);
+      const corner = new Words(root, 0, 0, 20, 'rgba(236,226,204,0.72)', 'right', 500);
       corner.el.classList.add('hg-hit');
       corner.set(name === null ? uiText('title.logIn') : uiText('title.logOut', { name }));
       corner.el.addEventListener('click', name === null ? this.c.signIn : account.logOut);
+      this.corner = corner.el;
     }
+    this.at = { x: NaN, y: NaN };
+    this.place();
   }
 
   press(e: KeyboardEvent, vm: ViewModel): boolean {
-    return this.menu?.press(e, vm.settings, 'up', 'down') ?? false;
+    const multi = this.c.multi;
+    if (multi && multi.view !== 'main' && bound(vm.settings, 'back', e)) multi.back();
+    else return this.menu?.press(e, vm.settings, 'up', 'down') ?? false;
+    return true;
   }
 }
 

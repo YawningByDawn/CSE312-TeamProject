@@ -14,7 +14,12 @@ Then open http://localhost:8080. No `.env` is needed; `compose.yaml` has default
 
 Hungry God Inc. lives in `app/game` (TypeScript, Vite, PixiJS). The app image builds it in a Node stage and serves the build at the site's root, `/`, after every other route. The title's top right corner opens a popup to log in or register (it posts to the auth service's `/register` and `/login`) and logs out; `/api/me` names who is logged in, `null` for nobody.
 
-Multiplayer: logged in, the game opens the app's `/ws` socket; logged out, it plays alone. The hub relays a `{"type":"game","data":...}` message to every other player as `{"type":"game","from":<name>,"data":...}`, and its `state` messages list who is on; the game reads them as `window.__hg.net` (`app/game/src/app/net.ts`). No game content uses it yet.
+Multiplayer: logged in, the game opens the app's `/ws` socket; logged out, it plays alone. The title's Multiplayer swaps its menu for Host, Search and Back (logged out, it opens the login popup); Host and Search show in the title itself, no popup. The hub (`app/websocket`) owns the lobbies: Host opens one named `<host>'s lobby` for up to 4 players, no password, and its host's Start tells every member (a stub: nothing yet starts a shared game); Search lists the open ones to join; the host leaving closes it, and a dropped connection leaves it. The socket's messages, JSON, the game reading them as `window.__hg.net` (`app/game/src/app/net.ts`):
+
+- To the hub: `{"type":"game","data":...}` (relayed to every other player as `{"type":"game","from":<name>,"data":...}`), `{"type":"input","dx":..,"dy":..}`, `{"type":"host"}`, `{"type":"search"}`, `{"type":"join","host":<name>}`, `{"type":"leave"}`, `{"type":"start"}` (the host only; anyone else is ignored).
+- From the hub: `state` (who is on), `{"type":"lobby","lobby":{"host","name","members","max"}|null}` (the lobby the player is in, to each member whenever it changes; `null` when they are out of it), `{"type":"lobbies","lobbies":[...],"refused":"full"|"gone"}` (the open lobbies, answering `search`, and a refused `join`, with the reason), `{"type":"start"}` (to every member of a lobby whose host started it), `kicked`.
+
+No game content uses the socket beyond the lobby screens yet.
 
 To work on it alone:
 
