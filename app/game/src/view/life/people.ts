@@ -47,12 +47,14 @@ export class People implements Layer {
   /** the figure being placed: where, what it does and is */
   private readonly spot: Spot = { x: 0, y: 0, facing: 1, doing: 'idle', walking: false, dist: 0, dx: 0, dy: 0, swing: -1, gone: false, lieLow: false, follower: false, devotion: 0, chosen: false, mob: false, marked: 0 };
   private readonly view = { x0: 0, y0: 0, x1: 0, y1: 0 };
-  /** what the last frame was placed for: render time, camera, the picked and the hovered */
-  private readonly last = { time: -1, x: 0, y: 0, zoom: -1, w: 0, h: 0, focus: null as ViewModel['focus'], hover: null as ViewModel['hover'], stamp: 0 };
+  /** what the last frame was placed for: the tick's fraction, camera, the picked and the hovered */
+  private readonly last = { alpha: -1, x: 0, y: 0, zoom: -1, w: 0, h: 0, focus: null as ViewModel['focus'], hover: null as ViewModel['hover'], stamp: 0 };
   /** the people shown at the last full placing */
   private readonly on: Shown[] = [];
   /** people shown last frame */
   private count = 0;
+  /** the render time at which the first of the shown next changes its picture by time alone (`Shown.until`) */
+  private wake = 0;
 
   private life!: Atlas;
   private stamps!: Stamps;
@@ -101,36 +103,43 @@ export class People implements Layer {
   }
 
   frame(vm: ViewModel): boolean {
-    const s = vm.state, c = vm.camera, L = this.last;
+    const s = vm.state, c = vm.camera, L = this.last, t = vm.time;
     const stateMoved = this.seen.moved(vm);
     if (stateMoved) {
       this.vis.clear();
-      for (const e of vm.fresh) this.react(e, vm.time);
+      for (const e of vm.fresh) this.react(e, t);
     }
     const looked = c.x !== L.x || c.y !== L.y || c.zoom !== L.zoom || this.screen.w !== L.w || this.screen.h !== L.h;
-    if (!stateMoved && !looked && vm.time === L.time && vm.focus === L.focus && vm.hover === L.hover) return false;
-    L.time = vm.time; L.x = c.x; L.y = c.y; L.zoom = c.zoom; L.focus = vm.focus; L.hover = vm.hover; L.w = this.screen.w; L.h = this.screen.h;
+    const whole = stateMoved || looked || vm.focus !== L.focus || vm.hover !== L.hover;
+    const ticked = vm.alpha !== L.alpha;
+    // time alone changes a picture at its `until`: a still frame before the first of them places no one
+    if (!whole && !ticked && t < this.wake) return false;
+    L.alpha = vm.alpha; L.x = c.x; L.y = c.y; L.zoom = c.zoom; L.focus = vm.focus; L.hover = vm.hover; L.w = this.screen.w; L.h = this.screen.h;
     frameOf(c, this.screen.w, this.screen.h, this.at);
     const a = this.at.a, v = this.view, pad = 40;
     v.x0 = -this.at.e / a - pad; v.y0 = -this.at.f / a - pad; v.x1 = (this.screen.w - this.at.e) / a + pad; v.y1 = (this.screen.h - this.at.f) / a + pad;
     const stamp = ++L.stamp, on = this.on;
-    let n = 0;
-    if (stateMoved || looked) {
+    let n = 0, redone = false;
+    if (whole) {
       // who shows can change only with the state or the view: everyone is placed, and the shown are kept
       for (const id in s.people) if (this.place(s.people[id]!, vm, a, stamp)) n++;
       for (const m of s.mobs) if (this.placeMob(m, vm, a, stamp)) n++;
       on.length = 0;
       for (const sh of this.shown.values()) if (sh.stamp !== stamp) this.hide(sh); else on.push(sh);
     } else {
-      // only time moved: the shown move on, nobody hidden comes into view
+      // only time or the tick's fraction moved: the shown due now move on, nobody hidden comes into view
       for (const sh of on) {
-        const p = s.people[sh.id], m = p ? null : s.mobs.find((x) => x.id === sh.id)!;
+        if (!ticked && t < sh.until) { sh.stamp = stamp; n++; continue; }
+        redone = true;
+            const p = s.people[sh.id], m = p ? null : s.mobs.find((x) => x.id === sh.id)!;
         if (p ? this.place(p, vm, a, stamp) : this.placeMob(m!, vm, a, stamp)) n++;
       }
       for (const sh of on) if (sh.stamp !== stamp) this.hide(sh);
     }
+    this.wake = Infinity;
+    for (const sh of on) if (sh.stamp === stamp && sh.until < this.wake) this.wake = sh.until;
     this.stamps.flush();
-    const changed = n > 0 || this.count > 0;
+    const changed = whole ? n > 0 || this.count > 0 : redone;
     this.count = n;
     return changed;
   }
@@ -222,7 +231,7 @@ export class People implements Layer {
     // pose: the loop for what they do, a walk's stride by the distance walked, a swing by the seconds into it
     const body = sh.body, role = this.roles[sh.role]!;
     const len = Math.hypot(S.dx, S.dy) || 1, uy = S.dy / len, dir = uy < -0.5 ? 'u' : uy > 0.5 ? 'd' : 'h';
-    let u: number;
+    let u: number, timed = false;
     if (S.swing >= 0 && role[`swing:${dir}`] !== undefined) {
       body.play(`swing:${dir}`, this.series[role[`swing:${dir}`]!]!, t);
       u = Math.min(S.swing, body.series!.dur * 0.999);
@@ -233,6 +242,7 @@ export class People implements Layer {
     } else {
       const clip = S.gone ? 'collapse' : S.doing === 'work' || (S.doing === 'guard' && sh.role === 'guard') ? 'work' : CLIP[S.doing];
       body.play(clip, this.series[role[clip] ?? role.idle!]!, S.gone ? sh.fellAt : t);
+      timed = true;
       u = t - body.start + (S.gone ? 0 : sh.v * body.series!.dur);
     }
     if (S.follower !== sh.follower) { sh.follower = S.follower; sh.paintAt = t; }
@@ -242,31 +252,39 @@ export class People implements Layer {
     const tu = (t - sh.turnAt) / 0.22;
     const xs = tu >= 1 || tu < 0 ? sh.facing : tu < 0.5 ? -sh.facing * (0.28 + 0.72 * (1 - 2 * tu)) : sh.facing * (0.28 + 0.72 * (2 * tu - 1));
     sh.figure.scale.set(xs * scale, scale);
-    marks(sh, S, vm, scale, x, y, a);
-    // a small figure is one sprite of its stamp, stepping through its loop's baked steps: a step it already shows at
-    // this size is not stamped again
-    const s = body.series!, small = devPx * FIGURE_H < SMALL_PX, px = bucket(devPx);
+    const pulses = marks(sh, S, vm, scale, x, y, a);
+    // a small figure is one sprite of its stamp, a still large one is laid out once: both step through their loop's
+    // baked steps, and a step it already shows at this size is not drawn again (a large figure's wick, blink and
+    // impact change it by `body.wake`). `end` is when time alone next changes the picture (0: it moves each frame)
+    const s = body.series!, small = devPx * FIGURE_H < SMALL_PX, px = small ? bucket(devPx) : devPx;
     sh.figure.visible = !small;
     sh.whole.visible = small;
     if (small) {
       if (sh.slot < 0) { sh.slot = this.stamps.take(); sh.key = -1; }
       this.stamps.place(sh.whole, sh.slot, px, xs * scale, scale);
-      let key = -1;
-      if (k === 1 && body.steady(t)) {
-        const step = Math.floor((((u / s.dur) % 1) + 1) % 1 * s.n);
-        key = step * 2 + to;
-        if (key === sh.key && body.name === sh.keyName && px === sh.keyPx) return sh;
-        u = ((step + 0.5) / s.n) * s.dur;
-      }
-      sh.key = key;
-      sh.keyName = body.name;
-      sh.keyPx = px;
     } else this.unstamp(sh);
-    body.hood = S.lieLow;
-    body.evaluate(t, u, !S.gone, this.holds, this.holdIdList, sh.look.body, vm.state.weather, sh.facing, sh.v);
-    body.layout(sh.look.body, k < 1 ? 1 - to : to, to, k, devPx, t, sh.v);
-    if (small) this.stamp(sh, px);
-    else this.parts(sh, devPx);
+    const steady = k === 1 && body.steady(t);
+    // nothing but the loop's step and `body.wake` changes a calm figure; a calm one that no loop plays waits for the tick
+    const calm = steady && !pulses && !S.gone && (tu >= 1 || tu < 0);
+    let end = calm && !timed ? Infinity : 0, same = false;
+    if (steady && (small || (timed && !S.gone))) {
+      const phase = (((u / s.dur) % 1) + 1) % 1 * s.n, step = Math.floor(phase), key = (step * 2 + to) * 2 + (small ? 1 : 0);
+      if (calm && timed) end = t + (step + 1 - phase) * s.dur / s.n;
+      same = key === sh.key && body.name === sh.keyName && px === sh.keyPx && (small || t < body.wake);
+      if (!same) {
+        u = ((step + 0.5) / s.n) * s.dur;
+        sh.key = key;
+        sh.keyName = body.name;
+        sh.keyPx = px;
+      }
+    } else sh.key = -1;
+    if (!same) {
+      body.hood = S.lieLow;
+      body.evaluate(t, u, !S.gone, this.holds, this.holdIdList, sh.look.body, vm.state.weather, sh.facing, sh.v);
+      body.layout(sh.look.body, k < 1 ? 1 - to : to, to, k, devPx, t, sh.v);
+      if (small) this.stamp(sh, px); else this.parts(sh, devPx);
+    }
+    sh.until = small || end === 0 ? end : Math.min(end, body.wake);
     return sh;
   }
 
@@ -358,7 +376,7 @@ export class People implements Layer {
     this.glow.addChild(beam, ...pips);
     const sh: Shown = {
       id, look, role: look.d.role, root, figure, sprites: [], whole, slot: -1, pool, ring, beam, ticks, pips, body: new Body(), v: hash(id), facing: 1, turnAt: -99,
-      follower, paintAt: -99, fellAt: -99, route: null, line: new Float64Array(64), lineN: 0, stamp: 0, key: -1, keyName: '', keyPx: 0,
+      follower, paintAt: -99, fellAt: -99, route: null, line: new Float64Array(64), lineN: 0, stamp: 0, until: 0, key: -1, keyName: '', keyPx: 0,
     };
     this.shown.set(id, sh);
     // the figure's own box is what a click takes (sized each frame for the region it is in)

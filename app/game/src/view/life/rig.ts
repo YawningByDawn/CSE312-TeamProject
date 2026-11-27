@@ -1,5 +1,6 @@
 import type { Weather } from '../../types';
 import { ID, LANTERN, outlineId, pack, type HoldIds } from './ids';
+import { WEATHER, io, smooth } from './posture';
 
 // A person's body this frame (#76-78): two baked steps of a loop (assets/poses) lerped, the blend
 // from the last loop and a reaction over it, the weather's posture, the rig solved for the look's height and hunch, and
@@ -37,13 +38,6 @@ export interface Rest { thigh: number; shin: number; upper: number; fore: number
 export interface LookBody { hk: number; hunch: number; tilt: number; seed: number; kit: Kit; rest: Rest; rainHood: boolean; outline: boolean }
 
 
-/** The weather on the body, 0..1 each. */
-const WEATHER: Record<Weather, readonly [wet: number, wind: number, cold: number, fog: number]> = {
-  clear: [0, 0, 0, 0], overcast: [0, 0.2, 0, 0], drizzle: [0.35, 0, 0, 0], rain: [0.75, 0.2, 0, 0], storm: [1, 0.9, 0, 0],
-  fog: [0, 0, 0.2, 0.9], wind: [0, 0.9, 0, 0], cold: [0, 0.2, 0.9, 0],
-};
-const smooth = (a: number, b: number, v: number): number => { const u = Math.min(1, Math.max(0, (v - a) / (b - a))); return u * u * (3 - 2 * u); };
-const io = (u: number): number => 0.5 - 0.5 * Math.cos(Math.PI * u);
 const lerp = (a: number, b: number, k: number): number => a + (b - a) * k;
 const turnOfLook = (look: number): number => (look >= 0 ? look * TURN_3Q : TURN_3Q + -look * (Math.PI - TURN_3Q));
 const angBin = (a: number): number => (((Math.round(a / ((2 * Math.PI) / PROP_STEPS)) % PROP_STEPS) + PROP_STEPS) % PROP_STEPS);
@@ -90,6 +84,9 @@ export class Body {
   // the laid-out parts: name id, packed bins, alpha and the 2x3 transform, PART numbers each
   readonly parts = new Float64Array(128 * PART);
   n = 0;
+  /** the render time the layout just made next differs on its own: the wick's frame, a blink, a burst, a flutter */
+  wake = Infinity;
+  private due(at: number): void { if (at < this.wake) this.wake = at; }
 
   /** Play loop `name` from time `t`: a change blends from the pose shown. */
   play(name: string, s: Series, t: number): void {
@@ -247,6 +244,7 @@ export class Body {
    */
   layout(look: LookBody, from: number, to: number, k: number, devPx: number, t: number, v: number): void {
     this.n = 0;
+    this.wake = Infinity;
     L.self = this; L.from = from; L.to = to; L.k = k;
     const p = this.pose, j = this.j, h = this.hold, ids = this.ids, kit = look.kit, rest = look.rest, M = L.m0;
     const rot = p[ROT]!, squash = p[SQUASH]!, cr = Math.cos(rot), sr = Math.sin(rot), qx = 1 / Math.sqrt(squash);
@@ -286,7 +284,9 @@ export class Body {
     if (ia >= 0 && ia < IMPACT_DUR) {
       M[0] = 1; M[1] = 0; M[2] = 0; M[3] = 1; M[4] = 0; M[5] = 0;
       at(this.impactX, this.impactY);
-      push(ID.im, pack(Math.min(IMPACT_FRAMES - 1, Math.floor((ia / IMPACT_DUR) * IMPACT_FRAMES))));
+      const fi = Math.min(IMPACT_FRAMES - 1, Math.floor((ia / IMPACT_DUR) * IMPACT_FRAMES));
+      push(ID.im, pack(fi));
+      this.due(t + ((fi + 1) / IMPACT_FRAMES) * IMPACT_DUR - ia);
     }
     if (look.outline) {
       // every part's outline first, under the parts: only the figure's rim shows
@@ -311,7 +311,10 @@ export class Body {
     const st = wick <= 0.04 ? 4 : wick > 1.32 ? 3 : wick < 0.45 ? 1 : fin === 2 && wick < 0.7 ? 2 : 0;
     let eyes = wick < 0.45 ? 2 : fin === 2 ? 3 : fin === 3 ? 1 : 0;
     const tq = Math.round(turnOfLook(back ? -look1 : look1) / TB), fk = Math.round(finK * 4);
-    if (eyes === 0 && (t + (look.seed % 97) * 0.053) % 4.3 < 0.13) eyes = 2;
+    const bp = (t + (look.seed % 97) * 0.053) % 4.3, blink = eyes === 0 && bp < 0.13;
+    if (eyes === 0) this.due(t + (blink ? 0.13 : 4.3) - bp);
+    if (p[FLICK]! > 0) this.due(t);
+    if (blink) eyes = 2;
     const finB = covered ? 0 : fin, fkc = covered ? 0 : fk, cov = covered ? 1 : 0;
     const wickOn = !covered && !kit.closed, sp = Math.round(Math.max(0, Math.min(1, wick)) * 4);
     const ang = this.headA * 0.7 + look.tilt, xs = back ? -1 : 1, hx = j[HEAD]!, hy = j[HEAD + 1]!;
@@ -326,7 +329,8 @@ export class Body {
     this.lampY = hy + xs * cpx * sa + cpy * ca;
     if (wickOn) {
       const big = devPx * R * (FOLK_H / HEAD_R) < SMALL_WICK_PX ? 1.3 : 1;
-      const fr = Math.floor(t * WICK_FPS + (look.seed % 13)) % WICK_FRAMES;
+      const ph = t * WICK_FPS + (look.seed % 13), fr = Math.floor(ph) % WICK_FRAMES;
+      this.due(t + (Math.floor(ph) + 1 - ph) / WICK_FPS);
       at(hx, hy, ang, xs, 1);
       const F = L.fr;
       F[4] = this.lampX; F[5] = this.lampY;
