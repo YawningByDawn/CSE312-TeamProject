@@ -68,7 +68,7 @@ describe('the pending and unchecked sets', () => {
   });
 
   it('writes one message per session with the note verbatim', () => {
-    expect(message(unchecked(cards, d).sessions.get('s2')!)).toBe(
+    expect(message('no card is left pending', unchecked(cards, d).sessions.get('s2')!)).toBe(
       'Workshop approvals: no card is left pending. Your cards the owner ruled on:\n- b "Tb": revise. Note: fix\nthe gold');
   });
 });
@@ -106,6 +106,16 @@ describe('the approvals ping switch', () => {
     });
     await post('decide', { id: 'c2', status: 'approved' });
     expect(got).toHaveLength(1);
+  });
+
+  it("a card's Ping sends its standing ruling at once, switch or not, and refuses an unruled or sessionless card", async () => {
+    expect((await post('ping-card', { id: 'c1' })).json.error).toBe('rule the card before pinging it');
+    await post('decide', { id: 'c1', status: 'revise', note: 'seams in the wall' });
+    expect((await post('ping-card', { id: 'c1' })).status).toBe(200);
+    expect(got.map((g) => g.body.body)).toEqual(['Workshop approvals: the owner pinged a ruling. Your cards the owner ruled on:\n- c1 "A card": revise. Note: seams in the wall']);
+    await post('decide', { id: 'c2', status: 'approved' });
+    expect((await post('ping-card', { id: 'c2' })).json.error).toBe('c2 has no session to ping');
+    expect((await post('ping-card', { id: 'nope' })).status).toBe(404);
   });
 
   it('returns a refusing or unreachable plane in the answer, the ruling still recorded', async () => {

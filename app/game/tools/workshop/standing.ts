@@ -29,6 +29,6 @@ export function unchecked(cards: Card[], decisions: Record<string, Ruling[]>): {
   return { sessions, orphans };
 }
 
-/** The one message a session gets: a line per card, the note verbatim. */
-export const message = (lines: Checked[]): string =>
-  'Workshop approvals: no card is left pending. Your cards the owner ruled on:\n' + lines.map((r) => `- ${r.id} "${r.title}": ${r.status}` + (r.note ? `. Note: ${r.note}` : '')).join('\n');
+/** A message to a session: why it is sent, then a line per card, the note verbatim. */
+export const message = (why: string, lines: Checked[]): string =>
+  `Workshop approvals: ${why}. Your cards the owner ruled on:\n` + lines.map((r) => `- ${r.id} "${r.title}": ${r.status}` + (r.note ? `. Note: ${r.note}` : '')).join('\n');
