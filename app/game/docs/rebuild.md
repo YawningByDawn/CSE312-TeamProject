@@ -166,7 +166,7 @@ Every line lands in a track: SIM (rules), WORLD (people's lives), CONTENT, BAKE,
 | 98 | The clock: hour, day, weekday; AP refilling; pause (LIVE replaces End Night, x2, x4 and skip) | ui/play/rest.ts, feel/fastday.ts, scenes/play/day.ts | HUD | keep |
 | 99 | The depth gauge at the left edge | ui/play/{rest.ts,kit/meter.ts} | HUD | drop: the camera already shows depth; a sixth thing at rest (style.md §7, CUTS) |
 | 100 | The people plate | ui/play/rest.ts | HUD | drop: the characters menu is the people list; a second copy of it (CUTS) |
-| 101 | The goal in plain words; a click goes there | ui/play/{rest,record}.ts | HUD | keep |
+| 101 | The goal in plain words; a click goes there | ui/play/{rest,record}.ts | HUD | drop: the owner cut the goal plate (queue PANELS) |
 | 102 | The record: goal and chronicle (C) | ui/play/record.ts, content/chronicle.ts | HUD | drop: the goal line and the day feed carry it; a chronicle is a second feed (CUTS) |
 | 103 | The feed: notes, warnings, a click jumps there | ui/play/notes.ts | HUD | keep |
 | 104 | Toasts | ui/kit.ts | HUD | drop: a second notice channel beside the feed and the notes where things happen (ONE SOURCE) |

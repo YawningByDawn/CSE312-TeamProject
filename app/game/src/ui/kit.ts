@@ -38,6 +38,7 @@ export function installCss(sheets: readonly Sheet[]): void {
     '.hg-b { position: absolute; }',
     '.hg-hit { pointer-events: auto; cursor: pointer; }',
     `.hg-t { position: absolute; white-space: nowrap; line-height: 1; text-shadow: 0 1px 0 ${INK}; }`,
+    '.hg-cut { overflow: hidden; text-overflow: ellipsis; padding-bottom: 3px; }',
     '.hg-row { position: absolute; display: flex; align-items: baseline; gap: 6px; white-space: nowrap; }',
     '.hg-row > .hg-t { position: static; }',
     '.hg-n { font-family: "Bitstream Charter", Georgia, serif; font-weight: 600; }',

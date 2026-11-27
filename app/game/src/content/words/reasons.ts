@@ -1,4 +1,4 @@
-/** The sim's reasons: why an action is refused (`why.*`), why a power's heat moved (`heat.*`, slot `n` the change), why Ichor or Nether moved, how a run ends (`end.*`), and what you want next (`goal.*`). */
+/** The sim's reasons: why an action is refused (`why.*`), why a power's heat moved (`heat.*`, slot `n` the change), why Ichor or Nether moved, how a run ends (`end.*`). */
 export const REASON_WORDS: Readonly<Record<string, string>> = {
   'why.over': 'The run is over',
   'why.pickOne': 'Take one first',
@@ -113,7 +113,4 @@ export const REASON_WORDS: Readonly<Record<string, string>> = {
   'end.rootedOut': 'No one was left who heard you, and your colour drained back into the grave.',
   'end.taken': 'The lift is yours. A thread of your shadow rides it into the grey light above the mine.',
   'end.sealed': 'The Council sealed the pit head and poured stone into the shaft, and you starved in the dark under it.',
-
-  'goal.rootLift': 'Reach the surface: root the lift',
-  'goal.rank': 'Grow stronger: reach rank {n}',
 };

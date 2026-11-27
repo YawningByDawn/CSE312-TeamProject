@@ -132,7 +132,7 @@ describe('content ids', () => {
     }
   });
 
-  it('every reason the sim gives (a refusal, a heat note, an ending, a goal) has its words', () => {
+  it('every reason the sim gives (a refusal, a heat note, an ending) has its words', () => {
     const dir = new URL('../../../src/sim/', import.meta.url);
     const src = readdirSync(dir, { recursive: true }).filter((f) => String(f).endsWith('.ts')).map((f) => readFileSync(new URL(String(f), dir), 'utf8')).join('\n');
     const keys = [

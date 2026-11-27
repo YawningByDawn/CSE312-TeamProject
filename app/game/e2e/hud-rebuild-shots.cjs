@@ -77,9 +77,6 @@ const LAYOUT = () => {
         await shot(`menu-${menu}`, '.hgp-slab');
       }
       await ev(() => window.__hg.send({ kind: 'menu', menu: null }));
-      await page.click('text=Reach the surface');
-      await shot('goal-click', null);
-      await ev(() => window.__hg.send({ kind: 'focus', focus: null }));
       await ev(() => {
         const s = window.__hg.state();
         s.god.played = 0;

@@ -50,8 +50,6 @@ export interface Query {
   stats(s: Readonly<GameState>): GodStats;
   /** The god's urges as their state words (sated / starving...). */
   urge(s: Readonly<GameState>, which: 'hunger' | 'malice'): string;
-  /** The goal in plain words: what to do next to take the mine. */
-  goal(s: Readonly<GameState>): Reason;
   /** What a stone counts for burnt into `card`'s miracle (its own nature half again), and the Hunger eating it takes away. */
   worth(s: Readonly<GameState>, crystal: CrystalId, card?: CardId): { burn: number; hunger: number };
   /** The slots the pending story's words fill (its numbers, who and where), or null with no story pending. */
@@ -172,11 +170,11 @@ export type Bind =
   | 'details' | 'work' | 'pick1' | 'pick2' | 'pick3' | 'pick4' | 'pick5' | 'profiler';
 
 /**
- * Volumes 0..1, the interface's size, whether the hints teach, the hints already taught (kept across runs), and the keys
+ * Volumes 0..1, the interface's size, whether the hints teach, the hints already taught (kept across runs), whether the feed shows its last few notes, and the keys
  * bound to each `Bind`.
  */
 export interface Settings {
-  master: number; music: number; sfx: number; ambience: number; uiSize: 'small' | 'medium' | 'large'; hints: boolean; seenHints: string[];
+  master: number; music: number; sfx: number; ambience: number; uiSize: 'small' | 'medium' | 'large'; hints: boolean; seenHints: string[]; feedOpen: boolean;
   keys: Record<Bind, string[]>;
 }
 

@@ -154,9 +154,10 @@ export const HUD_WORDS: Readonly<Record<string, string>> = {
   'hint.offer.body': 'Click a follower and set them to Offer: at dusk they bring their crystals to your grave.',
   'hint.hand.title': 'Your hand',
   'hint.hand.body': 'Drag a card onto the field to play it. The first each night is free; after it, a card costs Nether.',
-  'hint.goal.title': 'What next',
-  'hint.goal.body': 'The line under your stats says what to do next. Click it to look there.',
   'hint.hunger.title': 'You are starving',
   'hint.hunger.body': 'Eat a crystal at your grave before Hunger eats your followers.',
+  'feed.quiet': 'Nothing has happened yet',
+  'feed.expand': 'Show the last few events',
+  'feed.shrink': 'Show only the latest event',
   'warn.lands': '{name}: in {h} {h|hour|hours}',
 };

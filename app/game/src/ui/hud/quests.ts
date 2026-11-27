@@ -5,14 +5,14 @@ import { ROLES } from '../../content/roles';
 import { HOST } from '../../content/stats';
 import { hostOf } from '../../sim/host';
 import { PALE, VIOLET, Words, div } from '../kit';
-import { GOAL_H, GOAL_Y } from './goal';
+import { SUSP_H, SUSP_Y } from './suspicion';
 
-// The quests, right side under the goal: a few lines of words with no slab behind them. By day, what the sim holds the host
+// The quests, right side under the suspicion box: a few lines of words with no slab behind them. By day, what the sim holds the host
 // to: the trade's quota of ore delivered, the stones pocketed against the free few, and the marks made of the day's
 // allowance. A line whose number is met turns violet. Nothing at night. The lines take no pointer.
 
 export const QUESTS_W = 260;
-export const QUESTS_Y = GOAL_Y + GOAL_H + 14;
+export const QUESTS_Y = SUSP_Y + SUSP_H + 14;
 const ROW = 28;
 
 /** One line of the list: its name and its figure. */

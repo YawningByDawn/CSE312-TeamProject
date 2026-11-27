@@ -1,0 +1,1 @@
+{"note": "FEEDTAB: the feed's tab, hanging from the box's bottom edge: tab.down opens the list, tab.up shrinks it. k = 2 px per CSS px; origin the tab's top left.", "file": "feedtab.webp", "w": 224, "h": 48, "levels": 1, "cells": {"tab.down": [0, 0, 112, 48, 2, 0, 0], "tab.up": [112, 0, 112, 48, 2, 0, 0]}}

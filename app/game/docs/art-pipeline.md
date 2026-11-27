@@ -26,6 +26,7 @@ Every picture and sound the game shows was made by our own painters offline and 
 | `fog/` | tables | the mine's and the town's fog fields | `src/view/fog.ts`, `fog.worker.ts` |
 | `valley/` | `far/`, four near tiles, `mask/` table | the land round the town and its known-ground mask | `src/view/valley.ts`, `fog.worker.ts` |
 | `weather/` | atlas, `.bc3` | white cells the view tints: rain streaks, smears, puddles, fog banks, gusts, lightning, the mine's pools | `src/view/weather.ts` |
+| `feedtab/` | sheet | the feed's tab, an arrow down and an arrow up | `src/ui/hud/feed.ts` |
 | `defeat/` | atlas | the defeat's ramps and the grave's eye | `src/view/film/films.ts`, `src/ui/panels/art.ts` |
 | `ui/` | sheet | the interface's plates, frames, icons and nine-slices | `src/ui/kit.ts`, `src/ui/panels/art.ts` |
 | `cardback/` | sheet | `card.back`, the face-down card the deal rises with, the plate's size and origin (`scripts/art/cardback.py`, held fresh by `scripts/art/test_cardback.py`) | `src/ui/panels/art.ts`, `src/ui/hud/cards.ts` |

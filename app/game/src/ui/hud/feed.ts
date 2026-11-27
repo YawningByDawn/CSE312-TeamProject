@@ -1,77 +1,75 @@
-import type { Focus, GameEvent, Intent, ViewModel } from '../../types';
+import type { Focus, Intent, ViewModel } from '../../types';
 import { TPH } from '../../content/clock';
 import { THREAT_SLOTS } from '../../content/threats';
 import { uiText } from '../../content/text';
-import { line } from '../panels/art';
-import { BLOOD, INK, PALE, Words, attr, div, surface } from '../kit';
+import { cell } from '../panels/art';
+import { BLOOD, DIM, PALE, Words, attr, div, surface } from '../kit';
 import { HOST_H, HOST_W } from './hostplate';
 
-// The feed (inventory #92, 103), the left column's events. The day's notes one at a time, on a line under the host's
-// plate, never over the world; replaced by the next, never a list: a heavier note stands longer and waits its turn (at most three wait), a
-// light one is dropped while others wait; a click looks at where it happened. Under the note's line, a strip for each
-// move a power has announced and the hours until it lands, nearest first; a click looks at its target. Each writes only
-// when what it shows changes.
+// The feed (inventory #92, 103), the left column's events: a small dim box under the host's plate holding the latest note,
+// never over the world; the tab hanging from its bottom edge opens it to the last few and shrinks it again (the settings
+// keep which, across runs). A click on a note looks at where it happened. Under the box, a strip for each move a power has
+// announced and the hours until it lands, nearest first; a click looks at its target. Each writes only when what it
+// shows changes.
 
 /** Under the host's plate. */
 const FEED_Y = HOST_H + 12;
-/** The note is as wide as the host's plate (the column clears the centre's panels) and at most three rows tall; the announced moves' strips stand under it. */
-const FEED_W = HOST_W, ROWS = 3;
-const WARN_W = 336, WARN_Y = FEED_Y + 16 + ROWS * 22 + 8;
-/** Seconds a note stands by its weight. */
-const STAND = [3.2, 4.6, 6.5];
-const WAITING = 3;
-const WARNINGS = 4;
+const FEED_W = HOST_W, PAD = 7, ROW = 25, KEPT = 5, TAB_W = 56, TAB_H = 24;
+const WARN_W = 336, WARNINGS = 4;
 
-interface Note { text: string; weight: number; at: Focus }
-
-/** How much a note matters: a life line or the day's weather 0, a gain or loss of a thing 1, a person, a power, a find 2. */
-function weight(e: GameEvent): number {
-  if (e.kind === 'story') return e.story === 'life' || e.story === 'day' ? 0 : 2;
-  if (e.kind === 'weather') return 0;
-  return e.kind === 'lost' || e.kind === 'turned' || e.kind === 'suspicion' || e.kind === 'threat' || e.kind === 'found' ? 2 : 1;
-}
+interface Note { text: string; at: Focus }
 
 export class Feed {
   private readonly box: HTMLDivElement;
   private readonly warns: HTMLDivElement;
-  private wait: Note[] = [];
-  private cur: (Note & { until: number }) | null = null;
+  private log: Note[] = [];
+  private seed = -1;
+  private open: boolean | null = null;
+  private dirty = false;
   private warnKey = '';
   private hour = -1;
 
   constructor(anchor: HTMLElement, private readonly send: (i: Intent) => void) {
-    this.box = div(anchor, 'hg-b hg-hit', 0, FEED_Y);
-    this.box.addEventListener('click', () => { if (this.cur?.at) this.send({ kind: 'focus', focus: this.cur.at }); });
-    this.warns = div(anchor, 'hg-b', 0, WARN_Y);
+    this.box = div(anchor, 'hg-b', 0, FEED_Y);
+    this.warns = div(anchor, 'hg-b', 0, 0);
   }
 
   frame(vm: ViewModel): void {
+    if (vm.state.seed !== this.seed) [this.seed, this.log, this.dirty] = [vm.state.seed, [], true];
     for (const e of vm.fresh) {
       if (!e.note) continue;
-      const n: Note = { text: uiText(e.note.key, e.note.slots), weight: weight(e), at: e.unit ? { unit: e.unit } : e.place ? { place: e.place } : null };
-      if (n.weight === 0 && (this.wait.length > 0 || (this.cur && this.cur.weight > 0 && vm.time < this.cur.until))) continue;
-      this.wait.push(n);
-      if (this.wait.length > WAITING) {
-        const light = this.wait.findIndex((w) => w.weight < 2);
-        this.wait.splice(light < 0 ? 0 : light, 1);
-      }
+      this.log.unshift({ text: uiText(e.note.key, e.note.slots), at: e.unit ? { unit: e.unit } : e.place ? { place: e.place } : null });
+      this.log.length = Math.min(this.log.length, KEPT);
+      this.dirty = true;
     }
-    if (this.cur && vm.time >= this.cur.until) this.show(null);
-    if (!this.cur && this.wait.length > 0) {
-      const n = this.wait.shift()!;
-      this.show({ ...n, until: vm.time + STAND[n.weight]! });
-    }
+    const open = vm.settings.feedOpen;
+    if (this.dirty || open !== this.open) this.draw((this.open = open));
     this.warnings(vm);
   }
 
-  private show(n: (Note & { until: number }) | null): void {
-    this.cur = n;
+  /** The box at its size: the latest note, or the last few when open, and the tab under it. */
+  private draw(open: boolean): void {
+    this.dirty = false;
+    const rows = open ? Math.max(1, this.log.length) : 1, h = PAD * 2 + rows * ROW;
     this.box.replaceChildren();
-    if (!n) return;
-    const w = Math.min(FEED_W, 40 + n.text.length * 8.4), rows = Math.min(ROWS, Math.ceil((n.text.length * 8.4) / (FEED_W - 40)));
-    const b = div(this.box, 'hg-b hgp-in');
-    surface(b, 'parch', 0, 0, w, 16 + rows * 22);
-    line(b, 20, 8, w - 40, 18, INK, n.text);
+    const b = surface(this.box, 'slab', 0, 0, FEED_W, h);
+    b.style.opacity = '0.82';
+    for (let i = 0; i < rows; i++) {
+      const n = this.log[i];
+      const w = new Words(b, 18, PAD + i * ROW + 3, 18, i === 0 ? PALE : DIM);
+      w.el.classList.add('hg-cut');
+      w.el.style.width = `${FEED_W - 36}px`;
+      w.set(n ? n.text : uiText('feed.quiet'));
+      if (n) {
+        w.el.classList.add('hg-hit');
+        w.el.addEventListener('click', () => { if (n.at) this.send({ kind: 'focus', focus: n.at }); });
+      }
+    }
+    const tab = cell(this.box, 'feedtab', open ? 'tab.up' : 'tab.down', (FEED_W - TAB_W) / 2, h - 3, 0.5);
+    tab.classList.add('hg-hit');
+    attr(tab, 'title', uiText(open ? 'feed.shrink' : 'feed.expand'));
+    tab.addEventListener('click', () => this.send({ kind: 'settings', patch: { feedOpen: !open } }));
+    this.warns.style.top = `${FEED_Y + h + TAB_H + 5}px`;
   }
 
   /** The announced moves, nearest first; rewritten on the hour or when the list changes. */

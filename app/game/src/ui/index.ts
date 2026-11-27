@@ -1,7 +1,7 @@
 // src/ui, the DOM interface over the canvas (implements `Ui`; docs/style.md §7). Owns the interface's layers, their
 // corner anchors and scale; kit.ts its DOM helpers, the ui atlas's cells and the fonts.
 // src/ui/hud holds the rest layout's parts, one a file: the hand and the deal (cards), the clock, the host's plate, the
-// feed, the god's corner (god) with the powers' suspicion, the goal and the quests under it, the hints, the menus, the
+// feed, the god's corner (god) with the powers' suspicion and the quests under it, the hints, the menus, the
 // pouch with the people plate and the hover tip; src/ui/panels what opens over them.
 // Reads the view model each frame, the sim's Query and its pure helpers (sim/core, sim/cards), content's tables and
 // its words (`uiText`), and where the view stands a thing on screen; it changes nothing itself: every choice is an
@@ -19,7 +19,6 @@ import { Hints } from './hud/hints';
 import { Menus } from './hud/menus';
 import { Tip } from './hud/tip';
 import { God } from './hud/god';
-import { Goal } from './hud/goal';
 import { HostPlate } from './hud/hostplate';
 import { Quests } from './hud/quests';
 import { Suspicion } from './hud/suspicion';
@@ -110,11 +109,11 @@ export function createUi(mountPanels?: MountPanels): Ui {
       // a film may be skipped: the prompt bottom right while one plays (inventory #3)
       skip = new Words(menuAt.br, -400, -24, 18, DIM, 'right', 400);
       skip.el.hidden = true;
-      // top left the host and under it the feed's events; top right the god, the powers' suspicion, the goal and the quests;
+      // top left the host and under it the feed's events; top right the god, the powers' suspicion and the quests;
       // bottom left the pouch and the people; bottom right the clock
       parts.push(
         new HostPlate(at.tl, send, q), new Feed(at.tl, toggle),
-        new God(at.tr, toggle, q), new Suspicion(at.tr), new Goal(at.tr, toggle, q),
+        new God(at.tr, toggle, q), new Suspicion(at.tr),
         new Pouch(at.bl, toggle), new People(at.bl, send, POUCH_H), new Clock(at.br, send, q),
         new Quests(at.tr, q), new Hints(at, (t) => q.day(t), send), new Drops(at.c, from('c')), hand, deal,
       );
