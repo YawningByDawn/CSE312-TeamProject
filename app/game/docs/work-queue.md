@@ -12,3 +12,4 @@ The specs for the owner's open orders: each item is one task an agent starts wit
 
 | Item | Row | Open |
 |---|---|---|
+| loop-page | LOOP | A bare-bones, playable model of the gameplay loop as one artifact page, not in the repo: the day (mine, deliver, fight) and the night (the deal, whispers, heat, threats), the win and the loss, the real numbers editable with their sources, and an auto-play of 100 seeded runs. |
