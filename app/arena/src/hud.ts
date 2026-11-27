@@ -1,6 +1,18 @@
 import { drawAnimal } from './animals';
 import type { Frame } from './view';
-import type { World } from './types';
+import type { Circle, World } from './types';
+
+const within = (set: Circle[], x: number, y: number): boolean => set.some((k) => Math.hypot(x - k.x, y - k.y) < k.r);
+
+/** What the ground under a player means for them, if anything special. */
+function terrainHint(world: World, x: number, y: number, tier: number, habitat: string): string {
+  const climber = tier <= world.climbTier || habitat === 'air';
+  if (within(world.rocks, x, y) && climber) return 'Up on the rocks: nothing bigger than tier ' + (world.climbTier + 1) + ' can follow (but fliers can)';
+  if (within(world.reefs, x, y) && climber) return 'In the reef: nothing bigger than tier ' + (world.climbTier + 1) + ' fits (but fliers can)';
+  if (within(world.tar, x, y) && habitat !== 'air') return climber ? 'Tar pit: light enough to skitter across. Big ones bog down here' : 'Tar pit: you are bogged down! Get out';
+  if (within(world.islands, x, y)) return 'An island: sea creatures are stranded here';
+  return '';
+}
 
 // The heads-up display, drawn on the canvas over the world in CSS pixels: what the player is, the leaderboard, the
 // minimap, the bars and dials, and the messages that come and go. The evolution choice and the stat buttons are DOM
@@ -97,7 +109,7 @@ export class Hud {
 
     if (me && playing) {
       const sp = world.species[me.sp]!;
-      this.card(c, world, me.sp, me.bite, me.ability, small);
+      this.card(c, world, me.sp, me.bite, me.ability, me.health, me.speed, small);
       const need = world.needs[sp.tier] ?? 1;
       const bw = Math.min(560, w - 32);
       const x = (w - bw) / 2;
@@ -110,6 +122,19 @@ export class Hud {
       bar(c, x + half + 8, y - 26, half, 20, me.hp / me.maxHp, me.hp > me.maxHp * 0.35 ? '#6cc24a' : '#e2533f', `Health ${me.hp}`);
       dial(c, x + bw - 22, y - 58, 1 - me.cooldown / world.boost, '#8fd3ff', 'BOOST', small ? '' : 'Space');
       dial(c, x + bw - 72, y - 58, 1 - me.abilityCd / sp.ability.cooldown, '#ffb14a', 'SKILL', small ? '' : 'E');
+      const hint = terrainHint(world, f.camX, f.camY, sp.tier, sp.habitat);
+      if (hint) { // top middle, clear of the evolution choice
+        c.font = `700 ${small ? 12 : 14}px ${FONT}`;
+        const tw = Math.min(w - 24, c.measureText(hint).width + 28);
+        const hy = small ? 108 : 16;
+        rounded(c, (w - tw) / 2, hy, tw, 26, 13);
+        c.fillStyle = 'rgba(28,44,26,0.72)';
+        c.fill();
+        c.fillStyle = '#ffe9a8';
+        c.textAlign = 'center';
+        c.textBaseline = 'middle';
+        c.fillText(hint, w / 2, hy + 14, tw - 20);
+      }
     }
 
     this.leaderboard(c, w, narrow && me && playing ? 80 : 12, f, myName, small);
@@ -159,7 +184,7 @@ export class Hud {
   }
 
   /** What the player is, top left: its picture, name, home and ability, and the levels bought with stat points. */
-  private card(c: CanvasRenderingContext2D, world: World, spIndex: number, bite: number, ability: number, small: boolean): void {
+  private card(c: CanvasRenderingContext2D, world: World, spIndex: number, bite: number, ability: number, health: number, speed: number, small: boolean): void {
     const sp = world.species[spIndex]!;
     const x = 12;
     const y = 12;
@@ -187,7 +212,9 @@ export class Hud {
     c.fillText(`Tier ${sp.tier + 1} · ${HABITAT_LABEL[sp.habitat] ?? ''}`, tx, y + (small ? 39 : 43));
     c.fillStyle = 'rgba(255,255,255,0.9)';
     const atk = Math.round(sp.atk * (1 + 0.2 * bite));
-    c.fillText(small ? `HP ${sp.hp} · ATK ${atk}` : `HP ${sp.hp} · ATK ${atk} · ${sp.ability.name}${ability ? ` +${ability}` : ''}`, tx, y + (small ? 53 : 60));
+    const hp = Math.round(sp.hp * (1 + 0.15 * health));
+    const levels = [['Bite', bite], ['Skill', ability], ['HP', health], ['Spd', speed]].filter(([, lv]) => lv).map(([n, lv]) => `${n}+${lv}`).join(' ');
+    c.fillText(small ? `HP ${hp} · ATK ${atk}` : `HP ${hp} · ATK ${atk} · ${levels || sp.ability.name}`, tx, y + (small ? 53 : 60));
     if (!small) {
       // what the outlines mean
       rounded(c, x, y + size + 16, 196, 22, 11);
@@ -254,6 +281,30 @@ export class Hud {
     }
     c.fillStyle = 'rgba(110,180,90,0.7)';
     for (const b of world.bushes) {
+      c.beginPath();
+      c.arc(x + b.x * k, y + b.y * k, Math.max(1.2, b.r * k), 0, TAU);
+      c.fill();
+    }
+    c.fillStyle = 'rgba(150,200,110,0.95)';
+    for (const b of world.islands) {
+      c.beginPath();
+      c.arc(x + b.x * k, y + b.y * k, Math.max(2, b.r * k), 0, TAU);
+      c.fill();
+    }
+    c.fillStyle = 'rgba(30,22,15,0.9)';
+    for (const b of world.tar) {
+      c.beginPath();
+      c.arc(x + b.x * k, y + b.y * k, Math.max(1.5, b.r * k), 0, TAU);
+      c.fill();
+    }
+    c.fillStyle = 'rgba(200,196,186,0.95)';
+    for (const b of world.rocks) {
+      c.beginPath();
+      c.arc(x + b.x * k, y + b.y * k, Math.max(1.2, b.r * k), 0, TAU);
+      c.fill();
+    }
+    c.fillStyle = 'rgba(240,140,120,0.95)';
+    for (const b of world.reefs) {
       c.beginPath();
       c.arc(x + b.x * k, y + b.y * k, Math.max(1.2, b.r * k), 0, TAU);
       c.fill();

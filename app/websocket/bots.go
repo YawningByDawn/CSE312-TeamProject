@@ -70,7 +70,8 @@ func (a *arena) think(c *creature, dt float64) {
 			if b.goalX != 0 || b.goalY != 0 { // cover to hide in
 				tx, ty = b.goalX-c.x, b.goalY-c.y
 			}
-			if c.hidden {
+			perched := climbs(c) && !climbs(t) && (inside(a.rocks, c.x, c.y) != nil || inside(a.reefs, c.x, c.y) != nil)
+			if c.hidden || perched {
 				tx, ty = 0, 0
 			} else if d < 140 && c.abilityCd == 0 && a.rng.Float64() < b.bold*dt*4 {
 				switch sp.Ability.Kind {
@@ -151,11 +152,7 @@ func (a *arena) botEvolve(c *creature) {
 	}
 	if len(options) == 0 {
 		a.evolve(c, -1)
-		stat := "bite"
-		if a.rng.IntN(2) == 0 {
-			stat = "ability"
-		}
-		a.upgrade(c, stat)
+		a.upgrade(c, stats[a.rng.IntN(len(stats))])
 		return
 	}
 	a.evolve(c, options[a.rng.IntN(len(options))])
@@ -184,11 +181,15 @@ func (a *arena) decide(c *creature) {
 	switch {
 	case threat != nil:
 		b.mode, b.target, b.goalX, b.goalY = fleeing, threat, 0, 0
-		if sp.Hides {
+		if sp.Hides || climbs(c) && !climbs(threat) {
 			best := 300.0
 			tx, ty := threat.x-c.x, threat.y-c.y
 			tl := max(1, math.Hypot(tx, ty))
-			for _, set := range [][]circle{a.bushes, a.kelp} {
+			refuges := [][]circle{a.rocks, a.reefs} // somewhere the threat cannot follow
+			if sp.Hides {
+				refuges = append(refuges, a.bushes, a.kelp)
+			}
+			for _, set := range refuges {
 				for _, bu := range set {
 					d := math.Hypot(bu.X-c.x, bu.Y-c.y)
 					// the nearest cover that is not past the threat

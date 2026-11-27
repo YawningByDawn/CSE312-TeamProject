@@ -9,10 +9,11 @@ import (
 )
 
 // newTestArena keeps the map's coast (the sea is east of x = 4500 or so) but nothing else: no food, bots, bushes,
-// kelp or ponds, and nothing grows back.
+// kelp, ponds, islands, tar, crags or food sources, and nothing grows back.
 func newTestArena() *arena {
 	a := newArena(rand.New(rand.NewPCG(1, 2)), 20)
 	a.creatures, a.food, a.bushes, a.kelp, a.ponds = nil, nil, nil, nil, nil
+	a.islands, a.tar, a.rocks, a.reefs, a.sources = nil, nil, nil, nil, nil
 	a.landFood, a.seaFood, a.minBots, a.totalCreatures = 0, 0, 0, 0
 	return a
 }
@@ -545,5 +546,133 @@ func TestGuestsGetNamesNoAccountCanHave(t *testing.T) {
 	}
 	if !guestKey.MatchString(k1) || guestKey.MatchString("short") || guestKey.MatchString("0123456789ABCDEF0123456789abcdef") {
 		t.Fatal("guest keys")
+	}
+}
+
+func TestCragsKeepBigCreaturesOffAndLetSmallOnesAndFliersOn(t *testing.T) {
+	a := newTestArena()
+	a.rocks = []circle{{X: 1000, Y: 1000, R: 100}, {X: 1000, Y: 1500, R: 100}, {X: 1000, Y: 2000, R: 100}}
+	big := put(t, a, "ann", "Sabertooth", 850, 1000)
+	small := put(t, a, "bea", "Raptor", 850, 1500)
+	flier := put(t, a, "cy", "Griffin", 850, 2000)
+	for _, c := range []*creature{big, small, flier} {
+		c.dx = 1
+	}
+	for range 10 {
+		a.step(0.05)
+	}
+	if d := math.Hypot(big.x-1000, big.y-1000); d < 100-0.01 {
+		t.Fatalf("the sabertooth got %v from the rock's middle", d)
+	}
+	if small.x < 920 || flier.x < 920 {
+		t.Fatalf("the raptor (at %v) or the griffin (at %v) did not get onto its rock", small.x, flier.x)
+	}
+	// on the rock, the raptor is out of the sabertooth's reach
+	small.x, small.y, small.dx = 1000, 1000, 0
+	big.x, big.y, big.dx = 880, 1000, 1
+	for range 20 {
+		a.step(0.05)
+	}
+	if small.hp != small.maxHP() {
+		t.Fatalf("the sabertooth reached the raptor on the rock: %v hp", small.hp)
+	}
+}
+
+func TestTarBogsDownBigCreaturesMoreThanSmallOnes(t *testing.T) {
+	a := newTestArena()
+	a.tar = []circle{{X: 1500, Y: 1500, R: 400}}
+	run := func(species string) float64 {
+		c := put(t, a, "ann", species, 1300, 1500)
+		c.dx = 1
+		for range 10 {
+			a.step(0.05)
+		}
+		c.dead = &death{left: true}
+		a.step(0.05)
+		return (c.x - 1300) / speciesList[c.sp].Speed
+	}
+	if small, big := run("Raptor"), run("Mammoth"); big > small*0.5 {
+		t.Fatalf("in tar a mammoth kept %v of its pace, a raptor %v", big, small)
+	}
+}
+
+func TestIslandsAreLandOutAtSea(t *testing.T) {
+	a := newTestArena()
+	x := a.coastX(3000) + 1200
+	if a.terrain(x, 3000) != ocean {
+		t.Fatal("not at sea")
+	}
+	a.islands = []circle{{X: x, Y: 3000, R: 300}}
+	if a.terrain(x, 3000) != ground || a.fits(sea, x, 3000) || !a.fits(land, x, 3000) {
+		t.Fatal("the island is not land")
+	}
+}
+
+func TestSourcesGrowTheirFoodUpToTheirMost(t *testing.T) {
+	a := newTestArena()
+	a.sources = []*source{{Kind: "tree", X: 1000, Y: 1000, R: 50}}
+	for range 400 {
+		a.step(0.05)
+	}
+	nuts := 0
+	for _, f := range a.food {
+		if foodKinds[f.kind].Name == "ginkgo" && math.Hypot(f.x-1000, f.y-1000) <= 50*1.4+0.01 {
+			nuts++
+		}
+	}
+	if k := sourceKinds["tree"]; nuts != k.max || a.sources[0].count != k.max {
+		t.Fatalf("%d nuts (counted %d), want %d", nuts, a.sources[0].count, k.max)
+	}
+	f := a.food[0]
+	c := put(t, a, "ann", "Millipede", f.x, f.y)
+	a.step(0.05)
+	if c.xp == 0 || a.sources[0].count != sourceKinds["tree"].max-1 {
+		t.Fatalf("after one was eaten: xp %v, count %d", c.xp, a.sources[0].count)
+	}
+}
+
+func TestStarfruitFeedsBigCreaturesAsMuchAsSmall(t *testing.T) {
+	a := newTestArena()
+	star := foodIndex("starfruit")
+	rex := put(t, a, "ann", "T-Rex", 1000, 1000)
+	a.food = []*foodItem{{id: a.id(), kind: star, x: 1000, y: 1000}, {id: a.id(), kind: foodIndex("berry"), x: 3000, y: 3000}}
+	a.step(0.05)
+	if rex.xp != foodKinds[star].XP {
+		t.Fatalf("the rex got %v xp from a starfruit, want %v", rex.xp, foodKinds[star].XP)
+	}
+}
+
+func TestStatPointsRaiseHealthAndSpeedToo(t *testing.T) {
+	a := newTestArena()
+	c := put(t, a, "ann", "Raptor", 1000, 1000)
+	c.points = 3
+	top, hp := c.maxHP(), c.hp
+	a.upgrade(c, "health")
+	if c.hpLv != 1 || c.maxHP() <= top || c.hp-hp != c.maxHP()-top {
+		t.Fatalf("health level %d: max %v from %v, hp %v from %v", c.hpLv, c.maxHP(), top, c.hp, hp)
+	}
+	a.upgrade(c, "speed")
+	a.upgrade(c, "nonsense")
+	if c.speedLv != 1 || c.points != 1 {
+		t.Fatalf("speed level %d, %d points left", c.speedLv, c.points)
+	}
+	slow := put(t, a, "bea", "Raptor", 1000, 2000)
+	c.dx, slow.dx = 1, 1
+	for range 20 {
+		a.step(0.05)
+	}
+	if c.x-1000 <= slow.x-1000 {
+		t.Fatalf("a speed level went %v, none %v", c.x-1000, slow.x-1000)
+	}
+}
+
+func TestEveryFoodAndSourceKindIsKnown(t *testing.T) {
+	for name, k := range sourceKinds {
+		if foodIndex(k.food) < 0 {
+			t.Errorf("source %s grows unknown food %q", name, k.food)
+		}
+	}
+	if foodKinds[meat].Name != "meat" {
+		t.Error("meat is not at its index")
 	}
 }

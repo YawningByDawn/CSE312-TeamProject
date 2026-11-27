@@ -27,6 +27,15 @@ export interface FoodKind {
   xp: number;
   hunger: number;
   sea: boolean;
+  full: boolean; // feeds big creatures as much as small ones
+}
+
+/** A place that grows food: a ginkgo tree, termite mound, nest, bones, sea vent, or a pond's lilies. */
+export interface Source {
+  kind: 'tree' | 'mound' | 'nest' | 'bones' | 'vent' | 'lilies';
+  x: number;
+  y: number;
+  r: number;
 }
 
 export interface Circle {
@@ -50,6 +59,12 @@ export interface World {
   ponds: Circle[];
   bushes: Circle[];
   kelp: Circle[];
+  islands: Circle[];
+  tar: Circle[];
+  rocks: Circle[]; // crags on land: only climbers (up to climbTier) and fliers get on
+  reefs: Circle[]; // and at sea
+  sources: Source[];
+  climbTier: number;
 }
 
 export interface MeAlive {
@@ -68,6 +83,8 @@ export interface MeAlive {
   points: number;
   bite: number; // levels
   ability: number;
+  health: number;
+  speed: number;
 }
 
 export interface MeDead {

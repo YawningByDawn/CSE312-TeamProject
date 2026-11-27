@@ -16,7 +16,7 @@ var kickedMessage = []byte(`{"type":"kicked"}`)
 var startMessage = []byte(`{"type":"start"}`)
 
 // inMessage is the arena's "input" (dx, dy: where to steer), "spawn", "boost", "ability", "evolve" (to: a species, or
-// -1 to stay for a stat point) and "upgrade" (stat: "bite" or "ability"); "game" (data, relayed as it came to every
+// -1 to stay for a stat point) and "upgrade" (stat: "bite", "ability", "health" or "speed"); "game" (data, relayed as it came to every
 // other player); or a lobby's "host", "search", "join" (host), "leave" and, from a lobby's host, "start".
 type inMessage struct {
 	Type string          `json:"type"`
@@ -44,6 +44,12 @@ type worldMessage struct {
 	Ponds     []circle   `json:"ponds"`
 	Bushes    []circle   `json:"bushes"`
 	Kelp      []circle   `json:"kelp"`
+	Islands   []circle   `json:"islands"`
+	Tar       []circle   `json:"tar"`
+	Rocks     []circle   `json:"rocks"`
+	Reefs     []circle   `json:"reefs"`
+	Sources   []*source  `json:"sources"`
+	ClimbTier int        `json:"climbTier"` // the biggest tier that gets onto rocks and reefs; fliers do too
 }
 
 // boardEntry is one row of the leaderboard.
@@ -71,6 +77,8 @@ type meAlive struct {
 	Points    int     `json:"points"`
 	Bite      int     `json:"bite"`    // its bite's level
 	Ability   int     `json:"ability"` // its ability's level
+	Health    int     `json:"health"`  // its health's level
+	Speed     int     `json:"speed"`   // its speed's level
 }
 
 type meDead struct {
@@ -120,7 +128,7 @@ func decode(data []byte) (inMessage, bool) {
 	case "evolve":
 		return msg, msg.To != nil
 	case "upgrade":
-		return msg, msg.Stat == "bite" || msg.Stat == "ability"
+		return msg, slices.Contains(stats, msg.Stat)
 	case "game":
 		return msg, msg.Data != nil
 	case "join":
@@ -160,6 +168,7 @@ func encodeWorld(a *arena) []byte {
 	data, _ := json.Marshal(worldMessage{
 		Type: "world", W: worldW, H: worldH, Tick: a.rate, Boost: boostCooldown, Coast: a.coast, CoastStep: coastStep,
 		Needs: tierNeed, MaxLevel: maxLevel, Species: speciesList, Foods: foodKinds, Ponds: a.ponds, Bushes: a.bushes, Kelp: a.kelp,
+		Islands: a.islands, Tar: a.tar, Rocks: a.rocks, Reefs: a.reefs, Sources: a.sources, ClimbTier: climbTier,
 	})
 	return data
 }
@@ -183,9 +192,9 @@ func encodeMe(b []byte, v viewer) []byte {
 	case v.cr != nil:
 		c := v.cr
 		me := meAlive{
-			Alive: true, ID: c.id, Sp: c.sp, XP: int(c.xp), Progress: int(c.progress), HP: int(math.Ceil(max(0, c.hp))), MaxHP: int(c.maxHP()),
+			Alive: true, ID: c.id, Sp: c.sp, XP: int(c.xp), Progress: int(c.progress), HP: int(math.Ceil(max(0, c.hp))), MaxHP: int(math.Round(c.maxHP())),
 			Hunger: int(math.Ceil(c.hunger)), Cooldown: math.Round(c.cooldown*100) / 100, AbilityCd: math.Round(c.abilityCd*100) / 100,
-			Kills: c.kills, Points: c.points, Bite: c.biteLv, Ability: c.abilityLv,
+			Kills: c.kills, Points: c.points, Bite: c.biteLv, Ability: c.abilityLv, Health: c.hpLv, Speed: c.speedLv,
 		}
 		if c.offer {
 			me.Offer = c.kind().Next

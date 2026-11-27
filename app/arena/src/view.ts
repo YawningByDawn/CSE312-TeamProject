@@ -1,6 +1,6 @@
 import { BODY_COLOR, drawAnimal, drawShadow } from './animals';
 import type { Net } from './net';
-import { drawCover, drawFood, drawGround, drawPonds, type Rect } from './scene';
+import { drawCover, drawFood, drawGround, drawPonds, drawTerrain, type Rect } from './scene';
 import { BOOSTING, BOT, CHARGING, GUARDED, HIDDEN, HURT, USING, WET, type BoardRow, type Creature, type MeAlive, type MeDead, type Snap, type Species, type World } from './types';
 
 // The world as one frame sees it: a little in the past, between the two snapshots either side of that moment, so
@@ -173,6 +173,7 @@ export class View {
     const v = this.place(c, w, h, dpr, this.camX, this.camY, scale, world, t);
 
     drawPonds(c, world.ponds, v, t);
+    drawTerrain(c, world, v, t);
     for (const f of cur.food.values()) {
       const kind = world.foods[f.kind]!;
       if (f.x + kind.r > v.x0 && f.x - kind.r < v.x1 && f.y + kind.r > v.y0 && f.y - kind.r < v.y1) drawFood(c, kind.name, f.x, f.y, kind.r, t, f.id);

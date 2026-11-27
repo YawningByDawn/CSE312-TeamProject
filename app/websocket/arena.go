@@ -26,8 +26,9 @@ type foodKind struct {
 	R      float64 `json:"r"`
 	XP     float64 `json:"xp"`
 	Hunger float64 `json:"hunger"`
-	Sea    bool    `json:"sea"` // grows in the sea, not on land
-	share  float64 // its share of what grows where it grows; meat only falls from creatures that die without being eaten
+	Sea    bool    `json:"sea"`  // grows in the sea, not on land
+	Full   bool    `json:"full"` // feeds big creatures as much as small ones; other food feeds them less
+	share  float64 // its share of what grows loose where it grows; the rest only comes from sources, or creatures
 }
 
 var foodKinds = []foodKind{
@@ -37,7 +38,12 @@ var foodKinds = []foodKind{
 	{Name: "krill", R: 7, XP: 3, Hunger: 5, Sea: true, share: 0.55},
 	{Name: "clam", R: 9, XP: 6, Hunger: 7, Sea: true, share: 0.3},
 	{Name: "fish", R: 11, XP: 12, Hunger: 12, Sea: true, share: 0.15},
-	{Name: "meat", R: 10, XP: 15, Hunger: 18},
+	{Name: "meat", R: 10, XP: 15, Hunger: 18, Full: true},
+	{Name: "ginkgo", R: 9, XP: 8, Hunger: 9},
+	{Name: "termites", R: 8, XP: 4, Hunger: 5},
+	{Name: "lily", R: 10, XP: 5, Hunger: 8},
+	{Name: "shrimp", R: 8, XP: 6, Hunger: 6, Sea: true},
+	{Name: "starfruit", R: 13, XP: 60, Hunger: 30, Full: true},
 }
 
 const meat = 6 // index of meat in foodKinds
@@ -53,6 +59,8 @@ const (
 	boostSpeed     = 2.1  // times the species' speed
 	maxLevel       = 5    // the most a stat can be raised
 	levelBonus     = 0.2  // damage a level adds, as a share
+	hpBonus        = 0.15 // health a level adds, as a share
+	speedBonus     = 0.05 // speed a level adds, as a share
 	preyBiteCd     = 0.75 // seconds between a creature's bites on smaller ones it touches
 	maxHitShare    = 0.5  // the most of a creature's health one hit can take
 	sameTierBite   = 1.2  // a boosting bite on a creature of one's own tier, times the bite
@@ -106,6 +114,7 @@ type creature struct {
 	offer                 bool    // it may evolve, and has not chosen
 	points                int     // stat points to spend
 	biteLv, abilityLv     int
+	hpLv, speedLv         int
 	hidden, wet           bool
 	kills                 int
 	born                  float64 // arena clock
@@ -115,7 +124,7 @@ type creature struct {
 func (c *creature) kind() *species { return &speciesList[c.sp] }
 func (c *creature) tier() int      { return speciesList[c.sp].Tier }
 func (c *creature) r() float64     { return speciesList[c.sp].R }
-func (c *creature) maxHP() float64 { return speciesList[c.sp].HP }
+func (c *creature) maxHP() float64 { return speciesList[c.sp].HP * (1 + hpBonus*float64(c.hpLv)) }
 
 // death is how a creature ended; a player's view shows it until they spawn again.
 type death struct {
@@ -131,6 +140,7 @@ type death struct {
 type foodItem struct {
 	id, kind int
 	x, y     float64
+	src      *source // the source it grew from; nil for none
 }
 
 // eaten is one thing eaten this tick, for the views to animate: food or a creature, and the id of the creature that ate it.
@@ -149,6 +159,10 @@ type arena struct {
 	shots               []*shot
 	coast               []float64 // the coastline: the sea starts at coast[i] px from the west, at y = i*coastStep
 	ponds, bushes, kelp []circle
+	islands, tar        []circle
+	rocks, reefs        []circle // crags: land and sea
+	sources             []*source
+	starTimer           float64
 	eaten               []eaten
 	landFood, seaFood   int // how much food the land and the sea grow back to
 	minBots             int // bots the arena keeps however many players there are
@@ -164,9 +178,26 @@ func newArena(rng *rand.Rand, rate int) *arena {
 	for y := 0.0; y <= worldH+coastStep; y += coastStep {
 		a.coast = append(a.coast, 5000+230*math.Sin(y/900+p1)+110*math.Sin(y/340+p2))
 	}
+	onLand := func(x, y, r float64) bool { return x+r+220 < a.coastX(y) }
+	atSea := func(x, y, r float64) bool { return x-r-220 > a.coastX(y) }
 	a.ponds = a.scatter(12, 140, 300, nil, func(x, y, r float64) bool { return x+r+350 < a.coastX(y) })
-	a.bushes = a.scatter(100, 55, 95, a.ponds, func(x, y, r float64) bool { return x+r+220 < a.coastX(y) })
-	a.kelp = a.scatter(34, 60, 110, nil, func(x, y, r float64) bool { return x-r-220 > a.coastX(y) })
+	a.tar = a.scatter(8, 110, 190, a.ponds, onLand)
+	a.bushes = a.scatter(100, 55, 95, slices.Concat(a.ponds, a.tar), onLand)
+	a.rocks = a.scatter(30, 60, 110, slices.Concat(a.ponds, a.tar, a.bushes), onLand)
+	a.islands = a.scatter(5, 220, 380, nil, func(x, y, r float64) bool { return x-r-350 > a.coastX(y) })
+	for _, isl := range a.islands { // each island has a fern, a rock and (in placeSources) a ginkgo tree
+		at := a.rng.Float64() * 2 * math.Pi
+		spot := func(k float64) (float64, float64) {
+			return isl.X + math.Cos(at+k*2.1)*isl.R*0.45, isl.Y + math.Sin(at+k*2.1)*isl.R*0.45
+		}
+		x, y := spot(0)
+		a.bushes = append(a.bushes, circle{X: x, Y: y, R: 55 + a.rng.Float64()*15})
+		x, y = spot(1)
+		a.rocks = append(a.rocks, circle{X: x, Y: y, R: 55 + a.rng.Float64()*20})
+	}
+	a.kelp = a.scatter(34, 60, 110, a.islands, atSea)
+	a.reefs = a.scatter(16, 60, 100, slices.Concat(a.islands, a.kelp), atSea)
+	a.placeSources()
 	a.world = encodeWorld(a)
 	a.restockFood(math.MaxInt)
 	for range a.totalCreatures {
@@ -213,7 +244,7 @@ func (a *arena) coastX(y float64) float64 {
 }
 
 func (a *arena) terrain(x, y float64) int {
-	if x > a.coastX(y) {
+	if x > a.coastX(y) && inside(a.islands, x, y) == nil {
 		return ocean
 	}
 	for _, p := range a.ponds {
@@ -302,9 +333,11 @@ func (a *arena) growFood(inSea bool) {
 func (a *arena) restockFood(n int) {
 	landN, seaN := 0, 0
 	for _, f := range a.food {
-		if foodKinds[f.kind].Sea {
+		switch k := foodKinds[f.kind]; {
+		case k.share == 0:
+		case k.Sea:
 			seaN++
-		} else if f.kind != meat {
+		default:
 			landN++
 		}
 	}
@@ -396,19 +429,22 @@ func (a *arena) evolve(c *creature, to int) {
 	c.abilityCd = 0
 }
 
-// upgrade spends a stat point on "bite" or "ability".
+// stats are what a stat point can raise.
+var stats = []string{"bite", "ability", "health", "speed"}
+
+// upgrade spends a stat point on "bite", "ability", "health" or "speed". Raising health heals by what it adds.
 func (a *arena) upgrade(c *creature, stat string) {
 	if c.dead != nil || c.points == 0 {
 		return
 	}
-	lv := &c.biteLv
-	if stat == "ability" {
-		lv = &c.abilityLv
+	lv := map[string]*int{"bite": &c.biteLv, "ability": &c.abilityLv, "health": &c.hpLv, "speed": &c.speedLv}[stat]
+	if lv == nil || *lv >= maxLevel {
+		return
 	}
-	if *lv < maxLevel {
-		*lv++
-		c.points--
-	}
+	before := c.maxHP()
+	*lv++
+	c.points--
+	c.hp += c.maxHP() - before
 }
 
 func (a *arena) step(dt float64) {
@@ -427,10 +463,12 @@ func (a *arena) step(dt float64) {
 	a.contact()
 	a.metabolise(dt)
 	a.creatures = slices.DeleteFunc(a.creatures, func(c *creature) bool { return c.dead != nil })
-	for _, c := range a.creatures { // pushes and growing can reach past the border
+	for _, c := range a.creatures { // pushes and growing can reach past the border, or onto a crag
+		a.keepOffCrags(c)
 		r := c.r()
 		c.x, c.y = max(r, min(worldW-r, c.x)), max(r, min(worldH-r, c.y))
 	}
+	a.growSources(dt)
 	a.restockFood(int(math.Ceil(dt * 60)))
 	a.restockBots(dt)
 	a.board = encodeBoard(a.creatures)
@@ -453,7 +491,7 @@ func (a *arena) move(c *creature, dt float64) {
 	}
 	t := a.terrain(c.x, c.y)
 	c.wet = t != ground
-	speed := sp.Speed * pace(sp.Habitat, t)
+	speed := sp.Speed * pace(sp.Habitat, t) * a.tarPaceOf(c) * (1 + speedBonus*float64(c.speedLv))
 	if c.flee > 0 {
 		speed *= adrenalineMul
 	}
@@ -472,10 +510,11 @@ func (a *arena) move(c *creature, dt float64) {
 	c.vy += (ty - c.vy) * k
 	c.x = max(sp.R, min(worldW-sp.R, c.x+c.vx*dt))
 	c.y = max(sp.R, min(worldH-sp.R, c.y+c.vy*dt))
+	a.keepOffCrags(c)
 	c.hidden = sp.Hides && (a.covered(c.x, c.y, sp.R) || sp.Habitat == amph && c.wet)
 }
 
-// graze lets each creature eat the food it touches. Plants and small sea food feed the big ones less; meat feeds
+// graze lets each creature eat the food it touches. Most food feeds the big ones less; meat and starfruit feed
 // everyone the same.
 func (a *arena) graze() {
 	for _, c := range a.creatures {
@@ -488,8 +527,11 @@ func (a *arena) graze() {
 				continue
 			}
 			share := plant
-			if f.kind == meat {
+			if k.Full {
 				share = 1
+			}
+			if f.src != nil {
+				f.src.count--
 			}
 			a.gain(c, k.XP*share)
 			c.hunger = min(maxHunger, c.hunger+k.Hunger*share)

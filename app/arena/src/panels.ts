@@ -3,8 +3,8 @@ import { HABITAT_COLOR, HABITAT_LABEL } from './hud';
 import type { MeAlive, Species, World } from './types';
 
 // The game's clickable panels: the evolution choice (each species the player's own leads to, or staying as it is for
-// a stat point), the stat buttons that spend points on bite or ability, and the whole evolution tree. Keys work too:
-// 1, 2, 3... pick an evolution, the last number stays; Z raises bite and X ability.
+// a stat point), the stat buttons that spend points on bite, skill, health or speed, and the whole evolution tree.
+// Keys work too: 1, 2, 3... pick an evolution, the last number stays; Z, X, C and V raise bite, skill, health, speed.
 
 const KIND_TEXT: Record<string, string> = {
   charge: 'charges, hurting what it hits',
@@ -38,9 +38,18 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string, text?: 
   return e;
 }
 
+export type Stat = 'bite' | 'ability' | 'health' | 'speed';
+
+const STATS: [Stat, string, string, string][] = [
+  ['bite', 'Bite', 'KeyZ', '+20% bite'],
+  ['ability', 'Skill', 'KeyX', '+20% skill'],
+  ['health', 'Health', 'KeyC', '+15% health'],
+  ['speed', 'Speed', 'KeyV', '+5% speed'],
+];
+
 export interface Actions {
   evolve(to: number): void;
-  upgrade(stat: 'bite' | 'ability'): void;
+  upgrade(stat: Stat): void;
 }
 
 export class Panels {
@@ -57,8 +66,8 @@ export class Panels {
       if (e.target instanceof HTMLInputElement || e.repeat) return;
       const n = Number(e.key);
       if (!this.evolvePanel.hidden && n >= 1 && n <= this.choices.length) this.actions.evolve(this.choices[n - 1]!);
-      if (!this.statsPanel.hidden && e.code === 'KeyZ') this.actions.upgrade('bite');
-      if (!this.statsPanel.hidden && e.code === 'KeyX') this.actions.upgrade('ability');
+      const stat = STATS.find(([, , code]) => code === e.code);
+      if (!this.statsPanel.hidden && stat) this.actions.upgrade(stat[0]);
     });
   }
 
@@ -70,7 +79,7 @@ export class Panels {
       this.evolvePanel.hidden = !offerKey;
       if (offerKey) this.renderOffer(me!, world!);
     }
-    const statsKey = me && world && me.points > 0 ? `${me.points}:${me.bite}:${me.ability}:${world.maxLevel}` : '';
+    const statsKey = me && world && me.points > 0 ? `${me.points}:${me.bite}:${me.ability}:${me.health}:${me.speed}:${world.maxLevel}` : '';
     if (statsKey !== this.shownStats) {
       this.shownStats = statsKey;
       this.statsPanel.hidden = !statsKey;
@@ -89,7 +98,7 @@ export class Panels {
       b.type = 'button';
       if (to < 0) {
         b.classList.add('stay');
-        b.append(icon(here, 52), el('b', '', `Stay ${here.name}`), el('small', '', '+1 stat point for bite or skill'));
+        b.append(icon(here, 52), el('b', '', `Stay ${here.name}`), el('small', '', '+1 stat point: bite, skill, health or speed'));
       } else {
         const sp = world.species[to]!;
         const habitat = el('small', 'habitat', HABITAT_LABEL[sp.habitat] ?? '');
@@ -110,12 +119,14 @@ export class Panels {
   private renderStats(me: MeAlive, world: World): void {
     const box = el('div', 'stats-box');
     box.append(el('p', 'stats-title', `${me.points} stat point${me.points === 1 ? '' : 's'}`));
-    for (const [stat, label, lv, key] of [['bite', 'Bite', me.bite, 'Z'], ['ability', 'Skill', me.ability, 'X']] as const) {
+    for (const [stat, label, code, what] of STATS) {
+      const lv = me[stat];
       const b = el('button', 'stat-btn');
       b.type = 'button';
+      b.title = what;
       const maxed = lv >= world.maxLevel;
       b.disabled = maxed;
-      b.append(el('span', '', maxed ? `${label} maxed` : `${label} ${lv} → ${lv + 1}`), el('kbd', '', key));
+      b.append(el('span', '', maxed ? `${label} maxed` : `${label} ${lv} → ${lv + 1}`), el('kbd', '', code.slice(3)));
       b.addEventListener('click', () => {
         b.blur();
         this.actions.upgrade(stat);

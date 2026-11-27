@@ -1,7 +1,7 @@
-import type { Circle, World } from './types';
+import type { Circle, Source, World } from './types';
 
-// The world: grass, the beach and the sea, the ponds, ferns and kelp of the map, and food. All in world units, on a
-// context the view has moved.
+// The world: grass, the beach, the sea and its islands, ponds and tar pits, rocks and reefs, ferns and kelp, the
+// places food grows, and food. All in world units, on a context the view has moved.
 
 type Ctx = CanvasRenderingContext2D;
 const TAU = Math.PI * 2;
@@ -107,6 +107,23 @@ export function drawGround(c: Ctx, w: World | null, v: Rect, t: number): void {
     deep.addColorStop(0.25, '#3c93c0');
     deep.addColorStop(1, '#1d5f8f');
     band(0, deep);
+    for (const isl of w.islands) {
+      if (!touches(isl, v, 160)) continue;
+      for (const [grow, fill] of [[110, 'rgba(255,255,255,0.35)'], [70, '#e8d6a2'], [40, '#d8c287'], [0, '']] as const) {
+        c.beginPath();
+        c.arc(isl.x, isl.y, isl.r + grow, 0, TAU);
+        if (fill) {
+          c.fillStyle = fill;
+          c.fill();
+        } else {
+          c.save();
+          c.clip();
+          c.fillStyle = grassPattern(c);
+          c.fillRect(isl.x - isl.r, isl.y - isl.r, isl.r * 2, isl.r * 2);
+          c.restore();
+        }
+      }
+    }
     // surf: lines that roll in to the shore
     c.lineWidth = 5;
     c.lineCap = 'round';
@@ -174,6 +191,203 @@ export function drawPonds(c: Ctx, ponds: Circle[], v: Rect, t: number): void {
         c.fillStyle = '#f6c5dc';
         c.fill();
       }
+    }
+  }
+}
+
+/** Tar pits, rocks and reefs, and the places food grows: all under the creatures, which walk on them. */
+export function drawTerrain(c: Ctx, w: World, v: Rect, t: number): void {
+  for (const [i, p] of w.tar.entries()) {
+    if (!touches(p, v, 20)) continue;
+    const rnd = seeded(300 + i);
+    c.beginPath();
+    for (let k = 0; k <= 24; k++) {
+      const a = (k / 24) * TAU;
+      const r = p.r * (0.92 + Math.sin(a * 3 + i) * 0.05 + rnd() * 0.04);
+      c.lineTo(p.x + Math.cos(a) * r, p.y + Math.sin(a) * r);
+    }
+    c.closePath();
+    c.fillStyle = '#2a2018';
+    c.fill();
+    c.strokeStyle = '#6b5a3a';
+    c.lineWidth = 8;
+    c.stroke();
+    c.beginPath();
+    c.ellipse(p.x - p.r * 0.25, p.y - p.r * 0.3, p.r * 0.35, p.r * 0.12, -0.4, 0, TAU);
+    c.fillStyle = 'rgba(255,255,255,0.08)';
+    c.fill();
+    for (let b = 0; b < 4; b++) {
+      const phase = (t * 0.5 + b * 0.27 + i * 0.1) % 1;
+      const a = rnd() * TAU;
+      const d = rnd() * p.r * 0.7;
+      c.beginPath();
+      c.arc(p.x + Math.cos(a) * d, p.y + Math.sin(a) * d, 4 + phase * 9, 0, TAU);
+      c.strokeStyle = `rgba(120,100,70,${0.6 * (1 - phase)})`;
+      c.lineWidth = 2;
+      c.stroke();
+    }
+  }
+  for (const [set, sea] of [[w.rocks, false], [w.reefs, true]] as const) {
+    for (const [i, k] of set.entries()) {
+      if (!touches(k, v, 20)) continue;
+      const rnd = seeded((sea ? 700 : 500) + i);
+      c.beginPath();
+      c.ellipse(k.x + 10, k.y + 14, k.r * 1.02, k.r * 0.95, 0, 0, TAU);
+      c.fillStyle = sea ? 'rgba(10,40,70,0.25)' : 'rgba(20,40,20,0.25)';
+      c.fill();
+      // a lumpy outline, a flat top, and cracks
+      c.beginPath();
+      for (let n = 0; n <= 16; n++) {
+        const a = (n / 16) * TAU;
+        const r = k.r * (0.9 + rnd() * 0.12);
+        c.lineTo(k.x + Math.cos(a) * r, k.y + Math.sin(a) * r);
+      }
+      c.closePath();
+      c.fillStyle = sea ? '#e07a6a' : '#9a958a';
+      c.fill();
+      c.strokeStyle = sea ? '#9a4038' : '#5e5a52';
+      c.lineWidth = 4;
+      c.stroke();
+      c.beginPath();
+      c.arc(k.x - k.r * 0.12, k.y - k.r * 0.12, k.r * 0.68, 0, TAU);
+      c.fillStyle = sea ? '#f0a08a' : '#b5b0a4';
+      c.fill();
+      if (sea) {
+        for (let n = 0; n < 9; n++) {
+          const a = rnd() * TAU;
+          const d = rnd() * k.r * 0.7;
+          c.beginPath();
+          c.arc(k.x + Math.cos(a) * d, k.y + Math.sin(a) * d, 5 + rnd() * 6, 0, TAU);
+          c.fillStyle = ['#f6c26a', '#c86ad0', '#fff0e0'][n % 3]!;
+          c.fill();
+        }
+      } else {
+        c.strokeStyle = '#7d786e';
+        c.lineWidth = 2.5;
+        for (let n = 0; n < 3; n++) {
+          const a = rnd() * TAU;
+          c.beginPath();
+          c.moveTo(k.x + Math.cos(a) * k.r * 0.15, k.y + Math.sin(a) * k.r * 0.15);
+          c.lineTo(k.x + Math.cos(a + 0.3) * k.r * 0.5, k.y + Math.sin(a + 0.3) * k.r * 0.5);
+          c.lineTo(k.x + Math.cos(a) * k.r * 0.75, k.y + Math.sin(a) * k.r * 0.75);
+          c.stroke();
+        }
+      }
+    }
+  }
+  for (const s of w.sources) {
+    if (s.kind !== 'lilies' && touches(s, v, s.r)) drawSource(c, s, t);
+  }
+}
+
+function drawSource(c: Ctx, s: Source, t: number): void {
+  const TAU2 = TAU;
+  switch (s.kind) {
+    case 'tree': // a ginkgo: a fan of fan-shaped leaves round a trunk
+      c.beginPath();
+      c.arc(s.x + 8, s.y + 10, s.r * 1.1, 0, TAU2);
+      c.fillStyle = 'rgba(20,50,20,0.2)';
+      c.fill();
+      for (let k = 0; k < 9; k++) {
+        const a = (k / 9) * TAU2 + Math.sin(t * 0.8 + k) * 0.03;
+        c.beginPath();
+        c.moveTo(s.x, s.y);
+        c.arc(s.x, s.y, s.r * 1.05, a - 0.3, a + 0.3);
+        c.closePath();
+        c.fillStyle = k % 2 ? '#d8c03a' : '#c4b030';
+        c.fill();
+      }
+      c.beginPath();
+      c.arc(s.x, s.y, s.r * 0.6, 0, TAU2);
+      c.fillStyle = '#b09a28';
+      c.fill();
+      c.beginPath();
+      c.arc(s.x, s.y, s.r * 0.22, 0, TAU2);
+      c.fillStyle = '#6b4a2a';
+      c.fill();
+      break;
+    case 'mound': // a termite mound: a lumpy cone of earth
+      for (const [k, fill] of [[1, '#a8743c'], [0.7, '#bf8a4a'], [0.4, '#d4a060']] as const) {
+        c.beginPath();
+        for (let n = 0; n <= 12; n++) {
+          const a = (n / 12) * TAU2;
+          const r = s.r * k * (0.9 + Math.sin(a * 4 + s.x) * 0.1);
+          c.lineTo(s.x + Math.cos(a) * r, s.y + Math.sin(a) * r);
+        }
+        c.closePath();
+        c.fillStyle = fill;
+        c.fill();
+      }
+      for (let n = 0; n < 5; n++) {
+        const a = n * 1.3;
+        c.beginPath();
+        c.arc(s.x + Math.cos(a) * s.r * 0.55, s.y + Math.sin(a) * s.r * 0.55, 2.5, 0, TAU2);
+        c.fillStyle = '#4a2e14';
+        c.fill();
+      }
+      break;
+    case 'nest': // a ring of twigs
+      c.lineWidth = 6;
+      c.lineCap = 'round';
+      for (let n = 0; n < 14; n++) {
+        const a = (n / 14) * TAU2;
+        c.beginPath();
+        c.moveTo(s.x + Math.cos(a) * s.r * 0.65, s.y + Math.sin(a) * s.r * 0.65);
+        c.lineTo(s.x + Math.cos(a + 0.6) * s.r * 1.05, s.y + Math.sin(a + 0.6) * s.r * 1.05);
+        c.strokeStyle = n % 2 ? '#8a6438' : '#a87c48';
+        c.stroke();
+      }
+      c.beginPath();
+      c.arc(s.x, s.y, s.r * 0.6, 0, TAU2);
+      c.fillStyle = '#6b4a28';
+      c.fill();
+      break;
+    case 'bones': // the ribs and skull of a fallen giant
+      c.strokeStyle = '#efe6d2';
+      c.lineCap = 'round';
+      c.lineWidth = s.r * 0.12;
+      c.beginPath();
+      c.moveTo(s.x - s.r, s.y);
+      c.lineTo(s.x + s.r * 0.7, s.y);
+      c.stroke();
+      c.lineWidth = s.r * 0.08;
+      for (let n = 0; n < 6; n++) {
+        const x = s.x - s.r * 0.75 + n * s.r * 0.26;
+        for (const side of [-1, 1]) {
+          c.beginPath();
+          c.moveTo(x, s.y);
+          c.quadraticCurveTo(x + s.r * 0.15, s.y + side * s.r * 0.55, x - s.r * 0.05, s.y + side * s.r * 0.8);
+          c.stroke();
+        }
+      }
+      c.beginPath();
+      c.ellipse(s.x + s.r * 0.95, s.y, s.r * 0.32, s.r * 0.24, 0, 0, TAU2);
+      c.fillStyle = '#efe6d2';
+      c.fill();
+      for (const side of [-1, 1]) {
+        c.beginPath();
+        c.arc(s.x + s.r * 1.02, s.y + side * s.r * 0.1, s.r * 0.07, 0, TAU2);
+        c.fillStyle = '#5a4a3a';
+        c.fill();
+      }
+      break;
+    case 'vent': { // a smoking vent on the sea floor
+      c.beginPath();
+      c.arc(s.x, s.y, s.r, 0, TAU2);
+      c.fillStyle = '#3a3a44';
+      c.fill();
+      c.beginPath();
+      c.arc(s.x, s.y, s.r * 0.45, 0, TAU2);
+      c.fillStyle = '#ff8a3a';
+      c.fill();
+      for (let b = 0; b < 3; b++) {
+        const phase = (t * 0.6 + b / 3) % 1;
+        c.beginPath();
+        c.arc(s.x + Math.sin(t + b) * 6, s.y - phase * s.r * 2.2, s.r * (0.25 + phase * 0.5), 0, TAU2);
+        c.fillStyle = `rgba(230,240,255,${0.35 * (1 - phase)})`;
+        c.fill();
+      }
+      break;
     }
   }
 }
@@ -356,6 +570,89 @@ export function drawFood(c: Ctx, name: string, x: number, y: number, r: number, 
       c.fillStyle = '#1a1208';
       c.fill();
       break;
+    case 'ginkgo': // a ginkgo nut, yellow and plump
+      blob(0, 0, 0.85, '#e8c84a', '#a8861c');
+      c.beginPath();
+      c.ellipse(-0.25, -0.25, 0.25, 0.15, -0.6, 0, TAU);
+      c.fillStyle = 'rgba(255,255,255,0.5)';
+      c.fill();
+      c.beginPath();
+      c.moveTo(0, -0.8);
+      c.lineTo(0.25, -1.25);
+      c.strokeStyle = '#7a5a1a';
+      c.lineWidth = 0.15;
+      c.stroke();
+      break;
+    case 'termites': // a little swarm
+      for (let k = 0; k < 6; k++) {
+        const a = t * 3 + k * 1.05;
+        const x = Math.cos(a) * 0.6;
+        const y = Math.sin(a * 1.3) * 0.6;
+        c.beginPath();
+        c.ellipse(x, y, 0.22, 0.13, a, 0, TAU);
+        c.fillStyle = '#f0e2c4';
+        c.fill();
+        c.beginPath();
+        c.arc(x + Math.cos(a) * 0.2, y + Math.sin(a) * 0.2, 0.11, 0, TAU);
+        c.fillStyle = '#a8743c';
+        c.fill();
+      }
+      break;
+    case 'lily': // a lily pad with its flower
+      c.beginPath();
+      c.moveTo(0, 0);
+      c.arc(0, 0, 1, 0.4, TAU - 0.1);
+      c.closePath();
+      c.fillStyle = '#5aa04a';
+      c.fill();
+      for (let k = 0; k < 6; k++) {
+        const a = (k / 6) * TAU;
+        c.beginPath();
+        c.ellipse(Math.cos(a) * 0.25, Math.sin(a) * 0.25, 0.32, 0.15, a, 0, TAU);
+        c.fillStyle = '#f6b8d8';
+        c.fill();
+      }
+      c.beginPath();
+      c.arc(0, 0, 0.15, 0, TAU);
+      c.fillStyle = '#ffe27a';
+      c.fill();
+      break;
+    case 'shrimp':
+      c.beginPath();
+      c.arc(0, 0, 0.75, -2.6, 1.3);
+      c.lineWidth = 0.5;
+      c.lineCap = 'round';
+      c.strokeStyle = '#ff6a5a';
+      c.stroke();
+      c.lineWidth = 0.1;
+      c.strokeStyle = '#ffc0a8';
+      c.beginPath();
+      c.moveTo(0.5, 0.65);
+      c.lineTo(1.1, 1);
+      c.moveTo(0.35, 0.75);
+      c.lineTo(0.7, 1.3);
+      c.stroke();
+      break;
+    case 'starfruit': { // rare, and it glows
+      c.save();
+      c.shadowColor = '#ffe45a';
+      c.shadowBlur = 18;
+      c.rotate(t * 0.8);
+      c.beginPath();
+      for (let k = 0; k < 10; k++) {
+        const a = (k / 10) * TAU - Math.PI / 2;
+        const r = k % 2 ? 0.45 : 1;
+        c.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+      }
+      c.closePath();
+      c.fillStyle = '#ffd23a';
+      c.fill();
+      c.strokeStyle = '#c8901a';
+      c.lineWidth = 0.1;
+      c.stroke();
+      c.restore();
+      break;
+    }
     default: // meat
       c.beginPath();
       c.ellipse(0, 0, 1, 0.72, 0, 0, TAU);
