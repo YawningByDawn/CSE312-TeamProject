@@ -20,7 +20,7 @@ describe('stamps', () => {
   it('holds every small step of every look inside the slot box', () => {
     const box = { x0: 0, x1: 0, y0: 0, y1: 0 }, who = { x0: '', x1: '', y0: '', y1: '' };
     for (const d of people as unknown as LookData[]) {
-      const x = P.looks[d.id]!, look: LookBody = { hk: d.hk, hunch: x[0]!, tilt: x[1]!, seed: x[2]!, kit: d.kit, rest: d.rest, rainHood: d.rainHood };
+      const x = P.looks[d.id]!, look: LookBody = { hk: d.hk, hunch: x[0]!, tilt: x[1]!, seed: x[2]!, kit: d.kit, rest: d.rest, rainHood: d.rainHood, outline: 'o:tr' in d.parts };
       const variants = new Map<number, number[][]>();
       for (const [name, vs] of Object.entries(d.parts)) variants.set(nameId(name), vs);
       // the cell a part shows (people.ts Look.cell: the variant nearest its bins), in its part's frame: x0, y0, x1, y1

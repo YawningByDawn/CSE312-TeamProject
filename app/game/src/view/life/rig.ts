@@ -1,5 +1,5 @@
 import type { Weather } from '../../types';
-import { ID, LANTERN, pack, type HoldIds } from './ids';
+import { ID, LANTERN, outlineId, pack, type HoldIds } from './ids';
 
 // A person's body this frame (#76-78): two baked steps of a loop (assets/poses) lerped, the blend
 // from the last loop and a reaction over it, the weather's posture, the rig solved for the look's height and hunch, and
@@ -33,8 +33,8 @@ export interface Hold { near: string | null; far: string | null; back: string | 
 /** a look's placement facts (people.json): its kit and its bones' rest lengths */
 export interface Kit { back: boolean; long: boolean; waders: boolean; headBack: boolean; headKit: boolean; hoodup: boolean; closed: boolean; lift: number }
 export interface Rest { thigh: number; shin: number; upper: number; fore: number; torso: number }
-/** `rainHood`: the look's hood comes up in the rain */
-export interface LookBody { hk: number; hunch: number; tilt: number; seed: number; kit: Kit; rest: Rest; rainHood: boolean }
+/** `rainHood`: the look's hood comes up in the rain; `outline`: its parts have outlines (an enemy's red line) */
+export interface LookBody { hk: number; hunch: number; tilt: number; seed: number; kit: Kit; rest: Rest; rainHood: boolean; outline: boolean }
 
 
 /** The weather on the body, 0..1 each. */
@@ -88,7 +88,7 @@ export class Body {
   lampX = 0;
   lampY = 0;
   // the laid-out parts: name id, packed bins, alpha and the 2x3 transform, PART numbers each
-  readonly parts = new Float64Array(64 * PART);
+  readonly parts = new Float64Array(128 * PART);
   n = 0;
 
   /** Play loop `name` from time `t`: a change blends from the pose shown. */
@@ -288,6 +288,13 @@ export class Body {
       at(this.impactX, this.impactY);
       push(ID.im, pack(Math.min(IMPACT_FRAMES - 1, Math.floor((ia / IMPACT_DUR) * IMPACT_FRAMES))));
     }
+    if (look.outline) {
+      // every part's outline first, under the parts: only the figure's rim shows
+      const n = this.n, P = this.parts;
+      P.copyWithin(n * PART, 0, n * PART);
+      for (let i = 0; i < n; i++) P[i * PART] = outlineId(P[i * PART]!);
+      this.n = 2 * n;
+    }
   }
 
   private head(look: LookBody, devPx: number, t: number, v: number): void {
@@ -331,7 +338,7 @@ export class Body {
 
 /** A small figure's box in rig units (feet at 0,0, facing +x): every part of every baked step lies inside it, the
  * lying loops' heads (sleep, collapse) at its ends, a rope held high on the ride at its top. */
-export const BOX = { x0: -28, x1: 43, y0: -69, y1: 21 } as const;
+export const BOX = { x0: -28, x1: 43, y0: -69, y1: 22 } as const;
 /** The finest stamp px per rig unit (stamps.ts): where a figure stops being small (28 device px over 40 rig units) rounded up. */
 export const R_MAX = 2 ** -0.5;
 /** Stamp px per rig unit for a figure shown at `devPx` device px per rig unit: quarter octaves at or above it. */

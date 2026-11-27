@@ -15,7 +15,7 @@ Owner: "the perspective doesn't seem right. You have to decide between an angled
 - **One light direction** for shadows (§5): shadows fall the same way for everything and lie on the floor as foreshortened shapes.
 
 ## 2. Line
-- Ink is warm black `#0b0a0c`. Never grey lines, never coloured outlines (except glow rims).
+- Ink is warm black `#0b0a0c`. Never grey lines, never coloured outlines (except glow rims and an enemy's dark blood-red hairline, DECISIONS §128).
 - Every object has a **closed outer contour about 1/30 of the object's height — 1.5–2 px on a prop at game scale, never heavier than the line in the reference crop at equal pixel scale**; inner form lines about half that. (Corrected 2026-11-23: an earlier 2.5–3.5 px rule made props read as stickers.) Thin even hairlines are still forbidden; interface slabs, being large, keep a 3 px contour.
 - Line weight **swells** on the shadow side, under overhangs and at ground contact; it **thins and breaks** on the lit side. Corners overshoot a little. Strokes wobble by hand (low-frequency, ±0.5 px): no ruler-straight or perfectly elliptical edge anywhere.
 - Black is also a fill: deep creases, undersides, door mouths and cast shadows go to solid ink.

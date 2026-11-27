@@ -6,7 +6,8 @@ python scripts/art/combat.py [root]   (Python 3 with Pillow and NumPy; determini
   (assets/poses/poses.json `swing:<dir>`); the rig (src/view/life/rig.ts) plays it with the look's own parts.
 - the skeleton: one of the mine's dead as a look of its own (people.json `s01`, role `skeleton`, its parts in
   assets/people/s01.hi.webp and its low detail on assets/poses/lo-4.webp), walking, swinging its old pick and
-  falling apart under the people's clip names (`idle`, `walk:own:<dir>`, `swing:<dir>`, `collapse`).
+  falling apart under the people's clip names (`idle`, `walk:own:<dir>`, `swing:<dir>`, `collapse`). Every part has its
+  outline `o:<part>` beside it: the part's silhouette grown by `OUTLINE` in dark blood red, drawn behind the whole figure (rig.ts).
 - hit: a struck body's flash and chips, frames `hit-0..` of the life atlas (assets/life), white for the game to tint.
 """
 import json
@@ -142,6 +143,8 @@ DUSK = (0x5e, 0x4d, 0x37)
 REST = {'thigh': 5.54, 'shin': 5.18, 'upper': 4.73, 'fore': 4.79, 'torso': 13.65}
 TB = math.pi / 16
 K = {'lo': 0.625, 'hi': 0.218772}
+# an enemy's red hairline: half a css px at the mine's play zoom (1.9 per rig unit), a dark desaturated blood red
+OUTLINE, HARM = 0.25, (0x66, 0x2a, 0x25)
 
 
 def bone_limb(L, r, knob0, knob1, mat, twin=False, seed=0):
@@ -289,6 +292,12 @@ def skeleton_parts():
     return parts
 
 
+def rim(layers):
+    """a part's outline: the union of its layers grown by OUTLINE (rendered, then the whole picture set to HARM)"""
+    d = union(*[L.shape for L in layers])
+    return [Layer(lambda X, Y: d(X, Y) - OUTLINE, IRON, flat=True)]
+
+
 def bounds(layers):
     """the rig rect a part's layers cover, found on a coarse grid"""
     g = np.linspace(-30, 30, 601)
@@ -302,6 +311,7 @@ def bounds(layers):
 
 def bake_skeleton(people, poses):
     parts = skeleton_parts()
+    parts.update({'o:' + n: [(b, rim(ls)) for b, ls in vs] for n, vs in list(parts.items())})
     cells = {'lo': [], 'hi': []}
     table = {}
     for name, variants in parts.items():
@@ -311,6 +321,8 @@ def bake_skeleton(people, poses):
             i = len(cells['hi'])
             for lod in ('lo', 'hi'):
                 cells[lod].append(render(layers, *rect, K[lod]))
+                if name.startswith('o:'):
+                    cells[lod][-1][0][..., :3] = HARM
             table[name].append([*bins, i, i])
     pages, cellrows = {}, {}
     for lod in ('lo', 'hi'):

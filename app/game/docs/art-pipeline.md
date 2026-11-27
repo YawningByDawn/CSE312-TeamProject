@@ -17,7 +17,7 @@ Every picture and sound the game shows was made by our own painters offline and 
 | `mine/` | two pictures | `lit-1.webp`, the mine lit by its static lights with every prop and set piece in it, and `night-1.png`, the night's light as a ratio to the day's | `src/view/ground.ts` |
 | `sheen/` | picture + grid | the wet streaks on the mine's faces and floor, and which fog cell owns each | `src/view/sheen.ts` |
 | `life/` | atlas | the white cells the lights, effects, marks and films tint and place: soft glows, puffs, stars, caps, rings; `hit-0..5`, a struck body's flash and chips (inked, white and grey) | `src/view/index.ts` (one atlas shared by lights, effects, weather and films) |
-| `people/` | `people.json` + `<look>.hi.webp` | every look's cut-out parts and their variants, at close zoom; `s01` the skeleton (role `skeleton`), one of the mine's dead with its old pick | `src/view/life/people.ts`, `looks.ts` |
+| `people/` | `people.json` + `<look>.hi.webp` | every look's cut-out parts and their variants, at close zoom; `s01` the skeleton (role `skeleton`), one of the mine's dead with its old pick, each part with its red outline `o:<part>` | `src/view/life/people.ts`, `looks.ts` |
 | `poses/` | `poses.json` + `lo*.webp` pages | the poses each role's loops step through, and every look's low-detail picture; every role's `swing:h/u/d` (the host's pick swing on click, its blow at `im`); the skeleton's `idle`, `walk:own:h/u/d`, `swing:h/u/d`, `collapse` | `src/view/life/people.ts`, `looks.ts`, `rig.ts` |
 | `town/` | pages + `manifest.json` | every building, place, prop and cap-tree of the town at two scales, each placed once by the manifest | `src/view/town.ts` |
 | `townground/` | tiles, `.bc1` | the surface's ground lit by day | `src/view/surface.ts` |

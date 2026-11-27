@@ -13,7 +13,7 @@ A dim, cold world under a small amber sun. Its people are the **wickfolk**: smal
 | **Cold white / pale blue** | the Council (the state, the mine's owners) | crystal-shard lamps, cast buildings, guards' plate, the tally house, searchlights, stamps and seals |
 | **Teal** | the old rock and the damp | mine rock, glow-moss, pools, shell, cap-tree crowns, shadow side of everything |
 | **Ochre, rust, tan** | the wickfolk's own daily life | dirt lanes, hide, felt, clay, stalk-timber, work clothes, clutter |
-| **Red** | blood and the war | wounds, the levy's banners, war news, the red people; used nowhere else |
+| **Red** | blood and the war | wounds, the levy's banners, war news, the red people, an enemy's outline; used nowhere else |
 | **Gray** | sensed, not yet yours | everything in a Sensed area, with no colour at all |
 | **Black `#000`** | unknown | Void |
 One glance at a light tells you whose it is. Never use violet, gold or cold white for decoration.
