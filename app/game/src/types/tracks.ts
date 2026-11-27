@@ -127,10 +127,10 @@ export interface View {
   /** Screen point to the thing under it, by the scene graph's own hit areas. */
   pick(x: number, y: number, vm: ViewModel): Focus;
   /**
-   * The screen point (CSS px) over a person as shown, a place or the grave, as the last frame stood it; false when it
+   * The screen point (CSS px) over a person as shown, a place, the grave or an ore's seam, as the last frame stood it; false when it
    * is not on screen (another region than the camera's, not shown, or past the canvas's edge).
    */
-  where(target: Focus | 'grave', out: { x: number; y: number }): boolean;
+  where(target: Focus | 'grave' | { ore: number }, out: { x: number; y: number }): boolean;
   /** Seconds a film runs, so app knows when to release the clock. */
   filmLength(kind: Film['kind']): number;
   /** The film's camera at its `t`, from `from`, the camera it began on: app's one camera takes it while a film plays. */

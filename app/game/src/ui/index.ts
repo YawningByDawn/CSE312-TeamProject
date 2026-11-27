@@ -21,6 +21,7 @@ import { Tip } from './hud/tip';
 import { God } from './hud/god';
 import { HostPlate } from './hud/hostplate';
 import { Quests } from './hud/quests';
+import { WorkKey } from './hud/workkey';
 import { Suspicion } from './hud/suspicion';
 import { Pouch, POUCH_H } from './hud/pouch';
 import { People } from './hud/people';
@@ -117,7 +118,7 @@ export function createUi(mountPanels?: MountPanels): Ui {
         new HostPlate(at.tl, send, q), new Feed(at.tl, toggle),
         new God(at.tr, toggle, q), new Suspicion(at.tr),
         new Pouch(at.bl, toggle), new People(at.bl, send, POUCH_H), new Clock(at.br, send, q),
-        new Quests(at.tr, q), new Hints(at, (t) => q.day(t), send), new Drops(at.c, from('c')), hand, deal,
+        new Quests(at.tr, q), new WorkKey(at.c, q, from('c')), new Hints(at, (t) => q.day(t), send), new Drops(at.c, from('c')), hand, deal,
       );
       menus = new Menus(menuAt, at.tr, send, q);
       tip = new Tip(hud, () => k);

@@ -113,27 +113,36 @@ def render(layers, x0, y0, x1, y1, K, ss=4, lw_min_px=0.6):
     X, Y = np.meshgrid(ox + (np.arange(w * ss) + 0.5) * k, oy + (np.arange(h * ss) + 0.5) * k)
     out = np.zeros((h * ss, w * ss, 4), np.float32)
     ink = np.array(INK, np.float32) / 255
+    # a layer is painted only over the texels its shape reaches: a sample inside lies within a texel of a sample near its
+    # texel's centre, and a shape's distance changes no faster than distance, so one over 1.5 texels out holds none
+    Xc, Yc = X[ss // 2::ss, ss // 2::ss], Y[ss // 2::ss, ss // 2::ss]
     for L in layers:
+        near = L.shape(Xc, Yc) < 1.5 * K
+        if not near.any():
+            continue
+        rows, cols = np.nonzero(near.any(1))[0], np.nonzero(near.any(0))[0]
+        box = (slice(max(rows[0] - 1, 0) * ss, min(rows[-1] + 2, h) * ss), slice(max(cols[0] - 1, 0) * ss, min(cols[-1] + 2, w) * ss))
+        Xb, Yb = X[box], Y[box]
         f, (deep, shadow, base, light) = L.shape, L.mat
-        d = f(X, Y)
+        d = f(Xb, Yb)
         inside = d < 0
         if not inside.any():
             continue
         lw = max(L.lw, lw_min_px * K)
-        col = np.empty(X.shape + (3,), np.float32)
+        col = np.empty(Xb.shape + (3,), np.float32)
         col[:] = base
         if not L.flat:
-            away = lambda s: f(X - LX * s, Y - LY * s) >= 0
-            col[(f(X + LX * L.lit, Y + LY * L.lit) >= 0)] = light
+            away = lambda s: f(Xb - LX * s, Yb - LY * s) >= 0
+            col[(f(Xb + LX * L.lit, Yb + LY * L.lit) >= 0)] = light
             col[away(L.shade)] = shadow
             col[away(L.shade * 0.38)] = deep
         for shape, c, a in L.marks:
-            m = (shape(X, Y) < 0) & (d < -lw * 0.5)
+            m = (shape(Xb, Yb) < 0) & (d < -lw * 0.5)
             col[m] = col[m] * (1 - a) + c * a
-        line = lw * np.where(f(X - LX * lw * 2.2, Y - LY * lw * 2.2) >= 0, 1.45, 0.8)
+        line = lw * np.where(f(Xb - LX * lw * 2.2, Yb - LY * lw * 2.2) >= 0, 1.45, 0.8)
         col[d > -line] = ink
         a = inside.astype(np.float32)[..., None]
-        out = np.concatenate([col * a, a], -1) + out * (1 - a)
+        out[box] = np.concatenate([col * a, a], -1) + out[box] * (1 - a)
     small = out.reshape(h, ss, w, ss, 4).mean(axis=(1, 3))
     al = small[..., 3:4]
     rgb = np.where(al > 0, small[..., :3] / np.maximum(al, 1e-6), 0)

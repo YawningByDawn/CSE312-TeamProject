@@ -1,11 +1,11 @@
 // The mine on foot (OVERHAUL, ov-mine): the walk's ground and hitboxes, the mining time, the ores' grades, the drop, the quota and the pocket.
 import { describe, expect, it } from 'vitest';
 import { DAY_TICK_S, NIGHT_TICKS } from '../../../src/content/clock';
-import { BLOCKS, DROP, MINING, ORE_SITES, POCKET, WALK, areaAt } from '../../../src/content/mine';
+import { BLOCKS, DROP, GROUND, MINING, ORE_SITES, POCKET, WALK, areaAt } from '../../../src/content/mine';
 import { ROLES } from '../../../src/content/roles';
 import { FIRST_MINER } from '../../../src/content/stats';
-import { AT, digSpots } from '../../../src/content/map';
-import { PLACES } from '../../../src/content/world';
+import { AT, DRESS, digSpots } from '../../../src/content/map';
+import { AREAS, PLACES } from '../../../src/content/world';
 import { makeSim } from '../../../src/sim';
 import { pouchIds } from '../../../src/sim/core';
 import { miningRarity, miningSeconds, oreOdds, walkSpeed } from '../../../src/sim/formulas';
@@ -31,8 +31,10 @@ function toDusk(s: GameState): void {
 }
 const heading = (s: GameState, dx: -1 | 0 | 1, dy: -1 | 0 | 1): void => void sim.act(s, { type: 'walk', dx, dy });
 const miner = (s: GameState) => s.people[FIRST_MINER.id]!;
-/** The body stood on an ore site. */
-const at = (s: GameState, site: number): void => void Object.assign(s.body!, { x: ORE_SITES[site]!.x, y: ORE_SITES[site]!.y });
+/** Where the host stands to work an ore: a step down from its seam's foot. */
+const stand = (o: { x: number; y: number }): { x: number; y: number } => ({ x: o.x, y: o.y + 8 });
+/** The body stood at an ore site. */
+const at = (s: GameState, site: number): void => void Object.assign(s.body!, stand(ORE_SITES[site]!));
 const site = (tier: number): number => ORE_SITES.findIndex((o) => o.tier === tier);
 
 describe('the time formula', () => {
@@ -127,7 +129,20 @@ describe('the ground and the hitboxes', () => {
     }
     expect(ORE_SITES.length).toBeGreaterThanOrEqual(10);
     expect(new Set(ORE_SITES.map((o) => o.tier))).toEqual(new Set([1, 2, 3]));
-    for (const o of ORE_SITES) expect(Math.hypot(o.x - DROP.x, o.y - DROP.y)).toBeGreaterThan(DROP.reach + MINING.reach);
+    for (const o of ORE_SITES) {
+      expect(Math.hypot(o.x - DROP.x, o.y - DROP.y)).toBeGreaterThan(DROP.reach + MINING.reach);
+      // a seam in a face the view shows: rock rising straight up from its foot, ground under it, no painted light on it
+      const rise = MINING.face.rise * GROUND.cell;
+      for (let dy = 4; dy <= rise; dy += 4) expect(areaAt(o.x, o.y - dy), `ore at ${o.x},${o.y} up ${dy}`).toBe(null);
+      expect(areaAt(o.x, o.y + 4), `ore at ${o.x},${o.y}`).not.toBe(null);
+      for (const l of DRESS.lights) expect(Math.hypot(l.x - o.x, l.y - o.y), `ore at ${o.x},${o.y} by a ${l.kind}`).toBeGreaterThanOrEqual(MINING.face.clear);
+      // the host stands clear in reach of it
+      const p = stand(o);
+      expect(clear(p.x, p.y), `ore at ${o.x},${o.y}`).toBe(true);
+      expect(Math.hypot(p.x - o.x, p.y - o.y)).toBeLessThanOrEqual(MINING.reach);
+    }
+    // every vein area, the grave the first miner works at among them, has ore to dig
+    for (const [a, d] of Object.entries(AREAS)) if (d.vein > 0) expect(ORE_SITES.some((o) => (PLACES[o.place]?.area ?? o.place) === a), a).toBe(true);
     expect(digSpots().length).toBeGreaterThan(0);
     expect(clear(DROP.x, DROP.y + 50)).toBe(true);
   });
@@ -162,7 +177,7 @@ describe('the ground and the hitboxes', () => {
     for (const o of ORE_SITES) expect(areaAt(o.x, o.y)).toBe(PLACES[o.place]?.area ?? o.place);
     const deep = ORE_SITES.find((o) => o.tier === 3)!;
     s.places.sump!.explored = false;
-    Object.assign(s.body!, { x: deep.x, y: deep.y });
+    Object.assign(s.body!, stand(deep));
     heading(s, 0, 1);
     ticks(s, 1);
     expect(s.places.sump!.explored).toBe(true);
