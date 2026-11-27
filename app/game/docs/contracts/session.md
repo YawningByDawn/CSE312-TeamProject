@@ -30,7 +30,7 @@ The main session delegates, checks, lands and reports.
 - An agent's report is a claim. Read its diff and its proof yourself: shots for render claims, bot tables for balance, before/after numbers from the current build for perf, a census for culls.
 - Asset review is blind (`docs/workshop.md`, Cards): look at the evidence beside the references first, then call PASS or FAIL. Only PASS goes to the owner.
 - Visual work goes to the owner as a card, non-visual feel work as a playtest card, posted only by the main session with `python tools/post_card.py CARD.json MEDIA...` (`docs/workshop.md`, Cards). Bug fixes land without a card.
-- A card the owner rules on closes that turn: set `closed`, record the ruling in the row's State, start the revise work or queue it for the next slot, and drop the branches the ruling rejects or supersedes.
+- A card the owner rules on closes that turn, in the workshop or in chat: `python tools/post_card.py --rule ID [STATUS] --note "<the owner's words>"` (STATUS only for a chat ruling, which it records); record the ruling in the row's State, start the revise work or queue it for the next slot, and drop the branches the ruling rejects or supersedes.
 - Asset art and feel work land only on the owner's verdict. Deferred rows wait on the owner; no agent builds from them.
 - The main session delegates land runs to an agent, never running them itself: `wt.py land <name>` runs `tools/land.py` in the worktree and removes it once the subject is on `main`. A landing that submits tests is rerun once the verdicts arrive.
 - `docs/queue.md` holds open rows only. A State is replaced with current facts, never appended to.

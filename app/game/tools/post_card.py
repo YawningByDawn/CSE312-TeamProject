@@ -12,6 +12,9 @@ Steps: back up the existing data/workshop/approvals.json to BACKUP/approvals_<ts
 recovery; BACKUP is C:/tmp/backup on Windows, /var/tmp/backup elsewhere), copy the media, replace the card with the same id in
 approvals.json or append it (atomic replace), then GET every media url through the running workshop and print each with its status. The workshop reads the file
 per request, so nothing restarts.
+`python tools/post_card.py --rule ID [STATUS] [--note TEXT]` closes card ID once the owner has ruled on it: a ruling given in chat
+(STATUS approved, rejected or revise, TEXT the owner's words) is first recorded through the workshop's decide route, the one writer
+of approvals_decisions.json; a ruling made in the workshop is already there, so it takes no STATUS.
 The cards live in the main checkout's data/workshop/ (the git common dir's worktree), whichever worktree this runs from: the workshop
 serves that checkout. --url (default http://127.0.0.1:5298/workshop/hgi) points it at another instance.
 """
@@ -128,11 +131,35 @@ def post(raw: dict, files: list[Path], approvals: Path, media_root: Path, backup
             encode(f, folder / shown(f.name))
         elif f.resolve() != (folder / f.name).resolve():   # media already in the card's folder stays as it is
             shutil.copy2(f, folder / f.name)
+    write(approvals, data)
+    return card
+
+
+def write(approvals: Path, data: dict) -> None:
     approvals.parent.mkdir(parents=True, exist_ok=True)
     tmp = approvals.with_suffix(".json.tmp")
     tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     os.replace(tmp, approvals)   # the workshop reads per request: never let it see half a file
-    return card
+
+
+def close(approvals: Path, cid: str) -> None:
+    """Marks card `cid` closed; raises ValueError when there is no such card."""
+    data = json.loads(approvals.read_text(encoding="utf-8"))
+    card = next((it for it in data["items"] if it["id"] == cid), None)
+    if card is None:
+        raise ValueError(f"no card {cid!r}")
+    card["closed"] = True
+    write(approvals, data)
+
+
+def decide(url: str, cid: str, status: str, note: str) -> None:
+    """Records the owner's ruling through the running workshop; raises ValueError with its answer when it refuses."""
+    req = urllib.request.Request(f"{url}/api/approvals/decide", json.dumps({"id": cid, "status": status, "note": note}).encode(),
+                                 {"content-type": "application/json"})
+    try:
+        urllib.request.urlopen(req, timeout=30).read()
+    except urllib.error.HTTPError as e:
+        raise ValueError(f"the workshop refused the ruling: {e.code} {e.read().decode(errors='replace')[:300]}") from e
 
 
 def status(url: str) -> int:
@@ -150,11 +177,26 @@ def status(url: str) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("card", type=Path)
+    ap.add_argument("card", type=Path, nargs="?")
     ap.add_argument("media", type=Path, nargs="*")
     ap.add_argument("--url", default="http://127.0.0.1:5298/workshop/hgi")
+    ap.add_argument("--rule", nargs="+", metavar=("ID", "STATUS"))
+    ap.add_argument("--note", default="")
     a = ap.parse_args(argv)
     workshop = main_checkout(ROOT) / "data" / "workshop"
+    if a.rule:
+        if len(a.rule) > 2 or a.card:
+            ap.error("--rule takes ID and an optional STATUS, and no card")
+        try:
+            if len(a.rule) == 2:
+                decide(a.url, a.rule[0], a.rule[1], a.note)
+            close(workshop / "approvals.json", a.rule[0])
+        except (ValueError, OSError) as e:
+            sys.exit(f"post_card: {e}")
+        print(f"closed: {a.url}/#approvals/{urllib.parse.quote(a.rule[0])}")
+        return 0
+    if not a.card:
+        ap.error("CARD.json is required")
     try:
         card = post(json.loads(a.card.read_text(encoding="utf-8")), a.media, workshop / "approvals.json", workshop / "media", BACKUP)
     except (ValueError, KeyError) as e:
