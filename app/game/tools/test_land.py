@@ -329,6 +329,15 @@ def test_verdicts_hold_unless_the_diff_since_affects_the_file(tmp_path):
         "tests/a.test.ts": "passed", "tests/b.test.ts": "passed", "tests/c.test.ts": "failed", "tests/e.test.ts": "passed"}
 
 
+def test_a_failed_batch_fails_only_the_files_its_failures_name(tmp_path):
+    stale = {"T": set()}.get
+    batch = {"status": "failed", "tree": "T", "failed_n": 1, "failures": ["FAIL  tests/b.test.ts > a > b"], "targets": ["tests/a.test.ts", "tests/b.test.ts"]}
+    assert land.verdicts([batch], tmp_path, stale) == {"tests/a.test.ts": "passed", "tests/b.test.ts": "failed"}
+    cut = {**batch, "failed_n": 2}                                    # a listing shorter than the count names nobody for sure
+    assert land.verdicts([cut], tmp_path, stale) == {"tests/a.test.ts": "failed", "tests/b.test.ts": "failed"}
+    assert land.verdicts([{**batch, "failures": [], "failed_n": 0}], tmp_path, stale) == {"tests/a.test.ts": "failed", "tests/b.test.ts": "failed"}   # a run that died
+
+
 def listing(receipts: Path):
     """A fake `testq status --json` printing the receipts in `receipts`, newest (the highest name) first, as testq does."""
     code = ("import glob, json, sys; "

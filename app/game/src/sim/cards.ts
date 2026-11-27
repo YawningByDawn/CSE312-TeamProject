@@ -1,5 +1,5 @@
 /**
- * The cards (spec §15.4, DECISIONS §43; inventory #32): the deal at dusk (and the opening's bonus deal), take one or
+ * The cards (spec §15.4, DECISIONS §43; inventory #32): the deal at dusk, take one or
  * none, discard, reroll; what every miracle and act of evil does; followers' own acts and Malice breaking loose.
  */
 import { BALANCE, PROFANE } from '../content/balance';
@@ -147,11 +147,11 @@ export function deal(c: Ctx): void {
 export function takeWhy(s: Readonly<GameState>, card: CardId | null): Reason[] {
   const g = s.god;
   if (!g.deal) return [{ key: 'why.noDeal' }];
-  if (card === null) return s.phase === 'bonus' ? [{ key: 'why.pickOne' }] : [];
+  if (card === null) return [];
   if (!g.deal.includes(card)) return [{ key: 'why.notDealt' }];
   return g.hand.length >= handMax(s) ? [{ key: 'why.handFull' }] : [];
 }
-/** One card of the deal into the hand, or none; the rest go back. The opening's take begins the run. */
+/** One card of the deal into the hand, or none; the rest go back. */
 export function take(c: Ctx, card: CardId | null): void {
   const g = c.s.god;
   g.deal = null;
@@ -216,7 +216,7 @@ export function play(c: Ctx, id: CardId, pay: readonly string[], target: string 
   ev(c, { kind: 'play', card: id, cardKind: 'miracle', by: 'god', burnt: pay.slice(), ...aimed(id, target) });
   gainXp(c, BALANCE.xpPerSoul * worth);
   if (ichor) loseIchor(c, ichor, 'bloodPrice');
-  if (s.phase === 'live' || s.phase === 'bonus') miracle(c, id, target);
+  if (s.phase === 'live') miracle(c, id, target);
 }
 
 const resist = (p: Person, d: number): void => { p.resistance = round1(Math.max(-60, p.resistance + d)); };

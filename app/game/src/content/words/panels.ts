@@ -1,4 +1,4 @@
-/** The panels (src/ui/panels): the title, the defeat and the ending's words; the starting gift and the picks; the person slab, the grave and a stone's card, paying a miracle; a building's screen; dusk's reveal and ledger. */
+/** The panels (src/ui/panels): the title, the defeat and the ending's words; the picks; the person slab, the grave and a stone's card, paying a miracle; a building's screen; dusk's reveal and ledger. */
 export const PANEL_WORDS: Readonly<Record<string, string>> = {
   'game.title': 'Hungry God Inc.',
   'title.word': 'Hungry God',
@@ -50,7 +50,6 @@ export const PANEL_WORDS: Readonly<Record<string, string>> = {
   'defeat.same': 'Same seed',
   'defeat.sameSub': 'seed {seed}',
   'defeat.title': 'Title',
-  'defeat.kept': 'You kept {name}.',
   'realm.1': 'Whisper I',
   'realm.2': 'Whisper II',
   'realm.3': 'Whisper III',
@@ -72,7 +71,6 @@ export const PANEL_WORDS: Readonly<Record<string, string>> = {
   'finale.hungry': 'You are still hungry.',
   'finale.returnToTitle': 'Click to return to the title',
 
-  'bonus.pickHead': 'Three things survived the fall. Keep one.',
   'blessing.choose': 'Choose a blessing',
   'pick.keys': 'Press {a} to {b}, or click',
   'pick.click': 'Click to take it',

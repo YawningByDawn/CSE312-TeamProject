@@ -1,5 +1,5 @@
 /**
- * Blessings (DECISIONS §15.5): pick 1 of 3 at the start of a run (the starting bonus) and at every level-up.
+ * Blessings (DECISIONS §15.5): pick 1 of 3 at every level-up.
  * Words: `blessing.<id>.name`, `.line`, `.details` (words/cards.ts), filled with `blessingSlots(id)`.
  */
 import type { BlessingId } from '../types';

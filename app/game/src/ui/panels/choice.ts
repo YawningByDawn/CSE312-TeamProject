@@ -4,8 +4,7 @@ import { PICKS, bound, keyName, pickOf } from '../../content/keys';
 import { CARD_H, CARD_W, DIM, PALE, Words, card, div, line, slab, verb } from './art';
 import type { Ctx, Panel } from './index';
 
-// What the clock waits on (inventory #5, 29, 120, 121): the opening's first deal (the starting gift: take one of the
-// cards on the opening's last frame), a blessing at a new rank, a story's choice. The pick keys pick.
+// What the clock waits on (inventory #29, 120, 121): a blessing at a new rank, a story's choice. The pick keys pick.
 
 const GAP = 34;
 
@@ -27,33 +26,6 @@ function picks(root: HTMLElement, title: string, foot: string, n: number, w: num
 const pickKey = (set: Readonly<Settings>, i: number): string => keyName(set.keys[PICKS[i]!]?.[0] ?? '');
 const footOf = (set: Readonly<Settings>, n: number): string =>
   n > 1 ? uiText('pick.keys', { a: pickKey(set, 0), b: pickKey(set, Math.min(n, PICKS.length) - 1) }) : uiText('pick.click');
-
-/** The starting gift: the first deal on the opening's last frame; taking one starts the clock. */
-export class Bonus implements Panel {
-  constructor(private readonly c: Ctx) {}
-
-  key(vm: ViewModel): string | null {
-    const s = vm.state;
-    return !vm.title && !vm.film && s.phase === 'bonus' && s.god.deal ? `bonus|${s.god.deal.join()}` : null;
-  }
-
-  build(root: HTMLElement, vm: ViewModel): void {
-    const deal = vm.state.god.deal!;
-    picks(root, uiText('bonus.pickHead'), footOf(vm.settings, deal.length), deal.length, CARD_W, CARD_H, (box, i) => card(box, vm.state, deal[i]!, 0, 0), (i) => this.take(deal[i]!));
-  }
-
-  private take(card: string): void {
-    this.c.act({ type: 'take', card });
-  }
-
-  press(e: KeyboardEvent, vm: ViewModel): boolean {
-    const deal = vm.state.god.deal!;
-    const i = pickOf(vm.settings, e, deal.length);
-    if (i < 0) return false;
-    this.take(deal[i]!);
-    return true;
-  }
-}
 
 export class Choice implements Panel {
   constructor(private readonly c: Ctx) {}

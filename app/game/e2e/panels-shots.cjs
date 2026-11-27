@@ -31,8 +31,6 @@ async function boot(browser, base, query) {
     await shot(t.page, 'title', '.hgp-seed');
     const { page, errors } = await boot(browser, srv.url, '?scene=play&seed=7&mute=1');
     const ev = (f, arg) => page.evaluate(f, arg);
-    await shot(page, 'bonus', '.hgp-hov');
-    await ev(() => { const s = window.__hg.state(); window.__hg.act({ type: 'take', card: s.god.deal[0] }); });
     await ev(() => window.__hg.send({ kind: 'focus', focus: { place: 'grave' } }));
     await shot(page, 'grave', '.hgp-slab');
     await ev(() => {

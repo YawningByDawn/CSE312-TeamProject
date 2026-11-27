@@ -10,7 +10,6 @@ import type { Effect } from '../../../src/types';
 function begin(): Ctx {
   const { sim } = makeSim();
   const s = sim.create(4);
-  sim.act(s, { type: 'take', card: s.god.deal![0]! });
   s.weather = 'clear';
   return { s, out: [] };
 }

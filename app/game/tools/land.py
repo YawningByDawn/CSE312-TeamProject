@@ -442,8 +442,9 @@ def rel(target: str, root: Path) -> str:
 
 def verdicts(receipts: list[dict], root: Path, stale: Callable[[str], set[str] | None]) -> dict[str, str]:
     """Each test file's verdict (`passed` or `failed`) from its newest receipt that still holds: one whose tested tree differs
-    from HEAD's in no path that affects the file. `stale(tree)` is the test files that tree's diff to HEAD affects, None for a
-    tree git does not hold. A queue edit or another file's change leaves a receipt standing."""
+    from HEAD's in no path that affects the file; in a failed receipt a file is failed only when its failures name it.
+    `stale(tree)` is the test files that tree's diff to HEAD affects, None for a tree git does not hold. A queue edit or another
+    file's change leaves a receipt standing."""
     out: dict[str, str] = {}
     for r in receipts:   # newest first
         if r.get("status") not in ("passed", "failed"):
@@ -451,9 +452,12 @@ def verdicts(receipts: list[dict], root: Path, stale: Callable[[str], set[str] |
         hit = stale(r.get("tree") or "")
         if hit is None:
             continue
+        # a failed batch fails the files its `failures` name; a run that listed none, or fewer than it counted, fails them all
+        named = r.get("failures") or []
+        whole = r["status"] == "failed" and (not named or len(named) < r.get("failed_n", 0))
         for t in r["targets"]:
             if (f := rel(t, root)) not in hit:
-                out.setdefault(f, r["status"])
+                out.setdefault(f, "failed" if r["status"] == "failed" and (whole or any(f in x for x in named)) else "passed")
     return out
 
 

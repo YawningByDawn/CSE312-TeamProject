@@ -13,6 +13,7 @@ import { uiText } from '../content/text';
 import { DIM, Words, div, installCss } from './kit';
 import { Deal, Hand } from './hud/cards';
 import { Clock } from './hud/clock';
+import { Drops } from './hud/drops';
 import { Feed } from './hud/feed';
 import { Hints } from './hud/hints';
 import { Menus } from './hud/menus';
@@ -28,7 +29,7 @@ import { People } from './hud/people';
 // The rest layout frames the world from its corners: each corner is an anchor 24 px in from the screen's edge, all
 // scaled by one factor from the window and the Interface size setting, their parts laid out in design px of a
 // 1600x900 screen. A frame hands the view model to each part; a part writes only what changed. The panels mount in
-// their own layer over the rest layout, and are framed after it.
+// their own layer over the rest layout, and are framed before it: the deal reads which of them is open this frame.
 
 /** The design screen the parts are laid out on. */
 const DESIGN_W = 1600, DESIGN_H = 900;
@@ -115,7 +116,7 @@ export function createUi(mountPanels?: MountPanels): Ui {
         new HostPlate(at.tl, send, q), new Feed(at.tl, toggle),
         new God(at.tr, toggle, q), new Suspicion(at.tr), new Goal(at.tr, toggle, q),
         new Pouch(at.bl, toggle), new People(at.bl, send, POUCH_H), new Clock(at.br, send, q),
-        new Quests(at.tr, q), new Hints(at, (t) => q.day(t), send), hand, deal,
+        new Quests(at.tr, q), new Hints(at, (t) => q.day(t), send), new Drops(at.c, from('c')), hand, deal,
       );
       menus = new Menus(menuAt, at.tr, send, q);
       tip = new Tip(hud, () => k);
@@ -138,10 +139,11 @@ export function createUi(mountPanels?: MountPanels): Ui {
       const film = vm.film !== null && vm.film.kind !== 'take';
       if (film === skip.el.hidden) skip.el.hidden = !film;
       if (film) skip.set(uiText('hud.skip', { back: name('back'), skip: name('skip') }));
+      // the panels first: the deal waits for them, and reads what is open this frame
+      panels?.frame(vm);
       if (!off) for (const p of parts) p.frame(vm);
       // the settings open over the title and the defeat too
       menus.frame(vm);
-      panels?.frame(vm);
       tip.frame(vm);
     },
   };

@@ -13,10 +13,13 @@ import { POUCH_W } from './pouch';
 // dragged follows the pointer and the discard zone shows on the right: dropped on the field it plays through the pay
 // slab (rb-panels), as 1..9 does; dropped back on the hand it returns; dropped on the zone it is discarded. By day the hand rests dim
 // whole (the day passes by itself: the sim refuses every card until dusk), no card can be pressed, and the plate says why.
-// The deal, dealt at dusk once the panels close: its cards large over the dimmed world; take one (1..3) into the hand, or none
-// (Esc, 0), or redraw them.
+// The deal, dealt at dusk once the panels close: its cards rise from below the screen face down (the baked `card.back`) to
+// their places at the centre over the dimmed world and turn face up; once they have, take one (1..3) into the hand, or
+// none (Esc, 0), or redraw them.
 // Each rebuilds only when its key changes; at rest neither writes.
 
+/** A dealt card's rise from below the screen, each card after the one before by `STAGGER_S`; the pause on arriving, and its turn face up. */
+const RISE_S = 0.6, STAGGER_S = 0.11, PAUSE_S = 0.25, TURN_S = 0.4;
 /** The kept card's flight to the hand, then the take. */
 const LEAVE_S = 0.38;
 const REST = 0.92;
@@ -195,6 +198,9 @@ export class Deal {
   private sendIn = -1;
   private taking: CardId | null = null;
   private up = false;
+  /** Seconds since the cards were laid, and when the last is face up: a card can be taken once it is. */
+  private age = 0;
+  private faceUp = 0;
 
   /** `busy`: a panel is open over the rest layout; the deal waits for it, and for a menu. */
   constructor(anchor: HTMLElement, private readonly send: (i: Intent) => void, private readonly busy: () => boolean, private readonly hand: () => HTMLElement) {
@@ -211,6 +217,7 @@ export class Deal {
   }
 
   frame(vm: ViewModel): void {
+    this.age += vm.dt;
     if (this.sendIn >= 0 && (this.sendIn -= vm.dt) < 0) {
       this.sendIn = -1;
       this.el.classList.remove('hg-leaving');
@@ -228,6 +235,8 @@ export class Deal {
     this.el.replaceChildren();
     if (!up) return;
     this.deal = g.deal!.slice();
+    this.age = 0;
+    this.faceUp = (this.deal.length - 1) * STAGGER_S + RISE_S + PAUSE_S + TURN_S;
     const veil = div(this.el, 'hg-b hgp-slab', -1200, -700, 2400, 1400);
     veil.style.background = 'rgba(4, 3, 6, 0.62)';
     const w = CARD_W * BIG, h = CARD_H * BIG, gap = 44, n = this.deal.length;
@@ -239,24 +248,28 @@ export class Deal {
     if (this.full) new Words(this.el, -400, top + 60, 18, DIM, 'center', 800).set(uiText('hand.discardFirst'));
     this.deal.forEach((id, i) => {
       const box = div(this.el, 'hg-b hg-hit hg-big hg-dealt', -total / 2 + i * (w + gap), top + 86, w, h);
-      box.style.animationDelay = `${i * 110}ms`;
+      box.style.animationDuration = `${RISE_S}s`;
+      box.style.animationDelay = `${i * STAGGER_S}s`;
       attr(box, 'title', tipOf(id, null));
-      const p = plate(box, s, id, 0, 0).style;
+      const turn = div(box, 'hg-b hg-turn', 0, 0, w, h);
+      turn.style.animationDuration = `${TURN_S}s`;
+      turn.style.animationDelay = `${i * STAGGER_S + RISE_S + PAUSE_S}s`;
+      cell(div(turn, 'hg-b hg-face hg-backface', 0, 0, w, h), 'cardback', 'card.back', 0, 0, 0.5 * BIG);
+      const p = plate(div(turn, 'hg-b hg-face', 0, 0, w, h), s, id, 0, 0).style;
       p.transformOrigin = '0 0';
       p.transform = `scale(${BIG})`;
       box.addEventListener('click', () => this.take(id));
     });
     const by = top + 86 + h + 26;
     const none = verb(this.el, g.rerolls > 0 ? -170 : -80, by, 160, 46, uiText('btn.takeNone'), '', () => this.take(null), () => {});
-    none.classList.add('hg-fade');
-    if (g.rerolls > 0) {
-      verb(this.el, 10, by, 160, 46, uiText('btn.redraw', { n: g.rerolls }), '', () => this.send({ kind: 'act', action: { type: 'reroll' } }), () => {}).classList.add('hg-fade');
-    }
+    const wait = (b: HTMLElement): void => { b.classList.add('hg-fade', 'hg-wait'); b.style.animationDelay = `${this.faceUp}s`; };
+    wait(none);
+    if (g.rerolls > 0) wait(verb(this.el, 10, by, 160, 46, uiText('btn.redraw', { n: g.rerolls }), '', () => this.send({ kind: 'act', action: { type: 'reroll' } }), () => {}));
   }
 
   /** The kept card flies to the hand and the rest fall away; then the take is sent. */
   private take(id: CardId | null): void {
-    if (this.leaving) return;
+    if (this.leaving || this.age < this.faceUp) return;
     const boxes = [...this.el.querySelectorAll<HTMLElement>('.hg-big')];
     if (id && this.full) {
       deny(boxes[this.deal.indexOf(id)]!);

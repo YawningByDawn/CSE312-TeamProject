@@ -14,7 +14,7 @@ This page holds the measured state and every cost above the target. The target a
 
 | state | cb mean ms | GPU ms | alloc KB/f | GCs in 240 frames |
 |---|---|---|---|---|
-| the mine at rest (the starting gift waiting) | 0.36 | 0.63 | 0.0 | 0 |
+| the mine at rest (the first night, its deal waiting, 8 s on) | 1.65 | 0.79 | 0.0 | 0 |
 | panning (x swaying 100 units at 0.25 Hz) | 0.34 | 0.54 | 0.0 | 0 |
 | zooming (zoom 0.5 to 1.5 at 0.25 Hz) | 0.77 | 0.92 | 0.0 | 0 |
 | the town at rest (zoom 2.2) | 0.19 | 0.54 | 0.0 | 0 |
@@ -24,7 +24,7 @@ The profiled page at rest: 59.9 fps, 10 draws and 0 uploads a frame, heap 72 MB,
 
 ## Named costs above the target
 
-None measured: in every state the CPU and the GPU each take under 1 ms a frame and nothing is allocated. Not measured: the owner's screen; at 2560x1440 a frame has 2.56 times these pixels, so the GPU's share there is larger.
+The mine at rest in the first night: the callback takes 1.6 ms (1.64 and 1.67 in two runs), against 0.5 panning, and the profiled page names People.parts, Stamps.flush and createView.frame with about 70 people rigged each frame while the night stands still; rule 1 of `docs/contracts/perf.md` forbids that work. Every other state takes under 1 ms on the CPU and the GPU a frame and nothing is allocated. Not measured: the owner's screen; at 2560x1440 a frame has 2.56 times these pixels, so the GPU's share there is larger.
 
 ## Tools
 

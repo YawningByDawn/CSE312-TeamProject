@@ -12,10 +12,9 @@ import type { GameEvent, GameState, Person } from '../../../src/types';
 
 const { sim, query } = makeSim();
 
-/** A run opened: the first gift taken, the day of the first dawn begun in the first miner. */
+/** A run opened: the day of the first dawn begun in the first miner. */
 function begin(seed = 7): GameState {
   const s = sim.create(seed);
-  expect(sim.act(s, { type: 'take', card: s.god.deal![0]! }).ok).toBe(true);
   return s;
 }
 /** Answer what stops the clock (a story, a blessing). */

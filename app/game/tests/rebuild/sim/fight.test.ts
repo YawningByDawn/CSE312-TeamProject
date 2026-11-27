@@ -15,7 +15,6 @@ const T = DAY_TICK_S;
 
 function day(seed = 7): GameState {
   const s = sim.create(seed);
-  expect(sim.act(s, { type: 'take', card: s.god.deal![0]! }).ok).toBe(true);
   while (s.pending?.kind === 'story') sim.act(s, { type: 'story', option: 1 });
   return s;
 }

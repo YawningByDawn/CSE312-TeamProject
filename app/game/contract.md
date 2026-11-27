@@ -14,7 +14,7 @@ Turn-based strategy for the browser: you are a fallen god feeding on the souls c
 
 ## Scope
 
-As `docs/spec.md` sets them: the opening cutscene into the first gameplay view with no cut, a starting bonus (one of 3), the Whisper stage (the mine), the watershed pull-back, the Shade stage (the town), and an ending beat that teases the city.
+As `docs/spec.md` sets them: the opening cutscene into the first gameplay view with no cut, the Whisper stage (the mine), the watershed pull-back, the Shade stage (the town), and an ending beat that teases the city.
 
 ## Work
 

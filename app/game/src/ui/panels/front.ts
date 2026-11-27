@@ -249,13 +249,6 @@ export class Defeat implements Panel {
     const items = [uiText('defeat.again'), uiText('defeat.same'), uiText('defeat.title')].map((w, i) => item(col, 200 + i * 190, 510, 24, w, subs[i]!, acts[i]!));
     for (const el of items) at(el, 4.6);
     this.menu = new Menu(items, acts);
-    // the starting gift the run kept
-    if (s.tally.gift) {
-      const kept = new Words(col, 0, 600, 15, DIM, 'center', 880);
-      kept.el.style.fontStyle = 'italic';
-      kept.set(uiText('defeat.kept', { name: uiText(`card.${s.tally.gift}.name`) }));
-      at(kept.el, 4.9);
-    }
   }
 
   /** The spark stands on the eye as the view shows it, and is out while the eye is off the screen. */

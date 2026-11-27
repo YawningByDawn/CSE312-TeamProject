@@ -40,11 +40,10 @@ const bot = buildSync({
     await page.fill('.hgp-seed', String(SEED));
     // Enter in the seed field begins, wherever the interface's scale puts the word
     await page.press('.hgp-seed', 'Enter');
-    await page.waitForFunction(() => window.__hg && window.__hg.state().phase === 'bonus', null, { timeout: 60000 });
+    await page.waitForFunction((seed) => window.__hg && window.__hg.state().seed === seed, SEED, { timeout: 60000 });
     await shot('opening');
     // the opening film plays out on its own clock
     await page.evaluate(() => window.__hg.advance(60));
-    await shot('bonus');
     for (let day = 0; day < MAX_DAYS; day++) {
       const r = await page.evaluate(() => {
         const hg = window.__hg, bot = window.__rbBot;

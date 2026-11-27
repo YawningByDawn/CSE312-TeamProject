@@ -1,8 +1,8 @@
 // rb-life's pieces in the rebuilt game (src/view/life, src/view/film) on seed 7 at 1280x720, reached through the
 // debug API alone (window.__hg: act, legal, ticks, advance, show, camera, state):
-//   python tools/browser_job.py --build [ONLY=bonus,cards,dusk,dawn,strikes,lost] node e2e/life-rebuild-shots.cjs
+//   python tools/browser_job.py --build [ONLY=cards,dusk,dawn,strikes,lost] node e2e/life-rebuild-shots.cjs
 // Each piece prints its name as it begins (a stuck piece is the last named); a renderer crash ends the run naming it.
-// The opening's bonus is taken first (its panel covers the middle). A card is put in the hand, the god given the
+// A card is put in the hand, the god given the
 // means, and played on its first legal target; the clock is ticked to dusk and dawn; each strike grade and a take are
 // shown at a digger at their face, who is then picked; the defeat drain on a fresh run. A film is stepped by `advance` to each mark. Writes
 // screenshots/life/<piece>.png and prints what it could not reach; exits 1 on a console error.
@@ -11,7 +11,7 @@ const path = require('node:path');
 const { launchBrowser, startStatic, collectConsole, ROOT } = require('./lib/browser.cjs');
 
 const OUT = path.join(ROOT, 'screenshots/life');
-const ONLY = (process.env.ONLY || 'bonus,cards,dusk,dawn,strikes,lost').split(',');
+const ONLY = (process.env.ONLY || 'cards,dusk,dawn,strikes,lost').split(',');
 const MAP = JSON.parse(fs.readFileSync(path.join(ROOT, 'src/content/map.json'), 'utf8'));
 const MINE = new Set([...fs.readFileSync(path.join(ROOT, 'src/content/world.ts'), 'utf8').matchAll(/^  (\w+): mine\(/gm)].map((m) => m[1]));
 const CARDS = [...fs.readFileSync(path.join(ROOT, 'src/content/cards.ts'), 'utf8').matchAll(/^  (\w+): (?:miracle|evil)\(/gm)].map((m) => m[1]);
@@ -83,7 +83,6 @@ function onPlace(place) {
   };
 
   await boot();
-  if (want('bonus')) await shot('bonus');
   await clear();
   const grave = onPlace('grave');
   if (want('cards')) {

@@ -184,7 +184,7 @@ Later stages add more buildings and more crafts in the same way (mint, scriptori
 - **Miracles** — each night you draw 3; play 1 or skip. [Spec] Pool and rarity depend on Divinity; each costs a different number of soul crystals; Faith sets power. Approved examples: Dream Directive (drives followers to infiltrate something); Bless Their Bodies (raises devotion, makes them more effective). [Design] The cost is in crystal worth and you choose which stones burn. Miracles serve the mine: richer strikes at a face, a cart that takes a wrong turn to your grave, an overseer who miscounts, colour soaking into a place, a sleeper made easy to turn.
 - **Acts of evil** — each night you draw 3; play 1 or skip. An act of evil quiets Malice, gives something real (food, stones, fear, a rival removed) and is noticed by someone. **Devour a Person** is one of them: Hunger falls hard and their soul is yours. Others: sabotage a cart, foul the water, a cave-in, a framing, a sacrifice, a riot, an assassination.
 - [Owner] **Followers' own evil** — "Followers may, based on your own malice, randomly decide to commit evil, which only sates your malice half as much as you yourself causing it." It is noticed all the same.
-- **Blessings** — a lasting buff or an interesting new action. [Design] Pick 1 of 3 at the start of a run (the starting bonus) and at every minor rank. Some crystals add a choice or a reroll.
+- **Blessings** — a lasting buff or an interesting new action. [Design] Pick 1 of 3 at every minor rank. Some crystals add a choice or a reroll.
 - Card pools widen and gain rarer cards with each rank; a new stage upgrades old cards.
 
 ## 10. Suspicion and the opposition
@@ -198,8 +198,8 @@ Later stages add more buildings and more crafts in the same way (mint, scriptori
 Suspicion cools slowly when you give it nothing. The first serious pushback comes in the town: a lockdown, the inquisitor, and a crusade gathering as you near the vault.
 
 ## 11. Run start
-[Spec] A new run starts at the fall of a crystal shard of the fallen, weak god (god alone, no miner): it falls through the dark and the rock and lands, and the starting bonus follows on that frame: choose 1 of 3 random offers.
-[Design] The cutscene's last shot is the first gameplay view, with no cut. The starting bonus is the first blessing: 1 of 3. The first three nights teach the loop one step at a time: whisper to the sleeper by your grave → watch a strike → receive a stone at dusk → decide what to do with it → draw your first cards → see the count.
+[Spec] A new run starts at the fall of a crystal shard of the fallen, weak god (god alone, no miner): it falls through the dark and the rock and lands, and the first day begins in a miner.
+[Design] The cutscene's last shot is the first gameplay view, with no cut. There is no starting gift: the first card is dealt at the first dusk, when the god takes over. The first three nights teach the loop one step at a time: whisper to the sleeper by your grave → watch a strike → receive a stone at dusk → decide what to do with it → draw your first cards → see the count.
 
 ## 12. The slice: the mine
 - [Owner] The game is the opening cutscene and the mine. The town and every stage above the mine are cut.

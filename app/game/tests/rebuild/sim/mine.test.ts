@@ -18,7 +18,6 @@ const { sim, query } = makeSim();
 /** The first miner's day begun. */
 function day(seed = 7): GameState {
   const s = sim.create(seed);
-  expect(sim.act(s, { type: 'take', card: s.god.deal![0]! }).ok).toBe(true);
   s.people[FIRST_MINER.id]!.stats.hp = 1e6; // these tests are of the work: no skeleton (fight.test.ts) fells a host who stands about at it all day
   return s;
 }

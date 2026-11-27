@@ -29,13 +29,12 @@ function until(pump: Pump, done: () => boolean): void {
   }
 }
 
-/** A real run with the first gift taken, the day played to the first dusk and its deal passed. */
+/** A real run, the day played to the first dusk and its deal passed. */
 function atDusk(): Pump {
   const t = { sim, query, view: { frame: none, filmLength: () => 1, filmPose: none, scale: () => 1 }, ui: { frame: none }, audio: { frame: none, settings: none } } as unknown as Tracks;
   const pump = new Pump(t, 7, 1);
   const s = pump.vm.state;
   pump.begin(s);
-  act(pump, { type: 'take', card: s.god.deal![0]! });
   until(pump, () => s.god.deal !== null);
   act(pump, { type: 'take', card: null });
   return pump;

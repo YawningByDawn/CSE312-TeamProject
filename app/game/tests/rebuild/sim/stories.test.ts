@@ -14,7 +14,6 @@ import type { GameEvent, GameState } from '../../../src/types';
 function begin(): Ctx {
   const { sim } = makeSim();
   const s = sim.create(6);
-  sim.act(s, { type: 'take', card: s.god.deal![0]! });
   s.tick += 7 * DAY_TICKS;
   return { s, out: [] };
 }

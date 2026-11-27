@@ -22,6 +22,7 @@ import {
 import { CARDS } from '../../../src/content/cards';
 import { CRYSTAL, GRADE_VALUE } from '../../../src/content/crystals';
 import { BASES } from '../../../src/content/gems';
+import { dealCards } from '../../../src/sim/cards';
 import { burnWorth, veinLevel } from '../../../src/sim/crystals';
 import { makeSim } from '../../../src/sim';
 import { everyone, flockOf } from '../../../src/sim/core';
@@ -259,7 +260,6 @@ describe("the god's means (spec §8): actions, sockets, and what a verb costs", 
   const live = (seed: number) => {
     const { sim, query } = makeSim();
     const s = sim.create(seed);
-    sim.act(s, { type: 'take', card: null });
     return { s, query };
   };
   /** the first person a whisper reaches now */
@@ -307,7 +307,7 @@ describe('a stone burnt and its miracle (spec §7)', () => {
 
   it('the deal lays three cards', () => {
     const { sim } = makeSim();
-    expect(sim.create(3).god.deal).toHaveLength(DRAW_SLOTS);
+    expect(dealCards(sim.create(3))).toHaveLength(DRAW_SLOTS);
     expect(DRAW_SLOTS).toBe(3);
   });
 

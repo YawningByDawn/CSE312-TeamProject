@@ -6,15 +6,14 @@
  * No DOM, IO, wall clock or Math.random. One rule area a file: the god's day (god), the mine's (mining), colour and the
  * whisper (influence), the cards, the grave and its stones (grave, crystals, bonus), the powers' moves (threats), the
  * stories, discoveries; core.ts holds what they share.
- * Tick 0 is the dusk; the run waits in `bonus` on the first deal, and the take wakes the god at the first dawn (host.ts:
- * the day is played as a possessed follower, marks, the fall). The night is the player's turn: the clock stands (`step` does nothing at `until`) and each action point spent moves `until` on by its share of the
+ * A run begins at the first dawn (host.ts: the day is played as a possessed follower, marks, the fall); the first deal is the first dusk's. The night is the player's turn: the clock stands (`step` does nothing at `until`) and each action point spent moves `until` on by its share of the
  * night (`nightUntil`), a `sleep` to the dawn; the day then passes by itself, dawn to dusk, where the action points
  * refill. Each tick the hour's rules run: dawn, the shift's swings, its end, dusk.
  */
 import { BALANCE } from '../content/balance';
 import { AT, NIGHT_TICKS, TPH, dayOf, hourOf, isDay, nextAt, partOf, tod } from '../content/clock';
 import { AREAS, NEIGHBOURS, PLACES } from '../content/world';
-import { dealCards, discard, discardWhy, cardCost, play, playWhy, reroll, rerollWhy, take, takeWhy, cardFee, cardTargets, payment, faithOf } from './cards';
+import { discard, discardWhy, cardCost, play, playWhy, reroll, rerollWhy, take, takeWhy, cardFee, cardTargets, payment, faithOf } from './cards';
 import { bonus } from './bonus';
 import { digs, ev, everyone, flockOf, influence, pouchIds, presence, settleRank, type Ctx, type Flock } from './core';
 import { burnWorth } from './crystals';
@@ -66,7 +65,7 @@ function blank(seed: number): GameState {
     for (const n of NEIGHBOURS[a]!) [places[n]!.hold, places[n]!.coloured] = [BALANCE.graveRingStart, BALANCE.graveRingStart >= BALANCE.colouredAt];
   }
   return {
-    v: 7, seed, rng: seedRng(seed), tick: 0, until: 0, phase: 'bonus', weather: 'clear', wind: 0,
+    v: 7, seed, rng: seedRng(seed), tick: 0, until: 0, phase: 'live', weather: 'clear', wind: 0,
     god: {
       level: 1, xp: 0, nether: 0, ichor: BALANCE.startIchor, hunger: BALANCE.startHunger, malice: BALANCE.startMalice, ap: 0, apMax: 0, sockets: [], blessings: [],
       hand: [], deal: null, rerolls: 0, played: 0, free: 0, boost: 0,
@@ -76,7 +75,7 @@ function blank(seed: number): GameState {
     threats: [], pending: null, host: null, body: null, mobs: [], ores: ORE_SITES.map(() => -1), effects: [], next: 1, mine: { carts: {}, expected: 0, shortDays: 0, delve: 0 },
     flags: { deepOpen: false, liftRooted: false },
     ledger: { crystals: 0, nether: 0, turned: 0, lost: 0, suspicion: { temple: 0, council: 0, public: 0 } },
-    tally: { turned: 0, peak: 0, whispers: 0, gift: null },
+    tally: { turned: 0, peak: 0, whispers: 0 },
   };
 }
 
@@ -110,7 +109,6 @@ function nightUntil(s: Readonly<GameState>): number {
 /** Why an action is refused now (empty: it may be taken). */
 function why(s: Readonly<GameState>, fl: Flock, a: Action): Reason[] {
   if (s.phase === 'won' || s.phase === 'lost') return [{ key: 'why.over' }];
-  if (s.phase === 'bonus') return a.type === 'take' ? takeWhy(s, a.card) : [{ key: 'why.pickBonus' }];
   if (s.pending?.kind === 'story') return a.type === 'story' ? storyWhy(s, a.option) : [{ key: 'why.pending' }];
   if (s.pending) return s.pending.kind === 'blessing' && a.type === 'pickBlessing' ? (s.pending.offers.includes(a.blessing) ? [] : [{ key: 'why.notOffered' }]) : [{ key: 'why.pending' }];
   if (isDay(s.tick)) return dayWhy(s, a);
@@ -158,10 +156,7 @@ function apply(c: Ctx, fl: Flock, a: Action): void {
       ev(c, { kind: 'routine', unit: a.unit, routine: a.routine });
       break;
     case 'move': move(c, s.people[a.unit]!, a.to, p.odds!); break;
-    case 'take':
-      take(c, a.card);
-      if (s.phase === 'bonus') { s.phase = 'live'; s.tally.gift = a.card; }
-      break;
+    case 'take': take(c, a.card); break;
     case 'discard': discard(c, a.card); break;
     case 'reroll': reroll(c); break;
     case 'sleep': s.until = Math.max(s.until, nextAt(s.tick, AT.dawn)); break;
@@ -224,9 +219,10 @@ export function makeSim(): { sim: Sim; query: Query } {
       settleRank(s);
       s.god.ap = s.god.apMax;
       for (const t of BALANCE.startTiers) newCrystal(s, { pouch: true }, { tier: t });
-      s.god.rerolls = bonus(s, 'rerolls');
       s.god.free = bonus(s, 'freeWhispers');
-      s.god.deal = dealCards(s);
+      // the run begins at the first dawn, the god in a miner: the first deal is the first dusk's
+      s.tick = NIGHT_TICKS;
+      dawn({ s, out: [] });
       return s;
     },
 
@@ -271,12 +267,7 @@ export function makeSim(): { sim: Sim; query: Query } {
       if (r.length > 0) return { ok: false, why: r, events: [] };
       const events: GameEvent[] = [];
       const ctx = { s, out: events };
-      const opening = s.phase === 'bonus';
       apply(ctx, fl, a);
-      if (opening && s.phase === 'live') {
-        s.tick = NIGHT_TICKS; // the first gift taken, the god wakes at the first dawn
-        dawn(ctx);
-      }
       relieve(ctx);
       if (s.phase === 'live') echoes(s, events, 0, events.length);
       return { ok: true, why: [], events };

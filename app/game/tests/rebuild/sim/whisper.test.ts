@@ -12,7 +12,7 @@ import type { GameEvent } from '../../../src/types';
 const { sim, query } = makeSim();
 function live(): Ctx {
   const s = sim.create(7);
-  s.phase = 'live';
+  while (s.tick < s.until) (s.pending?.kind === 'story' ? sim.act(s, { type: 'story', option: 1 }) : sim.step(s)); // the first day played to its dusk: the night is the god's
   s.god.nether = 500;
   s.god.ap = s.god.apMax = 50;
   s.until = Infinity; // the clock runs: these tests step ticks, not turns

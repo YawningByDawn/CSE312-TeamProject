@@ -1,6 +1,6 @@
 # Art pipeline: the baked pictures and sounds, and what places them
 
-Every picture and sound the game shows was made by our own painters offline and ships as files under `assets/`. Nothing draws at load or per frame (`contract.md`, Architecture): the view places sprites of these files and picks frames. The painters and bake scripts are not in this tree, except `scripts/art/combat.py` (the fight's art, painted by `scripts/art/paint.py`, Python with Pillow and NumPy; `scripts/art/test_combat.py` holds it fresh); a new or changed asset is a bake that writes its folder in the shape below (the rules for the agent that makes one: `docs/contracts/asset.md`).
+Every picture and sound the game shows was made by our own painters offline and ships as files under `assets/`. Nothing draws at load or per frame (`contract.md`, Architecture): the view places sprites of these files and picks frames. The painters and bake scripts are not in this tree, except `scripts/art/combat.py` (the fight's art) and `scripts/art/cardback.py` (the card's back), painted by `scripts/art/paint.py`, Python with Pillow and NumPy; `scripts/art/test_combat.py` and `test_cardback.py` hold them fresh; a new or changed asset is a bake that writes its folder in the shape below (the rules for the agent that makes one: `docs/contracts/asset.md`).
 
 ## The shapes
 
@@ -28,6 +28,7 @@ Every picture and sound the game shows was made by our own painters offline and 
 | `weather/` | atlas, `.bc3` | white cells the view tints: rain streaks, smears, puddles, fog banks, gusts, lightning, the mine's pools | `src/view/weather.ts` |
 | `defeat/` | atlas | the defeat's ramps and the grave's eye | `src/view/film/films.ts`, `src/ui/panels/art.ts` |
 | `ui/` | sheet | the interface's plates, frames, icons and nine-slices | `src/ui/kit.ts`, `src/ui/panels/art.ts` |
+| `cardback/` | sheet | `card.back`, the face-down card the deal rises with, the plate's size and origin (`scripts/art/cardback.py`, held fresh by `scripts/art/test_cardback.py`) | `src/ui/panels/art.ts`, `src/ui/hud/cards.ts` |
 | `cardart/`, `crystals/`, `crystalmarks/<affinity>/`, `portraits/p<n>/`, `interiors/<room>/`, `front/`, `title/` | sheets | card art, the stones by base and grade, each affinity's material, the people's portraits, each room's interior, the title's still and its lettering | `src/ui/panels/art.ts` |
 | `opening/` | `opening.mp4` | the opening film: the owner-approved opening's last 8 s (the eye opens, the crystal rises, the god's thread spreads), recorded at 1920x1080 60 fps with its sound, H.264 + AAC, 1.7 MB | `src/view/film/opening.ts` (played over the canvas while the `opening` film runs; `e2e/opening-check.cjs`) |
 | `fonts/` | two `.woff2` + `OFL.txt` | IM Fell English (`CREDITS.md`) | `src/ui/kit.ts` |

@@ -346,7 +346,6 @@ export interface RunResult {
   /** The day the lift was rooted. */
   liftDay: number | null;
   endDay: number | null;
-  gift: string;
   whispers: number;
   peakFollowers: number;
   maxHeat: number;
@@ -375,7 +374,7 @@ export function playRun(seed: number, bot: BotId, opts: PlayOptions = {}): RunRe
   const rng = seedRng((seed * 0x9e3779b1) ^ bot.length);
   const next = bot === 'random' ? null : scripted(bot);
   const res: RunResult = {
-    seed, bot, outcome: 'stalled', why: '', days: 0, liftDay: null, endDay: null, gift: '', whispers: 0, peakFollowers: 0, maxHeat: 0,
+    seed, bot, outcome: 'stalled', why: '', days: 0, liftDay: null, endDay: null, whispers: 0, peakFollowers: 0, maxHeat: 0,
     mined: [0, 0, 0, 0, 0, 0], noCrystalDays: 0, noCardDays: 0, threats: { announced: 0, landed: 0, answered: 0 }, refused: [],
   };
   const scan = (evs: readonly GameEvent[]): void => {
@@ -395,11 +394,6 @@ export function playRun(seed: number, bot: BotId, opts: PlayOptions = {}): RunRe
     scan(r.events);
     return true;
   };
-  // the opening's deal: the bot takes the card it wants (random: any)
-  const deal = s.god.deal!;
-  const want = (c: CardId): number => (bot === 'random' ? 0 : cardWant(s, flockOf(s), STYLES[bot], c));
-  act({ type: 'take', card: bot === 'random' ? pick(rng, deal)! : deal.slice().sort((a, b) => want(b) - want(a))[0]! });
-  res.gift = s.tally.gift ?? '';
   let lastDay = -1, acted = -1, acts = 0, standAt = -1, stood = 0;
   while (s.phase === 'live' && dayOf(s.tick) <= maxDays) {
     const d = dayOf(s.tick);
