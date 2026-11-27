@@ -34,7 +34,8 @@ export interface StoryRule {
 const n = (id: StoryId): Readonly<Record<string, number>> => STORIES[id]!.n;
 const day = (s: Readonly<GameState>): number => dayOf(s.tick);
 const people = (s: Readonly<GameState>, f: (p: Person) => boolean): Person[] => everyone(s).filter((p) => here(p) && f(p));
-const strangers = (s: Readonly<GameState>, f: (p: Person) => boolean = () => true): Person[] => people(s, (p) => !p.follower && f(p));
+/** The people not yours: never the god's own host, whom the day's rules fell, not a story. */
+const strangers = (s: Readonly<GameState>, f: (p: Person) => boolean = () => true): Person[] => people(s, (p) => !p.follower && p.id !== s.host && f(p));
 const flock = (s: Readonly<GameState>, f: (p: Person) => boolean = () => true): Person[] => people(s, (p) => p.follower && f(p));
 const strongest = (ps: readonly Person[]): Person | undefined => ps.reduce<Person | undefined>((b, p) => (!b || p.stats.strength > b.stats.strength ? p : b), undefined);
 const one = <T>(s: GameState, xs: readonly T[]): T | undefined => pick(s.rng, xs);
@@ -67,9 +68,9 @@ export const RULES: Readonly<Record<StoryId, StoryRule>> = {
   },
   caveIn: {
     cast: (s) => {
-      const a = one(s, STAGE.caveInAreas.filter((x) => people(s, (p) => area(p.work) === x).length > 0));
+      const a = one(s, STAGE.caveInAreas.filter((x) => people(s, (p) => area(p.work) === x && p.id !== s.host).length > 0));
       if (!a) return null;
-      const there = people(s, (p) => area(p.work) === a);
+      const there = people(s, (p) => area(p.work) === a && p.id !== s.host);
       const pool = there.filter((p) => !p.follower);
       const u = (chance(s.rng, n('caveIn').stranger!) && pool.length > 0 ? one(s, pool) : one(s, there))!;
       return { unit: u, place: a };

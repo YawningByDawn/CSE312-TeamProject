@@ -27,7 +27,7 @@ export const STORIES: Readonly<Record<StoryId, StoryDef>> = {
   /** Followers ≥ minFollowers from day minDay; the strongest. March: Council −cool, public −publicCool. Hide: Council +heat. */
   conscription: { cooldown: 8, weight: 7, choice: true, n: { minFollowers: 2, minDay: 4, cool: 10, publicCool: 3, heat: 10 } },
   /** More than minPeople not yours; a weak one dies, a mourner there grieves and resists −resist. */
-  deathInTunnels: { cooldown: 6, weight: 7, choice: false, n: { minPeople: 6, weakest: 4, resist: 10 } },
+  deathInTunnels: { cooldown: 6, weight: 7, choice: false, n: { minPeople: 3, weakest: 4, resist: 10 } },
   /** The shrine stands, from day minDay. Go: Temple −cool, every follower −faith. Stay away: Temple +cool, every follower +faith. */
   kilnFeast: { cooldown: 9, weight: 6, choice: true, n: { minDay: 3, cool: 8, faith: 4 } },
   /** From day minDay. Take: +crystals, Council +heat. Sell a dream: −cost crystals, +nether. */

@@ -353,7 +353,7 @@ export class People implements Layer {
   private make(id: UnitId, role: RoleId, follower: boolean): Shown {
     const own = this.looks.get(id);
     const look = own ?? (() => {
-      const fam = this.byFamily.get(role === MOB_FAMILY ? MOB_FAMILY : familyOf(role, id))!;
+      const fam = this.byFamily.get(role === MOB_FAMILY ? MOB_FAMILY : familyOf(role))!;
       return fam[Math.floor(hash(id + '/look') * fam.length)]!;
     })();
     const root = role === MOB_FAMILY ? new Container() : pickable(new Container(), { unit: id });

@@ -14,7 +14,7 @@ import type { Activity, FactionId, GameEvent, GameState, Person, PlaceId, RoleId
 import { addHeat, remove, type Ctx } from '../core';
 import { area } from './area';
 import { K, idKey, keyed, keyedInt } from './draw';
-import { makeName, roster, tieKind } from './society';
+import { roster, tieKind } from './society';
 import { dayWeathers, weatherAt } from './sky';
 
 const N = WORLD_EVENTS.length;
@@ -282,16 +282,6 @@ function happen(s: GameState, out: GameEvent[], h: Happening, echo: GameEvent | 
   if (def.gone) for (const p of cast.slice(def.gone[1])) remove(c, p, def.gone[0]);
   const slots: Record<string, string | number> = { place: placeWord(place) };
   cast.slice(0, 3).forEach((p, i) => { slots[i === 0 ? 'name' : `name${i + 1}`] = p.name; });
-  if (def.n) slots.n = def.n[0] + keyedInt(s.seed, K.event, def.n[1] - def.n[0] + 1, h.od, k + 1);
-  if (def.list !== undefined) {
-    const names = cast.slice(def.list).map((p) => p.name);
-    slots.list = names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}` : names.join('');
-    slots.n = names.length;
-  }
-  if (def.names) {
-    const used = new Set(roster(s).all.map((p) => p.name));
-    for (let i = 1; i <= def.names; i++) slots[`new${i}`] = makeName(s.seed, 100000 + h.od * 1024 + h.oe * 4 + i, used);
-  }
   const base = holds ? `event.${def.id}.${v}` : `event.${def.id}`;
   out.push({ tick: s.tick, kind: 'story', story: def.id, place, ...(first ? { unit: first.id } : {}), note: { key: noteKey(s, base, h.od, k), slots } });
 }
@@ -321,7 +311,7 @@ function echoing(s: Readonly<GameState>, def: WorldEventDef, echo: GameEvent): b
 function lifePool(p: Readonly<Person>): string | null {
   const a = p.at;
   if ('route' in a || a.doing === 'sleep' || a.doing === 'offer') return null;
-  return LIFE_NOTES.role[p.role] ?? LIFE_NOTES.at[a.place] ?? LIFE_NOTES.doing[a.doing] ?? null;
+  return LIFE_NOTES.at[a.place] ?? LIFE_NOTES.doing[a.doing] ?? null;
 }
 
 /** The world's answer to the rule events `out[from, to)`, a tick's or an action's: each echo whose words name one happens now. */

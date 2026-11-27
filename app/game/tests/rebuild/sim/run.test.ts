@@ -311,7 +311,8 @@ describe("a going's ties notice (TIES)", () => {
   const setup = (seed: number) => {
     const { sim } = makeSim();
     const s = begin(sim, seed);
-    const p = Object.values(s.people).find((x) => x.ties.length >= 2)!;
+    const p = Object.values(s.people).find((x) => !x.follower && x.ties.filter((id) => !s.people[id]!.follower).length >= 2)!;
+    p.ties = p.ties.filter((id) => !s.people[id]!.follower);
     const [mine, theirs] = p.ties.map((id) => s.people[id]!);
     Object.assign(mine!, { follower: true, routine: 'pray', trait: 'curious' });
     mine!.stats.devotion = 50;

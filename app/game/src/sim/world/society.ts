@@ -1,7 +1,6 @@
 /**
- * The people (#48): every trade's headcount from content's role table, the named people in their places, the
- * rest rolled from the seed: a name, a trait, a work place, stats, a bunk, ties to kin, friends and workmates; and
- * the newcomers the rules find.
+ * The people (#48): the named people of content's people table in their trades' places, each with stats, a bunk and
+ * ties to kin, friends and workmates rolled from the seed; and the newcomers the rules find.
  */
 import { BALANCE, TIES } from '../../content/balance';
 import { dayOf } from '../../content/clock';
@@ -45,11 +44,11 @@ function statsOf(seed: number, id: UnitId, bias: RoleDef['bias']): Stats {
   return { devotion: 0, ...body, hp: maxHp(body) };
 }
 
-/** One of trade `role` at `work` (else dealt one), with a trait, stats and resistance from the seed and their id. */
+/** One of trade `role` at `work` (else dealt a face), with a trait, stats and resistance from the seed and their id. */
 function born(seed: number, id: UnitId, role: RoleId, work: PlaceId | undefined, name: string, trait?: TraitId): Person {
   const r = ROLES[role]!;
   const k = idKey(id);
-  const w = work ?? (role === 'digger' ? weighted(DIGGER_FACES, keyed(seed, K.work, k)) : r.work[keyedInt(seed, K.work, r.work.length, k)]!);
+  const w = work ?? weighted(DIGGER_FACES, keyed(seed, K.work, k));
   const t = trait ?? TRAIT_IDS[keyedInt(seed, K.trait, TRAIT_IDS.length, k)]!;
   const resist = BALANCE.personalResist[0] + keyedInt(seed, K.stat, BALANCE.personalResist[1] - BALANCE.personalResist[0] + 1, k, 9);
   return {
@@ -78,20 +77,9 @@ export function spawn(s: GameState, kind: 'loner' | 'fresh', at: PlaceId): Perso
   return p;
 }
 
-/** The seed's people as they are born: trades, works, names, before homes and ties. */
+/** The seed's people as they are born: the named people in their trades' order, before homes and ties. */
 function bear(seed: number): Person[] {
-  const used = new Set(PEOPLE.map((p) => p.name.split(' ').pop()!));
-  const all: Person[] = [];
-  let n = 0;
-  for (const [role, r] of Object.entries(ROLES)) {
-    const named = PEOPLE.filter((p) => p.role === role);
-    for (let i = 0; i < r.count; i++) {
-      const def = named[i];
-      const id = def?.id ?? `u${++n}`;
-      all.push(born(seed, id, role, def?.work, def?.name ?? makeName(seed, n, used), def?.trait));
-    }
-  }
-  return all;
+  return Object.keys(ROLES).flatMap((role) => PEOPLE.filter((p) => p.role === role).map((p) => born(seed, p.id, role, p.work, p.name, p.trait)));
 }
 
 /** Everyone into `s.people`, placed where their plan has them at `s.tick` (`at` is set by the world's first step). */

@@ -31,8 +31,7 @@ export const DAY = {
   serviceGoes: { habit: 0.7, other: 0.35 },
   /**
    * Trades with hours of their own on a work day: the first stretch that covers the hour (and the weekday, if it
-   * names some) holds, else the common day. `at`: `work` (their place or round), `rounds` (the first `stops` of
-   * their round, an hour a stop), `home`, `evening` (their evening out) or a place.
+   * names some) holds, else the common day. `at`: `work` (their place), `home`, `evening` (their evening out) or a place.
    */
   hours: {
     // the overseer stands at the lift for the count as the shift comes up
@@ -41,7 +40,7 @@ export const DAY = {
 } as const;
 
 /** A stretch of a trade's own hours (`DAY.hours`). */
-export interface Stretch { from: number; to: number; at: PlaceId; doing?: Activity; days?: readonly Weekday[]; stops?: number }
+export interface Stretch { from: number; to: number; at: PlaceId; doing?: Activity; days?: readonly Weekday[] }
 
 /** Diggers are dealt onto the faces by these weights. */
 export const DIGGER_FACES: readonly (readonly [PlaceId, number])[] = [
