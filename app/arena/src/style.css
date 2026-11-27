@@ -245,7 +245,7 @@ code {
 
 #touch {
   position: absolute;
-  left: 14px;
+  right: 14px;
   bottom: 120px;
   display: grid;
   gap: 12px;
@@ -354,46 +354,167 @@ kbd {
   border-color: var(--accent);
 }
 
-/* stat points: under the species card */
+/* the stat bars: bottom left, a segmented bar a stat */
 #stats {
   position: absolute;
   left: 12px;
-  top: 100px;
+  bottom: 12px;
+  width: 232px;
 }
 
-.stats-box {
+.statbox {
   display: grid;
-  gap: 6px;
-  padding: 10px;
+  gap: 5px;
+  padding: 8px 8px 9px;
   border-radius: 14px;
-  background: rgba(255, 250, 240, 0.92);
-  box-shadow: 0 3px 0 rgba(35, 63, 39, 0.2);
+  background: rgba(28, 44, 26, 0.55);
+  transition: opacity 0.2s;
 }
 
-.stats-title {
-  margin: 0;
-  font-weight: 900;
-  font-size: 14px;
-  text-align: center;
+#stats:not(.has-points) .statbox {
+  opacity: 0.72;
 }
 
-.stat-btn {
+#stats.has-points .statbox {
+  box-shadow: 0 0 0 2px rgba(255, 233, 168, 0.75);
+  animation: stat-glow 1.4s ease-in-out infinite alternate;
+}
+
+@keyframes stat-glow {
+  from {
+    box-shadow: 0 0 0 2px rgba(255, 233, 168, 0.35);
+  }
+  to {
+    box-shadow: 0 0 0 2px rgba(255, 233, 168, 0.95), 0 0 16px rgba(255, 233, 168, 0.35);
+  }
+}
+
+.stat-head {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 10px;
-  padding: 7px 10px;
-  font-size: 14px;
-  background: var(--accent);
+  padding: 0 2px 2px;
   color: #fff;
-  box-shadow: 0 3px 0 var(--accent-dark);
+  font: 800 13px var(--font);
 }
 
-.stat-btn:disabled {
-  background: #d8d0bc;
-  color: var(--soft);
+.stat-head .pts {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  font-size: 12px;
+}
+
+#stats.has-points .stat-head .pts {
+  background: var(--accent);
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.stat-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border-radius: 999px;
+  background: none;
   box-shadow: none;
+  color: #fff;
+}
+
+.stat-row:active {
+  transform: none;
+  box-shadow: none;
+}
+
+.stat-row:disabled {
   cursor: default;
+}
+
+.stat-bar {
+  position: relative;
+  flex: 1;
+  height: 24px;
+  border-radius: 999px;
+  background: rgba(12, 20, 12, 0.78);
+  border: 2px solid rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+
+.stat-row:not(:disabled):hover .stat-bar {
+  border-color: var(--c);
+}
+
+.segs {
+  position: absolute;
+  inset: 3px 4px;
+  display: flex;
+  gap: 3px;
+}
+
+.segs i {
+  flex: 1;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.segs i.on {
+  background: var(--c);
+  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.22);
+}
+
+.stat-name {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font: 800 12px var(--font);
+  letter-spacing: 0.3px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9), 0 0 4px rgba(0, 0, 0, 0.6);
+}
+
+.stat-row kbd {
+  min-width: 1.2em;
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+}
+
+.stat-plus {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--c);
+  color: #1b1b12;
+  font: 900 18px/1 var(--font);
+  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.22);
+}
+
+#stats:not(.has-points) .stat-plus,
+.stat-plus.gone {
+  visibility: hidden;
+}
+
+.stat-row:not(:disabled):hover .stat-plus {
+  filter: brightness(1.12);
+}
+
+.stat-row:not(:disabled):active .stat-plus {
+  transform: translateY(1px);
+}
+
+/* below 1100px the bars would meet the stat panel: it rises above them, and shows only while there are points to
+   spend and no evolution to choose */
+@media (max-width: 1100px) {
+  #stats {
+    bottom: 128px;
+  }
+
+  #stats:not(.has-points),
+  #stats.offering {
+    display: none;
+  }
 }
 
 /* the evolution tree */
@@ -441,7 +562,4 @@ kbd {
     display: none;
   }
 
-  #stats {
-    top: 150px;
-  }
 }

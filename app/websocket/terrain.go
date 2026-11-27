@@ -40,15 +40,16 @@ type sourceKind struct {
 	max    int     // the most of its food about at once
 	every  float64 // seconds between new food
 	spread float64 // how far out its food lands, in its radii
+	on     bool    // its food lands on it, not round it
 }
 
 var sourceKinds = map[string]sourceKind{
 	"tree":   {food: "ginkgo", max: 6, every: 3, spread: 1.4},
 	"mound":  {food: "termites", max: 10, every: 1.2, spread: 1.8},
 	"nest":   {food: "egg", max: 3, every: 6, spread: 1},
-	"bones":  {food: "meat", max: 4, every: 5, spread: 1.3},
+	"bones":  {food: "meat", max: 4, every: 5, spread: 0.9, on: true}, // meat lies on the carcass
 	"vent":   {food: "shrimp", max: 8, every: 1.5, spread: 1.8},
-	"lilies": {food: "lily", max: 4, every: 4, spread: 0.8},
+	"lilies": {food: "lily", max: 4, every: 4, spread: 0.8, on: true},
 }
 
 func foodIndex(name string) int {
@@ -118,7 +119,7 @@ func (a *arena) placeSources() {
 		ok         func(x, y, r float64) bool
 	}{
 		{"tree", 22, 45, 60, onLand}, {"mound", 14, 22, 30, onLand}, {"nest", 12, 20, 26, onLand},
-		{"bones", 8, 50, 70, onLand}, {"vent", 14, 22, 32, atSea},
+		{"bones", 8, 75, 95, onLand}, {"vent", 14, 22, 32, atSea},
 	} {
 		for _, c := range a.scatter(spec.n, spec.minR, spec.maxR, taken, spec.ok) {
 			a.sources = append(a.sources, &source{Kind: spec.kind, X: c.X, Y: c.Y, R: c.R})
@@ -151,7 +152,7 @@ func (a *arena) growSources(dt float64) {
 		for range 10 {
 			ang := a.rng.Float64() * 2 * math.Pi
 			d := s.R * (0.8 + a.rng.Float64()*(k.spread-0.8))
-			if s.Kind == "lilies" {
+			if k.on {
 				d = s.R * a.rng.Float64() * k.spread
 			}
 			x, y := s.X+math.Cos(ang)*d, s.Y+math.Sin(ang)*d

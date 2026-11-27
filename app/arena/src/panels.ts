@@ -40,11 +40,12 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string, text?: 
 
 export type Stat = 'bite' | 'ability' | 'health' | 'speed';
 
-const STATS: [Stat, string, string, string][] = [
-  ['bite', 'Bite', 'KeyZ', '+20% bite'],
-  ['ability', 'Skill', 'KeyX', '+20% skill'],
-  ['health', 'Health', 'KeyC', '+15% health'],
-  ['speed', 'Speed', 'KeyV', '+5% speed'],
+/** Each stat: its name, key, what a level adds, and its colour on the bars. */
+const STATS: [Stat, string, string, string, string][] = [
+  ['bite', 'Bite', 'KeyZ', '+20% bite damage', '#ff7a5c'],
+  ['ability', 'Skill', 'KeyX', '+20% skill damage', '#ffb84a'],
+  ['health', 'Health', 'KeyC', '+15% max health', '#6cd46a'],
+  ['speed', 'Speed', 'KeyV', '+5% speed', '#5ab8ff'],
 ];
 
 export interface Actions {
@@ -67,7 +68,7 @@ export class Panels {
       const n = Number(e.key);
       if (!this.evolvePanel.hidden && n >= 1 && n <= this.choices.length) this.actions.evolve(this.choices[n - 1]!);
       const stat = STATS.find(([, , code]) => code === e.code);
-      if (!this.statsPanel.hidden && stat) this.actions.upgrade(stat[0]);
+      if (!this.statsPanel.hidden && this.statsPanel.classList.contains('has-points') && stat) this.actions.upgrade(stat[0]);
     });
   }
 
@@ -79,12 +80,15 @@ export class Panels {
       this.evolvePanel.hidden = !offerKey;
       if (offerKey) this.renderOffer(me!, world!);
     }
-    const statsKey = me && world && me.points > 0 ? `${me.points}:${me.bite}:${me.ability}:${me.health}:${me.speed}:${world.maxLevel}` : '';
+    // the stat bars show the whole time the player plays; they light up while there are points to spend
+    const statsKey = me && world ? `${me.points}:${me.bite}:${me.ability}:${me.health}:${me.speed}:${world.maxLevel}` : '';
     if (statsKey !== this.shownStats) {
       this.shownStats = statsKey;
       this.statsPanel.hidden = !statsKey;
       if (statsKey) this.renderStats(me!, world!);
     }
+    this.statsPanel.classList.toggle('has-points', (me?.points ?? 0) > 0);
+    this.statsPanel.classList.toggle('offering', !!offerKey);
   }
 
   private renderOffer(me: MeAlive, world: World): void {
@@ -116,22 +120,30 @@ export class Panels {
     this.evolvePanel.replaceChildren(box);
   }
 
+  /** The stat bars: a row a stat, its levels as lit segments, its key and a plus to spend a point on it. */
   private renderStats(me: MeAlive, world: World): void {
-    const box = el('div', 'stats-box');
-    box.append(el('p', 'stats-title', `${me.points} stat point${me.points === 1 ? '' : 's'}`));
-    for (const [stat, label, code, what] of STATS) {
+    const box = el('div', 'statbox');
+    const head = el('div', 'stat-head');
+    head.append(el('span', '', 'Upgrades'), el('span', 'pts', me.points > 0 ? `×${me.points}` : 'stay to earn'));
+    box.append(head);
+    for (const [stat, label, code, what, color] of STATS) {
       const lv = me[stat];
-      const b = el('button', 'stat-btn');
-      b.type = 'button';
-      b.title = what;
       const maxed = lv >= world.maxLevel;
-      b.disabled = maxed;
-      b.append(el('span', '', maxed ? `${label} maxed` : `${label} ${lv} → ${lv + 1}`), el('kbd', '', code.slice(3)));
-      b.addEventListener('click', () => {
-        b.blur();
+      const row = el('button', 'stat-row');
+      row.type = 'button';
+      row.title = `${label}: ${what} a level`;
+      row.style.setProperty('--c', color);
+      row.disabled = maxed || me.points === 0;
+      const bar = el('span', 'stat-bar');
+      const segs = el('span', 'segs');
+      for (let i = 0; i < world.maxLevel; i++) segs.append(el('i', i < lv ? 'on' : ''));
+      bar.append(segs, el('span', 'stat-name', maxed ? `${label} · max` : label));
+      row.append(bar, el('kbd', '', code.slice(3)), el('span', maxed ? 'stat-plus gone' : 'stat-plus', '+'));
+      row.addEventListener('click', () => {
+        row.blur();
         this.actions.upgrade(stat);
       });
-      box.append(b);
+      box.append(row);
     }
     this.statsPanel.replaceChildren(box);
   }

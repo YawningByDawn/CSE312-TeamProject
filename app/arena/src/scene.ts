@@ -342,7 +342,33 @@ function drawSource(c: Ctx, s: Source, t: number): void {
       c.fillStyle = '#6b4a28';
       c.fill();
       break;
-    case 'bones': // the ribs and skull of a fallen giant
+    case 'bones': { // a fallen giant, still meaty: red flesh on the spine and between the ribs, bones over it
+      const meat = (x: number, y: number, rx: number, ry: number, rot: number): void => {
+        c.beginPath();
+        c.ellipse(x, y, rx, ry, rot, 0, TAU2);
+        c.fillStyle = '#b5413a';
+        c.fill();
+        c.strokeStyle = '#7e2a24';
+        c.lineWidth = s.r * 0.03;
+        c.stroke();
+        c.beginPath();
+        c.ellipse(x - rx * 0.2, y - ry * 0.25, rx * 0.55, ry * 0.45, rot, 0, TAU2);
+        c.fillStyle = '#d9685c';
+        c.fill();
+        c.beginPath(); // a streak of fat
+        c.ellipse(x + rx * 0.15, y + ry * 0.1, rx * 0.35, ry * 0.12, rot + 0.4, 0, TAU2);
+        c.fillStyle = 'rgba(255,235,220,0.75)';
+        c.fill();
+      };
+      c.beginPath();
+      c.ellipse(s.x + 6, s.y + 8, s.r * 1.2, s.r * 0.85, 0, 0, TAU2);
+      c.fillStyle = 'rgba(60,20,15,0.18)';
+      c.fill();
+      meat(s.x - s.r * 0.1, s.y, s.r * 0.85, s.r * 0.26, 0);
+      for (let n = 0; n < 6; n++) {
+        if (n % 2 === 0) meat(s.x - s.r * 0.65 + n * s.r * 0.26, s.y - s.r * 0.42, s.r * 0.16, s.r * 0.24, 0.2);
+        if (n % 2 === 1) meat(s.x - s.r * 0.65 + n * s.r * 0.26, s.y + s.r * 0.42, s.r * 0.16, s.r * 0.24, -0.2);
+      }
       c.strokeStyle = '#efe6d2';
       c.lineCap = 'round';
       c.lineWidth = s.r * 0.12;
@@ -360,6 +386,7 @@ function drawSource(c: Ctx, s: Source, t: number): void {
           c.stroke();
         }
       }
+      for (let n = 0; n < 4; n++) meat(s.x - s.r * 0.55 + n * s.r * 0.36, s.y + (n % 2 ? 1 : -1) * s.r * 0.18, s.r * 0.1, s.r * 0.08, n); // bits on the bone
       c.beginPath();
       c.ellipse(s.x + s.r * 0.95, s.y, s.r * 0.32, s.r * 0.24, 0, 0, TAU2);
       c.fillStyle = '#efe6d2';
@@ -370,7 +397,14 @@ function drawSource(c: Ctx, s: Source, t: number): void {
         c.fillStyle = '#5a4a3a';
         c.fill();
       }
+      // a slow shine, so it catches the eye as food does
+      const glint = (Math.sin(t * 2 + s.x) + 1) / 2;
+      c.beginPath();
+      c.ellipse(s.x - s.r * 0.3, s.y - s.r * 0.06, s.r * 0.25, s.r * 0.05, 0, 0, TAU2);
+      c.fillStyle = `rgba(255,255,255,${0.15 + glint * 0.35})`;
+      c.fill();
       break;
+    }
     case 'vent': { // a smoking vent on the sea floor
       c.beginPath();
       c.arc(s.x, s.y, s.r, 0, TAU2);

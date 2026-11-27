@@ -44,7 +44,7 @@ const TIPS = [
   'Ferns hide the small ones on land, and kelp at sea.',
   'Rocks and reefs are too steep for anything above tier 4: small creatures are safe up there. Fliers can still reach you.',
   'Tar pits bog big creatures down, while small ones skitter across.',
-  'Ginkgo trees, termite mounds, nests and old bones keep growing food. Watch for a glowing starfruit!',
+  'Ginkgo trees, termite mounds and nests keep growing food, and the meat on a fallen giant\'s bones grows back. Watch for a glowing starfruit!',
   'Devil Frogs hide under water, and lead to the sea.',
   'Red outlines can eat you; green ones you can eat.',
   'Skills hurt anything, bigger creatures less. Stay a tier for a point, and make yours hurt more.',
