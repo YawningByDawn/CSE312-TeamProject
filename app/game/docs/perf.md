@@ -10,21 +10,21 @@ This page holds the measured state and every cost above the target. The target a
 - **cb** is the rAF callback mean: the game's CPU work in the frame.
 - **GPU** is the GPU's time for the commands the frame's callbacks issue: one WebGL2 timer query (`EXT_disjoint_timer_query_webgl2`) round each callback, summed per frame. A query from frame to frame would hold the wait for the display, about the whole 16.7 ms.
 
-## The frame by state (game VM, N=1, 1600x900, the game's own page)
+## The frame by state (game VM, N=2 runs of `e2e/perf.cjs`, 1600x900, the game's own page)
 
 | state | cb mean ms | GPU ms | alloc KB/f | GCs in 240 frames |
 |---|---|---|---|---|
-| the mine at rest (the first night, its deal waiting, 8 s on) | 1.65 | 0.79 | 0.0 | 0 |
-| panning (x swaying 100 units at 0.25 Hz) | 0.34 | 0.54 | 0.0 | 0 |
-| zooming (zoom 0.5 to 1.5 at 0.25 Hz) | 0.77 | 0.92 | 0.0 | 0 |
-| the town at rest (zoom 2.2) | 0.19 | 0.54 | 0.0 | 0 |
-| the mine with the Day running | 0.39 | 0.53 | 0.0 | 0 |
+| the mine at rest (the first night, its deal waiting, 8 s on) | 0.54 | 0.79 | 0.0 | 0 |
+| panning (x swaying 100 units at 0.25 Hz) | 0.43 | 0.63 | 0.0 | 0 |
+| zooming (zoom 0.5 to 1.5 at 0.25 Hz) | 0.68 | 0.66 | 0.0 | 0 |
+| the town at rest (zoom 2.2; N=1, not in `e2e/perf.cjs`) | 0.19 | 0.54 | 0.0 | 0 |
+| the mine with the Day running | 0.36 | 0.70 | 0.0 | 0 |
 
-The profiled page at rest: 59.9 fps, 10 draws and 0 uploads a frame, heap 72 MB, 84 textures (302 MB). Its ms and KB are its probes' as much as the game's: a probe wraps every named function in a call that is never inlined, so numbers crossing it are boxed and allocate. It names where the frame goes; the game's own page gives what the frame costs.
+The profiled page at rest: 59.9 fps, 32.3 draws and 0.0 uploads a frame, heap 55 MB, 47 textures (340 MB). Its ms and KB are its probes' as much as the game's: a probe wraps every named function in a call that is never inlined, so numbers crossing it are boxed and allocate. It names where the frame goes; the game's own page gives what the frame costs.
 
 ## Named costs above the target
 
-The mine at rest in the first night: the callback takes 1.6 ms (1.64 and 1.67 in two runs), against 0.5 panning, and the profiled page names People.parts, Stamps.flush and createView.frame with about 70 people rigged each frame while the night stands still; rule 1 of `docs/contracts/perf.md` forbids that work. Every other state takes under 1 ms on the CPU and the GPU a frame and nothing is allocated. Not measured: the owner's screen; at 2560x1440 a frame has 2.56 times these pixels, so the GPU's share there is larger.
+The mine at rest in the first night renders every frame. Its callback takes 0.54 ms (0.53 and 0.56 in two runs) and the GPU 0.79 ms, but in 240 frames at rest the layers reported a change in 240 (people), 120 (weather) and 40 (above): a still frame issues a render and a draw call (rule 1 and 2 of `docs/contracts/perf.md`). The people layer lays a figure out only when its baked step, its wick's frame or a blink changes, and the 70 figures' steps and blinks fall at different phases, about 16 changes a second a figure and 18 figures a frame, so some figure changes every frame. It would drop to the wick's 8 steps a second if the loops' step clock were one for all (every figure's phase a whole number of steps on a shared grid) and the wick sprite changed its texture alone rather than the figure's parts. Weather's 30 changes a second and above's 10 are not yet attributed. Every other state takes under 1 ms on the CPU and the GPU a frame and nothing is allocated. Not measured: the owner's screen; at 2560x1440 a frame has 2.56 times these pixels, so the GPU's share there is larger.
 
 ## Tools
 
