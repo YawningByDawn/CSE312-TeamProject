@@ -12,4 +12,3 @@ The specs for the owner's open orders: each item is one task an agent starts wit
 
 | Item | Row | Open |
 |---|---|---|
-| ore-marks | MINE | Possessing a miner, the player can see where to mine: the minable wall sections (the sim's ore/vein cells, §121) carry a baked indicator that they are interactable (nothing draws live), and the one in reach is highlighted with its key shown (the mine key, F by default and rebindable in the Keys tab; left click stays attack). If no minable section exists near the host's start, that is the bug to fix first. Shots of a host walking up to ore, looked at; a card `ore-marks`. |

@@ -16,8 +16,10 @@ export const MINING = {
   rarityPerDevotion: 0.5,
   /** Percent chance of each grade above dull (clear, bright, blazing) by ore tier at rarity 1; dull is what is left. Royal and impossible never come from this mine. */
   odds: [[8.5, 1.5, 0], [12.5, 2.4, 0.1], [15, 4.5, 0.5]] as readonly (readonly number[])[],
-  /** Ore sites sit on diggers' standing spots at least this far apart. */
+  /** Ore sites sit in the face of the wall nearest each digger's standing spot, at least this far apart. */
   spacing: 70,
+  /** How far from a digger's spot a face is looked for; the rock (ground cells) a face rises straight up from its foot, the north walls the view shows standing; how far a seam keeps from each light the lit picture paints (a crystal cluster, a torch, a lamp). */
+  face: { search: 120, rise: 6, clear: 28 },
   /** How near the host must stand to an ore to work it. */
   reach: 36,
 } as const;
@@ -83,17 +85,36 @@ export const BLOCKS: readonly Block[] = [
   ...DRESS.flames.filter((f) => f.kind !== 'candle').map((f) => ({ x: f.x, y: f.y, rx: WALK.flameR * f.size, ry: WALK.flameR * f.size })),
 ];
 
-/** An ore in the wall: where it stands and its tier (1..3, the depth of its area). */
+/** An ore in the wall: the foot of its seam, where the wall's face meets the ground, and its tier (1..3, the depth of its area). */
 export interface OreSite { x: number; y: number; tier: number; place: PlaceId }
 
-/** Ores at the diggers' faces: each dig spot of the map, kept `spacing` from the ores before it; tier by the face's depth. */
+/**
+ * The foot of the shown wall face nearest (x, y) within `face.search`, or null: the top edge of a ground cell, on a run of
+ * `area`'s ground three cells wide and two deep, under rock that rises `face.rise` cells straight up over it and its neighbours,
+ * `face.clear` from every painted light. Such a wall is one the 3/4 view shows standing, its face up the screen from the foot.
+ */
+function faceFoot(x: number, y: number, area: PlaceId): [number, number] | null {
+  const { search, rise, clear } = MINING.face, c = GROUND.cell;
+  const rock = (col: number, row: number): boolean => areaAt((col + 0.5) * c, (row + 0.5) * c) === null;
+  const own = (col: number, row: number): boolean => areaAt((col + 0.5) * c, (row + 0.5) * c) === area;
+  const ground = (col: number, row: number): boolean => [-1, 0, 1].every((k) => own(col + k, row) && own(col + k, row + 1));
+  const wall = (col: number, row: number): boolean => rock(col, row - 1) && [-1, 0, 1].every((k) => Array.from({ length: rise - 1 }, (_, i) => rock(col + k, row - 2 - i)).every(Boolean));
+  let best: number = search, at: [number, number] | null = null;
+  for (let row = Math.floor((y - search) / c); row * c <= y + search; row++) for (let col = Math.floor((x - search) / c); col * c <= x + search; col++) {
+    const fx = (col + 0.5) * c, fy = row * c, d = Math.hypot(fx - x, fy - y);
+    if (d < best && ground(col, row) && wall(col, row) && DRESS.lights.every((l) => Math.hypot(l.x - fx, l.y - fy) >= clear)) [best, at] = [d, [fx, fy]];
+  }
+  return at;
+}
+
+/** Ores in the shown wall faces by the diggers' spots: the face's foot nearest each dig spot of the map, kept `spacing` from the ores before it; tier by the face's depth. */
 export const ORE_SITES: readonly OreSite[] = ((): OreSite[] => {
   const out: OreSite[] = [];
   for (const [place, spots] of digSpots()) {
-    const tier = Math.min(MINING.seconds.length, AREAS[PLACES[place]?.area ?? place]!.depth);
+    const area = PLACES[place]?.area ?? place, tier = Math.min(MINING.seconds.length, AREAS[area]!.depth);
     for (let i = 0; i < spots.length; i += 3) {
-      const x = spots[i]!, y = spots[i + 1]!;
-      if (out.every((o) => Math.hypot(o.x - x, o.y - y) >= MINING.spacing)) out.push({ x, y, tier, place });
+      const foot = faceFoot(spots[i]!, spots[i + 1]!, area);
+      if (foot && out.every((o) => Math.hypot(o.x - foot[0], o.y - foot[1]) >= MINING.spacing)) out.push({ x: foot[0], y: foot[1], tier, place });
     }
   }
   return out;

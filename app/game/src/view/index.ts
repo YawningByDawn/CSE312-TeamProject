@@ -16,8 +16,13 @@ import { Atlas } from './atlas';
 import { hit, placeHits } from './hits';
 import lifeManifest from '../../assets/life/manifest.json';
 import lifeUrl from '../../assets/life/life.png?url';
+import oreManifest from '../../assets/ore/manifest.json';
+import oreUrl from '../../assets/ore/ore.png?url';
 import { People } from './life/people';
 import { Ores } from './life/ores';
+import { ORE_SITES } from '../content/mine';
+import { MINE_FRAME } from '../content/map';
+import { mx, my } from './life/looks';
 import { Fog } from './fog';
 import { Gray } from './gray';
 import { Sky } from './sky';
@@ -47,6 +52,7 @@ export function createView(canvas: HTMLCanvasElement, dpr: number, q: Query, mut
   const sky = new Sky();
   let films!: Films;
   let people!: People;
+  let ores!: Ores;
   const thing: Anchor = { x: 0, y: 0, u: 0, crown: 0 };
 
   /** Layers into the world in their order, over the places' hit disks. */
@@ -73,12 +79,13 @@ export function createView(canvas: HTMLCanvasElement, dpr: number, q: Query, mut
       const lifeP = Atlas.load(renderer, lifeManifest as unknown as AtlasManifest, lifeUrl);
       people = new People(q, renderer, screen, dpr);
       const fogP = Fog.load(renderer, q);
-      const [life, fog, gray, sheen] = await Promise.all([
-        lifeP, fogP, fogP.then((f) => Gray.load(renderer, f)), Sheen.load(renderer, q, sky), ground.load(renderer), people.load(lifeP),
+      const [life, fog, gray, sheen, ore] = await Promise.all([
+        lifeP, fogP, fogP.then((f) => Gray.load(renderer, f)), Sheen.load(renderer, q, sky),
+        Atlas.load(renderer, oreManifest as unknown as AtlasManifest, oreUrl), ground.load(renderer), people.load(lifeP),
       ]);
       films = new Films(people, world, screen, renderer);
       // the sheen lies on the mine's ground, over the lit picture
-      add(ground, sheen, gray, new Lights(q, life), new Ores(q, life), people, new Fx(q, life, people), new Weather(q, sky, fog, life, renderer), fog, films);
+      add(ground, sheen, gray, new Lights(q, life), (ores = new Ores(q, life, ore)), people, new Fx(q, life, people), new Weather(q, sky, fog, life, renderer), fog, films);
       ready = true;
       opening.load();
     },
@@ -105,8 +112,9 @@ export function createView(canvas: HTMLCanvasElement, dpr: number, q: Query, mut
 
     where(target, out) {
       if (!ready || !target || (target !== 'grave' && 'crystal' in target)) return false;
-      // the effects' one anchor rule: a person's feet as shown, else the place's point
+      // the effects' one anchor rule: a person's feet as shown, else the place's point; an ore's seam's foot
       if (target === 'grave') thing.x = GRAVE_AT.x, thing.y = GRAVE_AT.y, thing.crown = 0;
+      else if ('ore' in target) thing.x = mx(ORE_SITES[target.ore]!.x), thing.y = my(ORE_SITES[target.ore]!.y), thing.crown = ores.tops[target.ore]! / MINE_FRAME.per;
       else if (!anchor('unit' in target ? target.unit : undefined, 'place' in target ? target.place : undefined, people, thing)) return false;
       // over its head, as the last frame stood it, in the region the camera shows
       out.x = thing.x * at.a + at.e;
