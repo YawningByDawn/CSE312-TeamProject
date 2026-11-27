@@ -57,7 +57,7 @@ Host nginx terminates HTTPS and forwards to the compose stack on `127.0.0.1:8080
    sudo rm /etc/nginx/sites-enabled/default
    sudo nginx -t && sudo systemctl reload nginx
    ```
-6. Link the deploy command once, from the repo's folder, then run `deploy` from anywhere to start the app and to redeploy main after pushing changes:
+6. Link the deploy command once, from the repo's folder, then run it from anywhere to start the app and to redeploy after pushing changes: `deploy io` deploys Gobble Grove (the `backup-game` branch), and `deploy` deploys Hungry God Inc. (`main`):
    ```
    chmod +x deploy/deploy.sh
    sudo ln -sf "$PWD/deploy/deploy.sh" /usr/local/bin/deploy
