@@ -14,12 +14,11 @@ Then open http://localhost:8080. No `.env` is needed; `compose.yaml` has default
 
 Hungry God Inc. lives in `app/game` (TypeScript, Vite, PixiJS). The app image builds it in a Node stage and serves the build at the site's root, `/`, after every other route. The title's top right corner opens a popup to log in or register (it posts to the auth service's `/register` and `/login`) and logs out; `/api/me` names who is logged in, `null` for nobody.
 
-Multiplayer: logged in, the game opens the app's `/ws` socket; logged out, it plays alone. The title's Multiplayer swaps its menu for Host, Search and Back (logged out, it opens the login popup); Host and Search show in the title itself, no popup. The hub (`app/websocket`) owns the lobbies: Host opens one named `<host>'s lobby` for up to 4 players, no password, and its host's Start tells every member (a stub: nothing yet starts a shared game); Search lists the open ones to join; the host leaving closes it, and a dropped connection leaves it. The socket's messages, JSON, the game reading them as `window.__hg.net` (`app/game/src/app/net.ts`):
+Multiplayer: logged in, the game opens the app's `/ws` socket; logged out, it plays alone. The title's Multiplayer swaps its menu for Host, Search and Back (logged out, it opens the login popup); Host and Search show in the title itself, no popup. The hub (`app/websocket`) owns the lobbies: Host opens one named `<host>'s lobby` for up to 4 players, no password; Search lists the open ones to join (a lobby playing a match is not open); the host leaving closes it, and a dropped connection leaves it.
 
-- To the hub: `{"type":"game","data":...}` (relayed to every other player as `{"type":"game","from":<name>,"data":...}`), `{"type":"input","dx":..,"dy":..}`, `{"type":"host"}`, `{"type":"search"}`, `{"type":"join","host":<name>}`, `{"type":"leave"}`, `{"type":"start"}` (the host only; anyone else is ignored).
-- From the hub: `state` (who is on), `{"type":"lobby","lobby":{"host","name","members","max"}|null}` (the lobby the player is in, to each member whenever it changes; `null` when they are out of it), `{"type":"lobbies","lobbies":[...],"refused":"full"|"gone"}` (the open lobbies, answering `search`, and a refused `join`, with the reason), `{"type":"start"}` (to every member of a lobby whose host started it), `kicked`.
+The host's Start begins a match in **the shared mine** for everyone in the lobby, run by the hub (`app/websocket/match.go`) and drawn by the game with its own mine, miners and crystals. The world fits the players (three of the mine's twelve zones a player); each player serves a different god (Violet, Crimson, Jade, Amber) and spawns at its shrine; WASD walks, a click swings the pick, and the first god given 20 crystals wins. Every action in a match is the server's, keyed by the username from the verified JWT.
 
-No game content uses the socket beyond the lobby screens yet.
+**The rules, the layouts, the socket's messages and how to change any of them: [`app/game/docs/multiplayer.md`](app/game/docs/multiplayer.md).** The rules are a first draft; keep that file current when they change.
 
 To work on it alone:
 

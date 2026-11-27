@@ -7,6 +7,8 @@ export interface Spot {
   gone: boolean; lieLow: boolean; follower: boolean; devotion: number; chosen: boolean; mob: boolean;
   /** days the host's mark on them has left (0: none): that many diamonds over the head */
   marked: number;
+  /** the god whose light they carry (a shared mine's player), 0 for the player's own violet */
+  paint: number;
 }
 
 /**
@@ -20,15 +22,15 @@ export function marks(sh: Shown, p: Spot, vm: ViewModel, scale: number, x: numbe
   const hover = !picked && !!vm.hover && 'unit' in vm.hover && vm.hover.unit === sh.id;
   const pool = sh.pool, ring = sh.ring, beam = sh.beam, s = scale, pulse = picked ? 0.85 + 0.15 * Math.sin(vm.time * 3.2) : 1;
   pool.visible = !p.gone && !p.mob;
-  const yours = p.follower || p.chosen;
-  pool.tint = yours ? VIOLET : sh.look.d.tally ? PALE : GOLD;
+  const yours = p.follower || p.chosen, own = p.paint || VIOLET;
+  pool.tint = yours ? own : sh.look.d.tally ? PALE : GOLD;
   pool.alpha = p.chosen ? 0.85 : p.follower ? 0.3 + 0.5 * Math.min(1, p.devotion / 100) : 0.18;
   const pr = ((yours ? 16 : 11) * s) / 32;
   pool.scale.set(pr, pr * 0.35);
   pool.position.set(x, y);
   ring.visible = picked || hover || p.follower;
   if (ring.visible) {
-    ring.tint = picked ? BONE : hover ? HOVER : VIOLET;
+    ring.tint = picked ? BONE : hover ? HOVER : own;
     ring.alpha = picked ? 0.95 * pulse : hover ? 0.7 : 0.45;
     ring.scale.set((13 * s) / 48);
     ring.position.set(x, y);

@@ -135,7 +135,8 @@ export class Title implements Panel {
   }
 
   key(vm: ViewModel): string | null {
-    return vm.title ? `title|${vm.saved}|${vm.settings.master > 0}|${this.c.account?.name}` : null;
+    // a match of the shared mine stands over the title while it plays; the lobby shows again when it ends
+    return vm.title && !vm.match ? `title|${vm.saved}|${vm.settings.master > 0}|${this.c.account?.name}` : null;
   }
 
   build(root: HTMLElement, vm: ViewModel): void {

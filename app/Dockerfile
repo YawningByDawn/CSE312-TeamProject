@@ -13,6 +13,8 @@ FROM golang:1.26 AS build
 WORKDIR /app
 
 COPY go.mod main.go ./
+# the shared mine's tables, which the server embeds (main.go)
+COPY game/src/content/walk.json game/src/content/arena.json game/src/content/
 COPY router router
 COPY token token
 COPY websocket websocket

@@ -2,13 +2,15 @@ package websocket
 
 import (
 	"os"
+	"slices"
 	"strconv"
+	"strings"
 	"time"
 )
 
 const (
-	gracePeriod = 10 * time.Second
-	speed       = 100.0 // px a second, whatever the tick rate
+	gracePeriod     = 10 * time.Second
+	defaultTickRate = 20
 )
 
 type client struct {
@@ -17,9 +19,8 @@ type client struct {
 }
 
 type player struct {
-	x, y, dx, dy float64
-	client       *client // nil while disconnected
-	leftAt       time.Time
+	client *client // nil while disconnected
+	leftAt time.Time
 }
 
 type input struct {
@@ -38,13 +39,15 @@ func RunHub() {
 	players := map[string]*player{}
 	lb := newLobbies(func(to string, data []byte) { deliver(players, to, data) })
 	rate := tickRate()
+	lb.rate = rate
 	ticker := time.NewTicker(time.Second / time.Duration(rate))
+	var on []byte // who is on, as last sent
 	for {
 		select {
 		case c := <-joinChan:
 			p := players[c.username]
 			if p == nil {
-				p = &player{x: 400, y: 300}
+				p = &player{}
 				players[c.username] = p
 			}
 			if p.client != nil { // a newer connection replaces the old one
@@ -55,9 +58,10 @@ func RunHub() {
 				close(p.client.send)
 			}
 			p.client = c
-			if host, ok := lb.of[c.username]; ok { // a takeover tab picks up the lobby
-				lb.show(lb.byHost[host])
+			if on != nil { // who is on; the next tick tells everyone if this player is new
+				deliver(players, c.username, on)
 			}
+			lb.resume(c.username) // a takeover tab picks up the lobby and its match
 		case c := <-leaveChan:
 			if p := players[c.username]; p != nil && p.client == c {
 				disconnect(p)
@@ -67,22 +71,22 @@ func RunHub() {
 			if p == nil || p.client == nil {
 				continue
 			}
-			switch in.msg.Type {
-			case "game":
+			if in.msg.Type == "game" {
 				relay(players, in.username, encodeGame(in.username, in.msg.Data))
-			case "input":
-				p.dx, p.dy = clamp(in.msg.DX), clamp(in.msg.DY)
-			default:
+			} else {
 				lb.handle(in.username, in.msg)
 			}
 		case <-ticker.C:
-			tick(players, lb, speed/float64(rate))
+			if now := tick(players, lb, 1/float64(rate)); string(now) != string(on) {
+				on = now
+				relay(players, "", on)
+			}
 		}
 	}
 }
 
-// tick moves everyone and tells them. A player without a connection is out of their lobby.
-func tick(players map[string]*player, lb *lobbies, step float64) {
+// tick runs the matches one step and says who is on. A player without a connection is out of their lobby.
+func tick(players map[string]*player, lb *lobbies, dt float64) []byte {
 	states := []playerState{}
 	for name, p := range players {
 		if p.client == nil {
@@ -92,12 +96,11 @@ func tick(players map[string]*player, lb *lobbies, step float64) {
 			}
 			continue
 		}
-		p.x += p.dx * step
-		p.y += p.dy * step
-		states = append(states, playerState{Name: name, X: p.x, Y: p.y})
+		states = append(states, playerState{Name: name})
 	}
-
-	relay(players, "", encodeState(states))
+	lb.step(dt)
+	slices.SortFunc(states, func(a, b playerState) int { return strings.Compare(a.Name, b.Name) })
+	return encodeState(states)
 }
 
 // deliver sends data to one connected player.
@@ -131,7 +134,6 @@ func relay(players map[string]*player, except string, data []byte) {
 func disconnect(p *player) {
 	close(p.client.send)
 	p.client = nil
-	p.dx, p.dy = 0, 0
 	p.leftAt = time.Now()
 }
 
@@ -143,5 +145,5 @@ func tickRate() int {
 	if n, err := strconv.Atoi(os.Getenv("TICK_RATE")); err == nil && n > 0 {
 		return n
 	}
-	return 10
+	return defaultTickRate
 }

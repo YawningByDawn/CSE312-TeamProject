@@ -6,7 +6,8 @@ import type { Pump } from './pump';
 
 // The player's hands: the pointer picks by the view's own hit areas, drag pans 1:1, wheel, pinch and keys zoom toward
 // a goal the camera eases to, and the keys bound to the stats, the characters, back (settings) and the film skip. The canvas
-// gets the pointer only where the ui lets it through (#ui is pointer-events: none outside its panels).
+// gets the pointer only where the ui lets it through (#ui is pointer-events: none outside its panels). In a match of the
+// shared mine the move keys steer the player's miner through the hub, a click swings their pick, and the camera follows them.
 
 const ZOOM_MIN = 0;
 const ZOOM_MAX = 1.15;
@@ -23,6 +24,8 @@ const CLICK_PX = 5;
 const HOST_ZOOM = 0.1;
 /** The skip key held this long skips a film. */
 const SKIP_HOLD_S = 1;
+/** The zoom the camera goes in to as a match begins: a miner about 55 px tall, a good stretch of the mine around them. */
+const MATCH_ZOOM = 0.3;
 
 /** The held binds' pan (x, y) and zoom. */
 const MOVES: Partial<Record<Bind, [number, number, number]>> = {
@@ -44,6 +47,9 @@ export class Input {
   private hosted: string | null = null;
   /** A film held the camera at the last update. */
   private filming = false;
+  /** The match the camera has gone in to, and the heading last sent to the hub. */
+  private matched: object | null = null;
+  private readonly sent = { dx: 0, dy: 0 };
   private w = 1;
   private h = 1;
 
@@ -93,8 +99,17 @@ export class Input {
       const [x, y, z] = MOVES[b]!;
       dx += x, dy += y, dz += z;
     }
-    const host = vm.hostAt;
-    if (host.on) {
+    const host = vm.hostAt, me = vm.match?.shown.find((p) => p.me);
+    if (vm.match !== this.matched) {
+      // a match begins (the zoom goes in once) or ends (the title stands again)
+      this.matched = vm.match;
+      this.sent.dx = this.sent.dy = 0;
+      if (vm.match) this.goal.zoom = MATCH_ZOOM, this.anchor.on = false, this.steer();
+    }
+    if (me) {
+      centreOn(me.x, me.y, this.goal);
+      dx = dy = 0;
+    } else if (host.on) {
       // the host's day: the move keys steer the host (not the camera), which follows them
       if (this.hosted !== vm.state.host) {
         this.hosted = vm.state.host;
@@ -146,7 +161,7 @@ export class Input {
     const vm = this.pump.vm;
     const p = this.pointers.get(e.pointerId);
     if (!p) {
-      vm.hover = this.view.pick(e.offsetX, e.offsetY, vm);
+      vm.hover = vm.match ? null : this.view.pick(e.offsetX, e.offsetY, vm);
       return;
     }
     const dx = e.offsetX - p.x, dy = e.offsetY - p.y;
@@ -169,7 +184,8 @@ export class Input {
     this.pointers.delete(e.pointerId);
     const vm = this.pump.vm;
     if (this.press && !this.press.moved) {
-      if (vm.hostAt.on && !vm.film) this.swing(e.offsetX, e.offsetY);
+      if (vm.match) this.strike(e.offsetX, e.offsetY);
+      else if (vm.hostAt.on && !vm.film) this.swing(e.offsetX, e.offsetY);
       else this.pump.send({ kind: 'focus', focus: this.view.pick(e.offsetX, e.offsetY, vm) });
     }
     this.press = null;
@@ -183,6 +199,15 @@ export class Input {
     this.pump.act({ type: 'swing', dx: sx - (this.w / 2 + (at.x - cam.x) * k), dy: sy - (this.h / 2 + (at.y - cam.y) * k) });
   }
 
+  /** A click in a match: the player's miner swings toward it. */
+  private strike(sx: number, sy: number): void {
+    const me = this.pump.vm.match?.shown.find((p) => p.me);
+    if (!me) return;
+    const cam = this.pump.vm.camera, at = { x: 0, y: 0 }, k = this.view.scale(cam.zoom);
+    centreOn(me.x, me.y, at);
+    this.pump.matchStrike(sx - (this.w / 2 + (at.x - cam.x) * k), sy - (this.h / 2 + (at.y - cam.y) * k));
+  }
+
   private spread(): number {
     const [a, b] = this.pointers.values();
     return a && b ? Math.hypot(a.x - b.x, a.y - b.y) : 0;
@@ -193,13 +218,17 @@ export class Input {
     return a && b ? (a[axis] + b[axis]) / 2 : 0;
   }
 
-  /** The held move keys as the host's heading, sent to the sim when it holds another. */
+  /** The held move keys as the host's heading, sent to the sim (or in a match the hub) when it holds another. */
   private steer(): void {
     const vm = this.pump.vm, body = vm.state.body;
-    if (!vm.hostAt.on || !body) return;
     let dx = 0, dy = 0;
     for (const b of this.held) dx += MOVES[b]![0], dy += MOVES[b]![1];
     const [hx, hy] = [Math.sign(dx) as -1 | 0 | 1, Math.sign(dy) as -1 | 0 | 1];
+    if (vm.match) {
+      if (this.sent.dx !== hx || this.sent.dy !== hy) this.pump.matchMove((this.sent.dx = hx), (this.sent.dy = hy));
+      return;
+    }
+    if (!vm.hostAt.on || !body) return;
     if (body.dx !== hx || body.dy !== hy) this.pump.act({ type: 'walk', dx: hx, dy: hy });
   }
 
@@ -215,7 +244,7 @@ export class Input {
       return;
     }
     if (moves.length > 0) {
-      if (!vm.title && !vm.film) for (const b of moves) this.held.add(b);
+      if ((!vm.title || vm.match) && !vm.film) for (const b of moves) this.held.add(b);
       this.steer();
       return;
     }

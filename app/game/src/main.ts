@@ -28,7 +28,7 @@ const muted = flag('mute') === '1';
 const view = createView(canvas, window.devicePixelRatio || 1, query, muted);
 const ui = createUi(mountPanels(framework.account, framework.net));
 const audio = createAudio(query, SOUNDS, muted);
-const pump = new Pump({ sim, query, view, ui, audio }, seed, flag('fast') === '1' ? FAST_FILMS : 1);
+const pump = new Pump({ sim, query, view, ui, audio }, seed, flag('fast') === '1' ? FAST_FILMS : 1, framework.net, () => framework.account.name);
 const input = new Input(pump, view, canvas);
 installDebug(pump, sim, input, framework.net, framework.account);
 

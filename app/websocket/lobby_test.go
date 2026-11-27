@@ -3,6 +3,7 @@ package websocket
 import (
 	"encoding/json"
 	"slices"
+	"strings"
 	"testing"
 )
 
@@ -186,15 +187,24 @@ func TestLobbyMessagesAreJSON(t *testing.T) {
 	}
 }
 
-func TestStartTellsEveryMember(t *testing.T) {
+// started: s is a match starting (not one ending, `"match":null`).
+func started(s string) bool {
+	return strings.HasPrefix(s, `{"type":"match","match":{`)
+}
+
+func TestStartSeatsEveryMemberInOrder(t *testing.T) {
 	l, got := newTestLobbies()
 	say(l, "ann", "host", "")
 	say(l, "bea", "join", "ann")
 	say(l, "cy", "join", "ann")
 	say(l, "ann", "start", "")
 	for _, name := range []string{"ann", "bea", "cy"} {
-		if got.last(name) != string(startMessage) {
-			t.Fatalf("%s got %s, want %s", name, got.last(name), startMessage)
+		var m matchMessage
+		if err := json.Unmarshal([]byte(got.last(name)), &m); err != nil || m.Match == nil {
+			t.Fatalf("%s got %s, want a match", name, got.last(name))
+		}
+		if len(m.Match.Seats) != 3 || len(m.Match.Players) != 3 || m.Match.Players[1] != (matchPlayerView{Name: "bea", Seat: 1}) {
+			t.Fatalf("%s got %+v", name, *m.Match)
 		}
 	}
 }
@@ -207,7 +217,7 @@ func TestOnlyTheHostStarts(t *testing.T) {
 	say(l, "bea", "start", "")
 	for _, name := range []string{"ann", "bea", "dov"} {
 		for _, m := range got[name] {
-			if m == string(startMessage) {
+			if started(m) {
 				t.Fatalf("%s was told of a start nobody with a lobby of their own made", name)
 			}
 		}
@@ -219,7 +229,7 @@ func TestStartOnlyReachesItsOwnLobby(t *testing.T) {
 	say(l, "ann", "host", "")
 	say(l, "bea", "host", "")
 	say(l, "ann", "start", "")
-	if got.last("bea") == string(startMessage) {
+	if started(got.last("bea")) {
 		t.Fatal("another lobby's member was told of ann's start")
 	}
 }
