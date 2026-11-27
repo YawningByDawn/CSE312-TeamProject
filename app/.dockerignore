@@ -1,5 +1,3 @@
-game/node_modules
-game/dist
-game/screenshots
-game/handoffs
-game/docs
+game
+arena/node_modules
+arena/dist

@@ -1,11 +1,11 @@
-# the npm that wrote game/package-lock.json; a newer one refuses it under `npm ci`
+# The game on this branch is Gobble Grove (arena/); the old game (game/) is not built.
 FROM node:24.11.1 AS game
 
-WORKDIR /game
+WORKDIR /arena
 
-COPY game/package.json game/package-lock.json ./
+COPY arena/package.json arena/package-lock.json ./
 RUN npm ci
-COPY game/ .
+COPY arena/ .
 RUN npm run build
 
 FROM golang:1.26 AS build
@@ -23,7 +23,7 @@ FROM debian:bookworm-slim
 
 WORKDIR /app
 COPY --from=build /app/server .
-COPY --from=game /game/dist public/game
+COPY --from=game /arena/dist public/game
 
 RUN useradd --system app
 USER app

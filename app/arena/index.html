@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='15' fill='%23a5d17f'/><ellipse cx='15' cy='17' rx='9' ry='8' fill='%232a9d8f' stroke='%23165e56' stroke-width='1.5'/><circle cx='24' cy='16' r='3.5' fill='%231d3b37'/></svg>" />
+    <title>Gobble Grove</title>
+  </head>
+  <body>
+    <div id="app">
+      <canvas id="view"></canvas>
+      <div id="status" hidden></div>
+      <button id="boost-btn" type="button" hidden>Boost</button>
+
+      <section id="menu" class="overlay">
+        <div class="card">
+          <h1 class="logo"><span class="a">Gobble</span><span class="b">Grove</span></h1>
+          <p class="tag">Eat. Grow. Climb the food chain.</p>
+
+          <form id="auth" hidden>
+            <input name="username" autocomplete="username" placeholder="Username" maxlength="20" required />
+            <input name="password" type="password" autocomplete="current-password" placeholder="Password" maxlength="72" required />
+            <div class="row">
+              <button type="submit" value="login" class="primary">Log in</button>
+              <button type="submit" value="register">Register</button>
+            </div>
+            <p class="error" id="auth-error"></p>
+          </form>
+
+          <div id="ready" hidden>
+            <button id="play" type="button" class="primary big">Play</button>
+            <p class="who">Playing as <b id="who"></b> · <button id="logout" type="button" class="link">Log out</button></p>
+          </div>
+
+          <p id="offline" class="error" hidden>Can't reach the game server. Start the stack with <code>docker compose up</code>.</p>
+
+          <ul class="help">
+            <li><b>Move</b> with the mouse, or WASD</li>
+            <li><b>Boost</b> with a click or Space: it bites creatures your size</li>
+            <li>Eat food and anything smaller to evolve, from beetle to mammoth</li>
+            <li>While small, hide in bushes; frogs hide under water</li>
+          </ul>
+        </div>
+      </section>
+
+      <section id="dead" class="overlay" hidden>
+        <div class="card">
+          <h2 id="dead-title">You were eaten</h2>
+          <p id="dead-sub" class="tag"></p>
+          <dl class="stats">
+            <div><dt>Reached</dt><dd id="st-sp"></dd></div>
+            <div><dt>XP</dt><dd id="st-xp"></dd></div>
+            <div><dt>Eaten</dt><dd id="st-kills"></dd></div>
+            <div><dt>Lasted</dt><dd id="st-time"></dd></div>
+          </dl>
+          <p id="dead-tip" class="tip"></p>
+          <div class="row">
+            <button id="again" type="button" class="primary big">Play again</button>
+            <button id="to-menu" type="button">Menu</button>
+          </div>
+        </div>
+      </section>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

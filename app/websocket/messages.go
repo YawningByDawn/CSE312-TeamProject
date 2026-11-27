@@ -1,8 +1,11 @@
 package websocket
 
 import (
+	"cmp"
 	"encoding/json"
 	"html"
+	"math"
+	"slices"
 )
 
 // All message encoding lives here, so a binary format can replace JSON in one place.
@@ -12,8 +15,8 @@ var kickedMessage = []byte(`{"type":"kicked"}`)
 // startMessage tells the members of a lobby that its host started it.
 var startMessage = []byte(`{"type":"start"}`)
 
-// inMessage is "input" (dx, dy), "game" (data, relayed as it came to every other player), or a lobby's "host", "search",
-// "join" (host), "leave" and, from a lobby's host, "start".
+// inMessage is the arena's "input" (dx, dy: where to steer), "spawn" and "boost"; "game" (data, relayed as it came to
+// every other player); or a lobby's "host", "search", "join" (host), "leave" and, from a lobby's host, "start".
 type inMessage struct {
 	Type string          `json:"type"`
 	Host string          `json:"host"`
@@ -22,15 +25,47 @@ type inMessage struct {
 	Data json.RawMessage `json:"data"`
 }
 
-type playerState struct {
-	Name string  `json:"name"`
-	X    float64 `json:"x"`
-	Y    float64 `json:"y"`
+// worldMessage is the arena's map and rules, sent once to each connection; the "state" messages that follow refer to it.
+type worldMessage struct {
+	Type    string     `json:"type"`
+	W       float64    `json:"w"`
+	H       float64    `json:"h"`
+	Tick    int        `json:"tick"`  // state messages a second
+	Boost   float64    `json:"boost"` // seconds between boosts
+	Species []species  `json:"species"`
+	Foods   []foodKind `json:"foods"`
+	Ponds   []circle   `json:"ponds"`
+	Bushes  []circle   `json:"bushes"`
 }
 
-type stateMessage struct {
-	Type    string        `json:"type"`
-	Players []playerState `json:"players"`
+// boardEntry is one row of the leaderboard.
+type boardEntry struct {
+	Name string `json:"name"`
+	XP   int    `json:"xp"`
+	Sp   int    `json:"sp"`
+	Bot  bool   `json:"bot,omitempty"`
+}
+
+// meAlive and meDead are a player's own numbers in their state messages; null before their first spawn.
+type meAlive struct {
+	Alive    bool    `json:"alive"`
+	ID       int     `json:"id"`
+	Sp       int     `json:"sp"`
+	XP       int     `json:"xp"`
+	HP       int     `json:"hp"`
+	Hunger   int     `json:"hunger"`
+	Cooldown float64 `json:"cooldown"` // seconds until it can boost
+	Kills    int     `json:"kills"`
+}
+
+type meDead struct {
+	Alive bool   `json:"alive"`
+	By    string `json:"by"` // who ate them; "" when they starved
+	BySp  int    `json:"bySp"`
+	Sp    int    `json:"sp"`
+	XP    int    `json:"xp"`
+	Kills int    `json:"kills"`
+	Secs  int    `json:"secs"`
 }
 
 type gameMessage struct {
@@ -65,7 +100,7 @@ func decode(data []byte) (inMessage, bool) {
 		return msg, false
 	}
 	switch msg.Type {
-	case "input", "host", "search", "leave", "start":
+	case "input", "spawn", "boost", "host", "search", "leave", "start":
 		return msg, true
 	case "game":
 		return msg, msg.Data != nil
@@ -102,12 +137,37 @@ func encodeLobbies(list []*lobby, refused string) []byte {
 	return data
 }
 
-func encodeState(players []playerState) []byte {
-	for i := range players {
-		players[i].Name = html.EscapeString(players[i].Name)
-	}
-	data, _ := json.Marshal(stateMessage{Type: "state", Players: players})
+func encodeWorld(a *arena) []byte {
+	data, _ := json.Marshal(worldMessage{Type: "world", W: worldW, H: worldH, Tick: a.rate, Boost: boostCooldown, Species: speciesList, Foods: foodKinds, Ponds: a.ponds, Bushes: a.bushes})
 	return data
+}
+
+// encodeBoard ranks the ten creatures with the most xp.
+func encodeBoard(cs []*creature) []byte {
+	alive := slices.DeleteFunc(slices.Clone(cs), func(c *creature) bool { return c.dead != nil })
+	slices.SortFunc(alive, func(p, q *creature) int { return cmp.Compare(q.xp, p.xp) })
+	rows := []boardEntry{}
+	for _, c := range alive[:min(10, len(alive))] {
+		rows = append(rows, boardEntry{Name: html.EscapeString(c.name), XP: int(c.xp), Sp: c.sp, Bot: c.bot != nil})
+	}
+	data, _ := json.Marshal(rows)
+	return data
+}
+
+// encodeMe appends a viewer's own numbers to a state message.
+func encodeMe(b []byte, v viewer) []byte {
+	var data []byte
+	switch {
+	case v.cr != nil:
+		c := v.cr
+		data, _ = json.Marshal(meAlive{Alive: true, ID: c.id, Sp: c.sp, XP: int(c.xp), HP: int(math.Ceil(c.hp)), Hunger: int(math.Ceil(c.hunger)), Cooldown: math.Round(c.cooldown*100) / 100, Kills: c.kills})
+	case v.died != nil:
+		d := v.died
+		data, _ = json.Marshal(meDead{By: html.EscapeString(d.By), BySp: d.BySp, Sp: d.Sp, XP: int(d.XP), Kills: d.Kills, Secs: int(d.Secs)})
+	default:
+		data = []byte("null")
+	}
+	return append(b, data...)
 }
 
 func encodeGame(from string, payload json.RawMessage) []byte {

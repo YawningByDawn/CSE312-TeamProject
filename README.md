@@ -12,22 +12,26 @@ Then open http://localhost:8080. No `.env` is needed; `compose.yaml` has default
 
 ## Game
 
-Hungry God Inc. lives in `app/game` (TypeScript, Vite, PixiJS). The app image builds it in a Node stage and serves the build at the site's root, `/`, after every other route. The title's top right corner opens a popup to log in or register (it posts to the auth service's `/register` and `/login`) and logs out; `/api/me` names who is logged in, `null` for nobody.
+This branch (`backup-game`) serves **Gobble Grove**, a multiplayer "eat and evolve" arena game, instead of Hungry God Inc. (whose code stays in `app/game`, unbuilt). The client lives in `app/arena` (TypeScript, Vite, Canvas 2D); the app image builds it in a Node stage and serves the build at the site's root, `/`, after every other route. The game itself runs on the server, in the app's websocket hub (`app/websocket/arena.go`).
 
-Multiplayer: logged in, the game opens the app's `/ws` socket; logged out, it plays alone. The title's Multiplayer swaps its menu for Host, Search and Back (logged out, it opens the login popup); Host and Search show in the title itself, no popup. The hub (`app/websocket`) owns the lobbies: Host opens one named `<host>'s lobby` for up to 4 players, no password, and its host's Start tells every member (a stub: nothing yet starts a shared game); Search lists the open ones to join; the host leaving closes it, and a dropped connection leaves it. The socket's messages, JSON, the game reading them as `window.__hg.net` (`app/game/src/app/net.ts`):
+How it plays: everyone shares one meadow, topped up with bots. You start as a beetle; food and anything smaller you catch give xp, and each xp mark evolves you up the food chain: Beetle, Frog, Hare, Hedgehog, Boar, Lynx, Wolf, Bear, Bison, Mammoth. Anything a tier or more above you can eat you. A boost (click or Space) dashes and bites a creature your size, or one a tier up, and a bite that empties its health eats it. Beetles up to hedgehogs hide in bushes, and frogs under water, where nothing can eat them. Hunger falls faster the bigger you are, and an empty belly costs health. Bots grow no bigger than a wolf, so the top of the chain is for players.
 
-- To the hub: `{"type":"game","data":...}` (relayed to every other player as `{"type":"game","from":<name>,"data":...}`), `{"type":"input","dx":..,"dy":..}`, `{"type":"host"}`, `{"type":"search"}`, `{"type":"join","host":<name>}`, `{"type":"leave"}`, `{"type":"start"}` (the host only; anyone else is ignored).
-- From the hub: `state` (who is on), `{"type":"lobby","lobby":{"host","name","members","max"}|null}` (the lobby the player is in, to each member whenever it changes; `null` when they are out of it), `{"type":"lobbies","lobbies":[...],"refused":"full"|"gone"}` (the open lobbies, answering `search`, and a refused `join`, with the reason), `{"type":"start"}` (to every member of a lobby whose host started it), `kicked`.
+The menu logs in or registers (it posts to the auth service's `/register` and `/login`) and logs out; `/api/me` names who is logged in, `null` for nobody. Only a logged-in player opens the app's `/ws` socket and plays. Its messages are JSON:
 
-No game content uses the socket beyond the lobby screens yet.
+- To the hub: `{"type":"input","dx":..,"dy":..}` (where to steer, each in [-1, 1]), `{"type":"spawn"}` (start a new creature, when you have none), `{"type":"boost"}`. The lobby messages (`host`, `search`, `join`, `leave`, `start`) and the `game` relay still work as on main; the arena does not use them.
+- From the hub: `world` once per connection (the map's size, ponds and bushes, the species and food kinds, the tick rate), then a `state` each tick: the player's own numbers in `me` (`null` before their first spawn; `alive: false` with who ate them after a death), and the creatures (`c`), food (`f`) and what was eaten (`e`) near them, plus the leaderboard (`lb`). `kicked` when a newer tab takes the player over.
 
-To work on it alone:
+The hub steps the arena `TICK_RATE` times a second (20 by default); the client draws a little in the past, between two states, so movement stays smooth.
+
+To work on the client alone, with the stack running (`docker compose up`) for logging in and the socket:
 
 ```
-cd app/game
+cd app/arena
 npm ci
 npm run dev
 ```
+
+Then open http://127.0.0.1:5173; the dev server forwards `/ws`, `/api`, `/login`, `/register` and `/logout` to http://localhost:8080. The server's tests: `cd app && go mod tidy && go test ./...` (the repo leaves `go.sum` out; the Dockerfile tidies too).
 
 ## Deploy (Ubuntu server)
 

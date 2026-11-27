@@ -153,7 +153,7 @@ func TestADroppedConnectionLeavesItsLobby(t *testing.T) {
 	say(l, "ann", "host", "")
 	say(l, "bea", "join", "ann")
 	players := map[string]*player{"ann": {client: &client{send: make(chan []byte, 16)}}, "bea": {}}
-	tick(players, l, 0)
+	tick(players, l, newTestArena(), 0)
 	if want := `{"type":"lobby","lobby":{"host":"ann","name":"ann's lobby","members":["ann"],"max":4}}`; got.last("ann") != want {
 		t.Fatalf("host got %s, want %s", got.last("ann"), want)
 	}
@@ -168,6 +168,8 @@ func TestDecodeLobbyMessages(t *testing.T) {
 		`{"type":"join","host":"ann"}`:   true,
 		`{"type":"join"}`:                false,
 		`{"type":"input","dx":1}`:        true,
+		`{"type":"spawn"}`:               true,
+		`{"type":"boost"}`:               true,
 		`{"type":"game"}`:                false,
 		`{"type":"game","data":{"a":1}}`: true,
 		`{"type":"nonsense"}`:            false,
