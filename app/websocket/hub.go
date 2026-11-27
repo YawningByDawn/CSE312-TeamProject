@@ -36,6 +36,7 @@ var (
 // RunHub owns all live state. Everything else talks to it through the channels above.
 func RunHub() {
 	players := map[string]*player{}
+	lb := newLobbies(func(to string, data []byte) { deliver(players, to, data) })
 	rate := tickRate()
 	ticker := time.NewTicker(time.Second / time.Duration(rate))
 	for {
@@ -54,6 +55,9 @@ func RunHub() {
 				close(p.client.send)
 			}
 			p.client = c
+			if host, ok := lb.of[c.username]; ok { // a takeover tab picks up the lobby
+				lb.show(lb.byHost[host])
+			}
 		case c := <-leaveChan:
 			if p := players[c.username]; p != nil && p.client == c {
 				disconnect(p)
@@ -63,21 +67,26 @@ func RunHub() {
 			if p == nil || p.client == nil {
 				continue
 			}
-			if in.msg.Type == "game" {
+			switch in.msg.Type {
+			case "game":
 				relay(players, in.username, encodeGame(in.username, in.msg.Data))
-			} else {
+			case "input":
 				p.dx, p.dy = clamp(in.msg.DX), clamp(in.msg.DY)
+			default:
+				lb.handle(in.username, in.msg)
 			}
 		case <-ticker.C:
-			tick(players, speed/float64(rate))
+			tick(players, lb, speed/float64(rate))
 		}
 	}
 }
 
-func tick(players map[string]*player, step float64) {
+// tick moves everyone and tells them. A player without a connection is out of their lobby.
+func tick(players map[string]*player, lb *lobbies, step float64) {
 	states := []playerState{}
 	for name, p := range players {
 		if p.client == nil {
+			lb.leave(name)
 			if time.Since(p.leftAt) > gracePeriod {
 				delete(players, name)
 			}
@@ -89,6 +98,19 @@ func tick(players map[string]*player, step float64) {
 	}
 
 	relay(players, "", encodeState(states))
+}
+
+// deliver sends data to one connected player.
+func deliver(players map[string]*player, to string, data []byte) {
+	p := players[to]
+	if p == nil || p.client == nil {
+		return
+	}
+	select {
+	case p.client.send <- data:
+	default:
+		disconnect(p) // too far behind to keep up
+	}
 }
 
 // relay sends data to every connected player but `except`.

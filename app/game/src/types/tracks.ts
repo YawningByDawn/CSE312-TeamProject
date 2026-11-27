@@ -242,13 +242,39 @@ export interface DebugApi {
   profText?(): string;
   /** The multiplayer socket, in a build that names one (src/app/net.ts). */
   net?: Net;
+  /** The framework's login. */
+  account: Account;
 }
 
-/** The multiplayer socket: who is on, and game messages to and from the other players. */
+/** A lobby as the hub keeps it: named after its host, the host first among its members. */
+export interface Lobby {
+  host: string;
+  name: string;
+  members: string[];
+  max: number;
+}
+
+/** The multiplayer socket: who is on, the lobbies, and game messages to and from the other players. */
 export interface Net {
   /** the players the hub has on, this one included (names as the hub sends them) */
   players: string[];
   open: boolean;
+  /** the lobby this player is in, null for none */
+  lobby: Lobby | null;
+  /** the open lobbies as the hub last listed them (it answers `search`, and a refused `join`) */
+  lobbies: Lobby[];
+  /** why the last `join` was refused (`full`, `gone`), empty when it was not */
+  refused: string;
+  /** the host pressed Start: the hub told this lobby's members (reset when this player is out of the lobby) */
+  started: boolean;
+  /** moves whenever `lobby`, `lobbies`, `refused` or `started` does */
+  rev: number;
+  host(): void;
+  search(): void;
+  join(host: string): void;
+  leave(): void;
+  /** the host's Start; the hub ignores it from anyone else */
+  start(): void;
   /** `data` to every other player; dropped while the socket is not open */
   send(data: unknown): void;
   onGame(f: (from: string, data: unknown) => void): void;
