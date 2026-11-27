@@ -1,7 +1,7 @@
 /**
  * src/sim, the rules. Owns the run's state (`GameState`) and every change to it: `makeSim()` gives the pump's
  * `Sim` (create, step one tick, act, legal) and the `Query` the view, the ui and the audio read (checks, odds, stats,
- * goal, slots), never writing. Reads content's tables (balance, cards, crystals, gems, world, clock, stages, threats,
+ * slots), never writing. Reads content's tables (balance, cards, crystals, gems, world, clock, stages, threats,
  * stories, blessings) and src/sim/world, the people's lives; its one RNG lives in the state (rng.ts).
  * No DOM, IO, wall clock or Math.random. One rule area a file: the god's day (god), the mine's (mining), colour and the
  * whisper (influence), the cards, the grave and its stones (grave, crystals, bonus), the powers' moves (threats), the
@@ -338,10 +338,6 @@ export function makeSim(): { sim: Sim; query: Query } {
       const v = which === 'hunger' ? s.god.hunger : s.god.malice;
       if (which === 'hunger') return v >= 100 ? 'ravenous' : v >= BALANCE.starvingAt ? 'starving' : v < BALANCE.satedBelow ? 'sated' : 'peckish';
       return v >= 100 ? 'outburst' : v >= BALANCE.seethingAt ? 'seething' : v >= BALANCE.maliceRestlessAt ? 'restless' : 'calm';
-    },
-    goal(s) {
-      if (!s.flags.liftRooted) return { key: 'goal.rootLift' };
-      return { key: 'goal.rank', slots: { n: BALANCE.takenLevel } };
     },
     worth(s, crystal, card) {
       const x = s.crystals[crystal]!;

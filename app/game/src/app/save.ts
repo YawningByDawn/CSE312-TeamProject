@@ -7,7 +7,7 @@ const SAVE = 'hg.rb.save';
 const SETTINGS = 'hg.rb.settings';
 
 const DEFAULTS: Settings = {
-  master: 1, music: 0.7, sfx: 0.8, ambience: 0.6, uiSize: 'medium', hints: true, seenHints: [],
+  master: 1, music: 0.7, sfx: 0.8, ambience: 0.6, uiSize: 'medium', hints: true, seenHints: [], feedOpen: false,
   keys: Object.fromEntries(BINDS.map((b) => [b, [...KEYS[b]]])) as Settings['keys'],
 };
 

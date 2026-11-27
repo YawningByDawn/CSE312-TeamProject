@@ -12,9 +12,9 @@ import { BLOOD, DIM, INK, PALE, VIOLET, Words, attr, div, surface } from '../kit
 type Cells = AtlasManifest['cells'];
 interface Sheet { cells: Cells; w: number; h: number; cls: string; url: string }
 
-const manifests = import.meta.glob<AtlasManifest & Record<string, unknown>>('../../../assets/{ui,cardart,cardback,crystals,crystalmarks/*,portraits/*,front,title,defeat}/manifest.json', { eager: true, import: 'default' });
+const manifests = import.meta.glob<AtlasManifest & Record<string, unknown>>('../../../assets/{ui,cardart,cardback,crystals,crystalmarks/*,portraits/*,front,title,defeat,feedtab}/manifest.json', { eager: true, import: 'default' });
 // the defeat's atlas is the view's mipmapped png: the panels take its level 0
-const pictures = import.meta.glob<string>(['../../../assets/{ui,cardart,cardback,crystals,crystalmarks/*,portraits/*,front,title}/*.webp', '../../../assets/defeat/defeat.png'], { eager: true, query: '?url', import: 'default' });
+const pictures = import.meta.glob<string>(['../../../assets/{ui,cardart,cardback,crystals,crystalmarks/*,portraits/*,front,title,feedtab}/*.webp', '../../../assets/defeat/defeat.png'], { eager: true, query: '?url', import: 'default' });
 
 const SHEETS = new Map<string, Sheet & { m: AtlasManifest & Record<string, unknown> }>();
 for (const [path, m] of Object.entries(manifests)) {

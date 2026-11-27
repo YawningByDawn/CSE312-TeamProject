@@ -6,12 +6,11 @@ import { line } from '../panels/art';
 import { DIM, INK, Words, div, surface } from '../kit';
 import type { Anchors, Corner } from '../index';
 import { GOD_W, GOD_Y } from './god';
-import { GOAL_Y } from './goal';
 
 // Hints (inventory #106): each teaches one thing and sits by it, one at a time, while hints are on in Settings. It goes
 // when the player does the thing, after a while, or on a click; a hint gone does not come back, in this run or the
 // next, until hints are turned on again in Settings. The first three
-// days teach the loop: whisper, the actions refilling, a follower's offering, the hand, the goal; Hunger when it bites.
+// days teach the loop: whisper, the actions refilling, a follower's offering, the hand; Hunger when it bites.
 
 const W = 300, H = 116;
 /** Seconds a hint stands at most. */
@@ -32,7 +31,6 @@ const HINTS: readonly Hint[] = [
   { id: 'whisper', at: ['c', -W / 2, -390], when: (s, d) => d <= 3 && followers(s) === 0, done: (_, e) => e.kind === 'whisper' || e.kind === 'turned' },
   { id: 'offer', at: ['c', -W / 2, -390], when: (s, d) => d <= 3 && followers(s) > 0, done: (_, e) => e.kind === 'routine' && e.routine === 'offer' },
   { id: 'hand', at: ['bc', -W / 2, -248 - H], when: (s, d) => d <= 3 && s.god.hand.length > 0 && !s.god.deal && !isDay(s.tick), done: (_, e) => e.kind === 'play' },
-  { id: 'goal', at: ['tr', -GOD_W - 16 - W, GOAL_Y], when: (_, d) => d >= 2 && d <= 3, done: () => false },
   { id: 'hunger', at: ['tr', -GOD_W - 16 - W, GOD_Y], when: (s) => s.god.hunger >= BALANCE.starvingAt, done: (_, e) => e.kind === 'eat' },
 ];
 
