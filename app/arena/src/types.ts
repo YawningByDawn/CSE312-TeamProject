@@ -1,5 +1,16 @@
 // The arena's messages, as the hub (app/websocket/arena.go) sends them.
 
+export type Biome = 'meadow' | 'swamp' | 'volcano' | 'tundra' | 'ocean';
+
+/** The biome borders: the volcano's southern edge and the tundra's northern one as y at x = i * step, the swamp's
+ * eastern edge as x at y = i * step. */
+export interface Edges {
+  volcano: number[];
+  tundra: number[];
+  swamp: number[];
+  step: number;
+}
+
 export interface Ability {
   name: string;
   kind: 'charge' | 'stomp' | 'spit' | 'pull';
@@ -16,6 +27,8 @@ export interface Species {
   speed: number;
   view: number; // the height of the world a player of it sees
   habitat: 'land' | 'sea' | 'amph' | 'air';
+  home: Biome; // where it lives
+  fireproof: boolean; // walks through lava
   hides: boolean;
   next: number[]; // what it can evolve into
   ability: Ability;
@@ -32,7 +45,7 @@ export interface FoodKind {
 
 /** A place that grows food: a ginkgo tree, termite mound, nest, bones, sea vent, or a pond's lilies. */
 export interface Source {
-  kind: 'tree' | 'mound' | 'nest' | 'bones' | 'vent' | 'lilies';
+  kind: 'tree' | 'mound' | 'nest' | 'bones' | 'vent' | 'lilies' | 'hole';
   x: number;
   y: number;
   r: number;
@@ -65,6 +78,9 @@ export interface World {
   reefs: Circle[]; // and at sea
   sources: Source[];
   climbTier: number;
+  lava: Circle[];
+  ice: Circle[];
+  edges: Edges;
 }
 
 export interface MeAlive {
@@ -89,7 +105,8 @@ export interface MeAlive {
 
 export interface MeDead {
   alive: false;
-  by: string; // '' when they starved
+  by: string; // '' when they starved or burned
+  cause: 'eaten' | 'starved' | 'lava';
   bySp: number;
   sp: number;
   xp: number;
@@ -104,14 +121,14 @@ export interface BoardRow {
   bot?: boolean;
 }
 
-/** id, x, y, angle, species, hp %, flags, name */
-export type CreatureRow = [number, number, number, number, number, number, number, string];
+/** id, x, y, angle, species, hp %, flags, name, skill level */
+export type CreatureRow = [number, number, number, number, number, number, number, string, number];
 /** id, x, y, kind */
 export type FoodRow = [number, number, number, number];
 /** 0 food or 1 creature, its id, the id of who ate it */
 export type EatRow = [number, number, number];
-/** id, x, y, the species that spat it */
-export type ShotRow = [number, number, number, number];
+/** id, x, y, the species that spat it, its skill level */
+export type ShotRow = [number, number, number, number, number];
 
 export interface StateMessage {
   type: 'state';
@@ -134,6 +151,10 @@ export const WET = 16;
 export const USING = 32; // its ability
 export const CHARGING = 64;
 export const HURT = 128; // just now
+export const TAIL_BIT = 256; // its tail, just now
+export const BURNING = 512; // in lava
+export const DAZED = 1024;
+export const SLIDING = 2048; // on ice
 
 export interface Creature {
   id: number;
@@ -144,6 +165,7 @@ export interface Creature {
   hp: number;
   flags: number;
   name: string;
+  lv: number; // skill level
 }
 
 export interface Food {
@@ -151,6 +173,14 @@ export interface Food {
   x: number;
   y: number;
   kind: number;
+}
+
+export interface Shot {
+  id: number;
+  x: number;
+  y: number;
+  sp: number;
+  lv: number;
 }
 
 /** One state message, kept to interpolate between. */
@@ -161,7 +191,7 @@ export interface Snap {
   me: MeAlive | MeDead | null;
   creatures: Map<number, Creature>;
   food: Map<number, Food>;
-  shots: Map<number, { id: number; x: number; y: number; sp: number }>;
+  shots: Map<number, Shot>;
   eaten: EatRow[];
   board: BoardRow[];
   played: boolean; // its events have been shown

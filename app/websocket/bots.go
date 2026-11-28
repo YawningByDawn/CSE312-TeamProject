@@ -32,6 +32,7 @@ const (
 	grazing
 	chasing
 	fleeing
+	tailing // going for a bigger creature's tail
 )
 
 // think steers a bot: away from what could eat it, after what it could eat, to food, or anywhere it fits.
@@ -55,6 +56,17 @@ func (a *arena) think(c *creature, dt float64) {
 	}
 	var tx, ty float64
 	switch b.mode {
+	case tailing:
+		t := b.target
+		if t == nil || t.dead != nil || facing(t, c) > 0.2 { // it turned round: run
+			b.mode, b.rethink = fleeing, 0
+			return
+		}
+		x, y, _ := tailSpot(t)
+		tx, ty = x-c.x, y-c.y
+		if math.Hypot(tx, ty) < sp.R+t.r() && a.rng.Float64() < b.bold*dt*4 {
+			a.boost(c)
+		}
 	case fleeing, chasing:
 		t := b.target
 		if t == nil || t.dead != nil || (b.mode == chasing && t.hidden) {
@@ -114,8 +126,38 @@ func (a *arena) think(c *creature, dt float64) {
 	} else {
 		c.dx, c.dy = 0, 0
 	}
+	a.avoidLava(c)
 	if b.mode == wandering {
 		c.dx, c.dy = c.dx*0.55, c.dy*0.55
+	}
+}
+
+// facing is how much `from` faces toward `to`: 1 straight at it, -1 straight away.
+func facing(from, to *creature) float64 {
+	d := math.Hypot(to.x-from.x, to.y-from.y)
+	if d < 0.001 {
+		return 0
+	}
+	return (math.Cos(from.angle)*(to.x-from.x) + math.Sin(from.angle)*(to.y-from.y)) / d
+}
+
+// avoidLava turns a bot that is not fireproof away from lava ahead of it.
+func (a *arena) avoidLava(c *creature) {
+	sp := c.kind()
+	if sp.Fireproof || sp.Habitat == air || (c.dx == 0 && c.dy == 0) {
+		return
+	}
+	ahead := sp.R + 70
+	if inside(a.lava, c.x+c.dx*ahead, c.y+c.dy*ahead) == nil {
+		return
+	}
+	for _, turn := range []float64{math.Pi / 2, -math.Pi / 2, math.Pi} {
+		cos, sin := math.Cos(turn), math.Sin(turn)
+		dx, dy := c.dx*cos-c.dy*sin, c.dx*sin+c.dy*cos
+		if inside(a.lava, c.x+dx*ahead, c.y+dy*ahead) == nil {
+			c.dx, c.dy = dx, dy
+			return
+		}
 	}
 }
 
@@ -179,6 +221,8 @@ func (a *arena) decide(c *creature) {
 		}
 	}
 	switch {
+	case threat != nil && b.bold > 0.55 && threat.tier()-c.tier() <= 2 && c.hp > 0.6*c.maxHP() && facing(threat, c) < -0.3:
+		b.mode, b.target = tailing, threat // a bold one goes for the tail of a predator facing away
 	case threat != nil:
 		b.mode, b.target, b.goalX, b.goalY = fleeing, threat, 0, 0
 		if sp.Hides || climbs(c) && !climbs(threat) {
@@ -188,6 +232,9 @@ func (a *arena) decide(c *creature) {
 			refuges := [][]circle{a.rocks, a.reefs} // somewhere the threat cannot follow
 			if sp.Hides {
 				refuges = append(refuges, a.bushes, a.kelp)
+			}
+			if sp.Fireproof && !threat.kind().Fireproof && threat.kind().Habitat != air {
+				refuges = append(refuges, a.lava)
 			}
 			for _, set := range refuges {
 				for _, bu := range set {

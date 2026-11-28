@@ -1,4 +1,4 @@
-import type { Creature, Food, Snap, StateMessage, World } from './types';
+import type { Creature, Food, Shot, Snap, StateMessage, World } from './types';
 
 // The arena's socket: the hub's `/ws`, which the login cookie authorises, or for a guest a random key of the tab's. The
 // hub sends the map once ("world"), then a "state" a tick. Snapshots are kept for a second so the view can draw a
@@ -80,11 +80,11 @@ export class Net {
       if (Number.isNaN(this.offset) || o < this.offset || o - this.offset > 1) this.offset = o;
       else this.offset += (o - this.offset) * 0.01;
       const creatures = new Map<number, Creature>();
-      for (const [id, x, y, a, sp, hp, flags, name] of st.c) creatures.set(id, { id, x, y, a, sp, hp, flags, name: unescape(name) });
+      for (const [id, x, y, a, sp, hp, flags, name, lv] of st.c) creatures.set(id, { id, x, y, a, sp, hp, flags, name: unescape(name), lv });
       const food = new Map<number, Food>();
       for (const [id, x, y, kind] of st.f) food.set(id, { id, x, y, kind });
-      const shots = new Map<number, { id: number; x: number; y: number; sp: number }>();
-      for (const [id, x, y, sp] of st.p) shots.set(id, { id, x, y, sp });
+      const shots = new Map<number, Shot>();
+      for (const [id, x, y, sp, lv] of st.p) shots.set(id, { id, x, y, sp, lv });
       if (st.me && !st.me.alive) st.me.by = unescape(st.me.by);
       for (const row of st.lb) row.name = unescape(row.name);
       this.snaps.push({ t: st.t, x: st.x, y: st.y, me: st.me, creatures, food, shots, eaten: st.e, board: st.lb, played: false });

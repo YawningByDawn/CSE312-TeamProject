@@ -1,4 +1,5 @@
-import type { Circle, Source, World } from './types';
+import { biomeAt } from './geo';
+import type { Biome, Circle, Source, World } from './types';
 
 // The world: grass, the beach, the sea and its islands, ponds and tar pits, rocks and reefs, ferns and kelp, the
 // places food grows, and food. All in world units, on a context the view has moved.
@@ -64,6 +65,123 @@ function grassPattern(c: Ctx): CanvasPattern {
   return (grass = c.createPattern(tile, 'repeat')!);
 }
 
+const tiles = new Map<string, CanvasPattern>();
+
+/** A repeating tile for a biome's ground, drawn once. */
+function tile(c: Ctx, key: string, base: string, paint: (g: CanvasRenderingContext2D, rnd: () => number) => void): CanvasPattern {
+  const kept = tiles.get(key);
+  if (kept) return kept;
+  const cv = document.createElement('canvas');
+  cv.width = cv.height = 384;
+  const g = cv.getContext('2d')!;
+  g.fillStyle = base;
+  g.fillRect(0, 0, 384, 384);
+  paint(g, seeded(key.length * 97 + 13));
+  const p = c.createPattern(cv, 'repeat')!;
+  tiles.set(key, p);
+  return p;
+}
+
+function blotches(g: CanvasRenderingContext2D, rnd: () => number, colors: string[], n: number, size: number): void {
+  for (let i = 0; i < n; i++) {
+    g.fillStyle = colors[i % colors.length]!;
+    g.beginPath();
+    g.ellipse(rnd() * 384, rnd() * 384, size * (0.5 + rnd()), size * (0.35 + rnd() * 0.6), rnd() * TAU, 0, TAU);
+    g.fill();
+  }
+}
+
+const swampTile = (c: Ctx): CanvasPattern =>
+  tile(c, 'swamp', '#6b8550', (g, rnd) => {
+    blotches(g, rnd, ['rgba(80,108,62,0.6)', 'rgba(124,150,88,0.5)', 'rgba(70,96,72,0.55)'], 30, 40);
+    g.strokeStyle = '#4e6a3a';
+    g.lineWidth = 2;
+    g.lineCap = 'round';
+    for (let i = 0; i < 70; i++) { // reeds
+      const x = rnd() * 384;
+      const y = rnd() * 384;
+      g.beginPath();
+      g.moveTo(x, y);
+      g.lineTo(x + rnd() * 3 - 1.5, y - 9 - rnd() * 6);
+      g.stroke();
+    }
+    for (let i = 0; i < 10; i++) {
+      g.fillStyle = 'rgba(160,190,90,0.7)';
+      g.beginPath();
+      g.arc(rnd() * 384, rnd() * 384, 2, 0, TAU);
+      g.fill();
+    }
+  });
+
+const ashTile = (c: Ctx): CanvasPattern =>
+  tile(c, 'ash', '#5c524a', (g, rnd) => {
+    blotches(g, rnd, ['rgba(70,62,56,0.6)', 'rgba(110,98,88,0.45)', 'rgba(60,52,48,0.5)'], 28, 42);
+    g.lineCap = 'round';
+    for (let i = 0; i < 9; i++) { // cracks, some glowing
+      let x = rnd() * 384;
+      let y = rnd() * 384;
+      const hot = rnd() < 0.45;
+      g.strokeStyle = hot ? 'rgba(230,100,40,0.75)' : '#3a322c';
+      g.lineWidth = hot ? 2.5 : 2;
+      g.beginPath();
+      g.moveTo(x, y);
+      for (let k = 0; k < 4; k++) {
+        x += rnd() * 40 - 20;
+        y += rnd() * 40 - 20;
+        g.lineTo(x, y);
+      }
+      g.stroke();
+    }
+    for (let i = 0; i < 16; i++) {
+      g.fillStyle = rnd() < 0.5 ? '#e0602a' : '#3a322c';
+      g.beginPath();
+      g.arc(rnd() * 384, rnd() * 384, 1.5 + rnd() * 1.5, 0, TAU);
+      g.fill();
+    }
+  });
+
+const snowTile = (c: Ctx): CanvasPattern =>
+  tile(c, 'snow', '#e9f0f4', (g, rnd) => {
+    blotches(g, rnd, ['rgba(208,222,232,0.6)', 'rgba(250,252,255,0.8)', 'rgba(196,212,226,0.45)'], 32, 40);
+    for (let i = 0; i < 40; i++) {
+      g.fillStyle = rnd() < 0.5 ? '#ffffff' : 'rgba(170,196,214,0.8)';
+      g.beginPath();
+      g.arc(rnd() * 384, rnd() * 384, 1 + rnd() * 1.5, 0, TAU);
+      g.fill();
+    }
+  });
+
+const biomeTile: Record<string, (c: Ctx) => CanvasPattern> = { swamp: swampTile, volcano: ashTile, tundra: snowTile };
+
+const biomes = new WeakMap<Circle, Biome>();
+/** The biome a feature of the map is in, worked out once. */
+function biomeOf(w: World, k: Circle): Biome {
+  let b = biomes.get(k);
+  if (!b) {
+    b = biomeAt(w, k.x, k.y);
+    biomes.set(k, b);
+  }
+  return b;
+}
+
+/** The outline of a biome region, from its border: swamp (west), volcano (north) or tundra (south). */
+function region(c: Ctx, w: World, which: 'swamp' | 'volcano' | 'tundra'): void {
+  const e = w.edges;
+  c.beginPath();
+  if (which === 'swamp') {
+    c.moveTo(-50, -50);
+    e.swamp.forEach((x, i) => c.lineTo(x, i * e.step));
+    c.lineTo(-50, w.h + 50);
+  } else {
+    const line = which === 'volcano' ? e.volcano : e.tundra;
+    const far = which === 'volcano' ? -50 : w.h + 50;
+    c.moveTo(-50, far);
+    line.forEach((y, i) => c.lineTo(i * e.step, y));
+    c.lineTo(w.w + 50, far);
+  }
+  c.closePath();
+}
+
 export interface Rect {
   x0: number;
   y0: number;
@@ -88,6 +206,22 @@ export function drawGround(c: Ctx, w: World | null, v: Rect, t: number): void {
   c.fillStyle = grassPattern(c);
   c.fillRect(x0, y0, Math.min(W, v.x1) - x0, Math.min(H, v.y1) - y0);
   if (!w) return;
+  const e = w.edges;
+  for (const which of ['swamp', 'volcano', 'tundra'] as const) {
+    const near =
+      which === 'swamp' ? v.x0 < Math.max(...e.swamp) : which === 'volcano' ? v.y0 < Math.max(...e.volcano) : v.y1 > Math.min(...e.tundra);
+    if (!near) continue;
+    c.save();
+    region(c, w, which);
+    c.clip();
+    c.fillStyle = biomeTile[which]!(c);
+    c.fillRect(v.x0, v.y0, v.x1 - v.x0, v.y1 - v.y0);
+    c.restore();
+    region(c, w, which); // a soft border
+    c.strokeStyle = which === 'tundra' ? 'rgba(255,255,255,0.55)' : which === 'volcano' ? 'rgba(40,30,25,0.35)' : 'rgba(50,70,40,0.35)';
+    c.lineWidth = 16;
+    c.stroke();
+  }
   const pts = coastPoints(w);
   if (Math.max(...w.coast) - 160 < v.x1) {
     // the beach, a band of sand west of the waterline, then the sea
@@ -147,16 +281,17 @@ export function drawGround(c: Ctx, w: World | null, v: Rect, t: number): void {
   c.setLineDash([]);
 }
 
-export function drawPonds(c: Ctx, ponds: Circle[], v: Rect, t: number): void {
-  for (const [i, p] of ponds.entries()) {
+export function drawPonds(c: Ctx, w: World, v: Rect, t: number): void {
+  for (const [i, p] of w.ponds.entries()) {
     if (!touches(p, v, 30)) continue;
+    const murky = biomeOf(w, p) === 'swamp';
     c.beginPath();
     c.arc(p.x, p.y, p.r + 12, 0, TAU);
-    c.fillStyle = '#d8c891';
+    c.fillStyle = murky ? '#7a6e48' : '#d8c891';
     c.fill();
     const g = c.createRadialGradient(p.x - p.r * 0.2, p.y - p.r * 0.2, p.r * 0.1, p.x, p.y, p.r);
-    g.addColorStop(0, '#79c3e0');
-    g.addColorStop(1, '#3f90bd');
+    g.addColorStop(0, murky ? '#7a9a6a' : '#79c3e0');
+    g.addColorStop(1, murky ? '#3e5a40' : '#3f90bd');
     c.beginPath();
     c.arc(p.x, p.y, p.r, 0, TAU);
     c.fillStyle = g;
@@ -195,8 +330,112 @@ export function drawPonds(c: Ctx, ponds: Circle[], v: Rect, t: number): void {
   }
 }
 
-/** Tar pits, rocks and reefs, and the places food grows: all under the creatures, which walk on them. */
+/** Lava pools: a crust round a glowing, bubbling middle. */
+function drawLava(c: Ctx, w: World, v: Rect, t: number): void {
+  for (const [i, p] of w.lava.entries()) {
+    if (!touches(p, v, 40)) continue;
+    const rnd = seeded(1500 + i);
+    c.save();
+    c.shadowColor = 'rgba(255,110,30,0.8)';
+    c.shadowBlur = 30;
+    c.beginPath();
+    for (let k = 0; k <= 22; k++) {
+      const a = (k / 22) * TAU;
+      const r = p.r * (0.95 + Math.sin(a * 3 + i) * 0.04 + rnd() * 0.04);
+      c.lineTo(p.x + Math.cos(a) * r, p.y + Math.sin(a) * r);
+    }
+    c.closePath();
+    c.fillStyle = '#2a1a14';
+    c.fill();
+    c.restore();
+    const g = c.createRadialGradient(p.x, p.y, p.r * 0.1, p.x, p.y, p.r * 0.85);
+    const pulse = (Math.sin(t * 1.5 + i) + 1) / 2;
+    g.addColorStop(0, `rgb(255,${210 + pulse * 30},${80 + pulse * 40})`);
+    g.addColorStop(0.55, '#ff7a1a');
+    g.addColorStop(1, '#b8340e');
+    c.beginPath();
+    c.arc(p.x, p.y, p.r * 0.84, 0, TAU);
+    c.fillStyle = g;
+    c.fill();
+    for (let k = 0; k < 5; k++) { // drifting crust
+      const a = rnd() * TAU + t * 0.05 * (k % 2 ? 1 : -1);
+      const d = p.r * (0.25 + rnd() * 0.45);
+      c.beginPath();
+      c.ellipse(p.x + Math.cos(a) * d, p.y + Math.sin(a) * d, p.r * 0.12, p.r * 0.07, a, 0, TAU);
+      c.fillStyle = 'rgba(60,30,20,0.7)';
+      c.fill();
+    }
+    for (let b = 0; b < 4; b++) { // bubbles that swell and pop
+      const phase = (t * 0.7 + b * 0.25 + i * 0.13) % 1;
+      const a = rnd() * TAU;
+      const d = rnd() * p.r * 0.6;
+      c.beginPath();
+      c.arc(p.x + Math.cos(a) * d, p.y + Math.sin(a) * d, 3 + phase * 12, 0, TAU);
+      c.strokeStyle = `rgba(255,240,170,${0.8 * (1 - phase)})`;
+      c.lineWidth = 2.5;
+      c.stroke();
+    }
+  }
+}
+
+/** Ice sheets: pale and glassy, with cracks. */
+function drawIce(c: Ctx, w: World, v: Rect): void {
+  for (const [i, p] of w.ice.entries()) {
+    if (!touches(p, v, 20)) continue;
+    const rnd = seeded(1700 + i);
+    c.beginPath();
+    for (let k = 0; k <= 18; k++) {
+      const a = (k / 18) * TAU;
+      const r = p.r * (0.92 + rnd() * 0.1);
+      c.lineTo(p.x + Math.cos(a) * r, p.y + Math.sin(a) * r);
+    }
+    c.closePath();
+    c.fillStyle = 'rgba(196,232,250,0.9)';
+    c.fill();
+    c.strokeStyle = '#9ccae4';
+    c.lineWidth = 5;
+    c.stroke();
+    c.strokeStyle = 'rgba(255,255,255,0.8)';
+    c.lineWidth = 6;
+    c.lineCap = 'round';
+    for (let k = 0; k < 3; k++) { // shine
+      const x = p.x - p.r * 0.4 + rnd() * p.r * 0.5;
+      const y = p.y - p.r * 0.4 + rnd() * p.r * 0.5;
+      c.beginPath();
+      c.moveTo(x, y);
+      c.lineTo(x + p.r * 0.25, y - p.r * 0.12);
+      c.stroke();
+    }
+    c.strokeStyle = '#a8d0e8';
+    c.lineWidth = 2;
+    for (let k = 0; k < 4; k++) { // cracks
+      let x = p.x + (rnd() - 0.5) * p.r;
+      let y = p.y + (rnd() - 0.5) * p.r;
+      c.beginPath();
+      c.moveTo(x, y);
+      for (let n = 0; n < 3; n++) {
+        x += (rnd() - 0.5) * p.r * 0.4;
+        y += (rnd() - 0.5) * p.r * 0.4;
+        c.lineTo(x, y);
+      }
+      c.stroke();
+    }
+  }
+}
+
+const ROCK_LOOK: Record<string, [string, string, string, string]> = {
+  // fill, edge, top, cracks
+  meadow: ['#9a958a', '#5e5a52', '#b5b0a4', '#7d786e'],
+  swamp: ['#7a8a6a', '#4a5a3e', '#8e9e7c', '#5a7a3a'],
+  volcano: ['#2e2834', '#15121a', '#463e50', '#8a7aa0'],
+  tundra: ['#9aa4ac', '#5a646c', '#c8d0d6', '#7a848c'],
+  ocean: ['#9a958a', '#5e5a52', '#b5b0a4', '#7d786e'],
+};
+
+/** Tar pits, lava and ice, rocks and reefs, and the places food grows: all under the creatures, which walk on them. */
 export function drawTerrain(c: Ctx, w: World, v: Rect, t: number): void {
+  drawLava(c, w, v, t);
+  drawIce(c, w, v);
   for (const [i, p] of w.tar.entries()) {
     if (!touches(p, v, 20)) continue;
     const rnd = seeded(300 + i);
@@ -243,15 +482,28 @@ export function drawTerrain(c: Ctx, w: World, v: Rect, t: number): void {
         c.lineTo(k.x + Math.cos(a) * r, k.y + Math.sin(a) * r);
       }
       c.closePath();
-      c.fillStyle = sea ? '#e07a6a' : '#9a958a';
+      const look = ROCK_LOOK[biomeOf(w, k)] ?? ROCK_LOOK.meadow!;
+      c.fillStyle = sea ? '#e07a6a' : look[0];
       c.fill();
-      c.strokeStyle = sea ? '#9a4038' : '#5e5a52';
+      c.strokeStyle = sea ? '#9a4038' : look[1];
       c.lineWidth = 4;
       c.stroke();
       c.beginPath();
       c.arc(k.x - k.r * 0.12, k.y - k.r * 0.12, k.r * 0.68, 0, TAU);
-      c.fillStyle = sea ? '#f0a08a' : '#b5b0a4';
+      c.fillStyle = sea ? '#f0a08a' : look[2];
       c.fill();
+      if (!sea && biomeOf(w, k) === 'tundra') { // a cap of snow
+        c.beginPath();
+        c.ellipse(k.x - k.r * 0.2, k.y - k.r * 0.25, k.r * 0.5, k.r * 0.32, -0.3, 0, TAU);
+        c.fillStyle = '#f6fafc';
+        c.fill();
+      }
+      if (!sea && biomeOf(w, k) === 'volcano') { // a glassy gleam
+        c.beginPath();
+        c.ellipse(k.x - k.r * 0.25, k.y - k.r * 0.3, k.r * 0.28, k.r * 0.08, -0.5, 0, TAU);
+        c.fillStyle = 'rgba(200,180,255,0.45)';
+        c.fill();
+      }
       if (sea) {
         for (let n = 0; n < 9; n++) {
           const a = rnd() * TAU;
@@ -262,7 +514,7 @@ export function drawTerrain(c: Ctx, w: World, v: Rect, t: number): void {
           c.fill();
         }
       } else {
-        c.strokeStyle = '#7d786e';
+        c.strokeStyle = (ROCK_LOOK[biomeOf(w, k)] ?? ROCK_LOOK.meadow!)[3];
         c.lineWidth = 2.5;
         for (let n = 0; n < 3; n++) {
           const a = rnd() * TAU;
@@ -405,6 +657,23 @@ function drawSource(c: Ctx, s: Source, t: number): void {
       c.fill();
       break;
     }
+    case 'hole': { // a fishing hole cut in the ice
+      c.beginPath();
+      c.arc(s.x, s.y, s.r * 1.25, 0, TAU2);
+      c.fillStyle = '#e8f6ff';
+      c.fill();
+      c.beginPath();
+      c.arc(s.x, s.y, s.r, 0, TAU2);
+      c.fillStyle = '#1f4a6a';
+      c.fill();
+      const phase = (t * 0.5 + s.x) % 1;
+      c.beginPath();
+      c.arc(s.x, s.y, s.r * (0.2 + phase * 0.7), 0, TAU2);
+      c.strokeStyle = `rgba(200,235,255,${0.6 * (1 - phase)})`;
+      c.lineWidth = 2;
+      c.stroke();
+      break;
+    }
     case 'vent': { // a smoking vent on the sea floor
       c.beginPath();
       c.arc(s.x, s.y, s.r, 0, TAU2);
@@ -427,22 +696,85 @@ function drawSource(c: Ctx, s: Source, t: number): void {
 }
 
 /** Ferns and kelp go over the creatures, so whatever hides in them is out of sight. */
-export function drawCover(c: Ctx, bushes: Circle[], kelp: Circle[], v: Rect, t: number): void {
+/** A tundra bush is a snowdrift: a white mound, shaded blue. */
+function snowdrift(c: Ctx, b: Circle, rnd: () => number): void {
+  c.beginPath();
+  c.ellipse(b.x + 8, b.y + 12, b.r * 1.02, b.r * 0.95, 0, 0, TAU);
+  c.fillStyle = 'rgba(80,110,140,0.22)';
+  c.fill();
+  for (const [k, fill] of [[1, '#c8d8e6'], [0.8, '#e4eef6'], [0.5, '#fbfdff']] as const) {
+    c.beginPath();
+    for (let n = 0; n <= 14; n++) {
+      const a = (n / 14) * TAU;
+      const r = b.r * k * (0.85 + rnd() * 0.2);
+      c.lineTo(b.x - (1 - k) * b.r * 0.2 + Math.cos(a) * r, b.y - (1 - k) * b.r * 0.25 + Math.sin(a) * r);
+    }
+    c.closePath();
+    c.fillStyle = fill;
+    c.fill();
+  }
+}
+
+/** A volcano bush is a charred shrub: black twigs, a few embers still glowing. */
+function ashShrub(c: Ctx, b: Circle, rnd: () => number, t: number): void {
+  c.beginPath();
+  c.ellipse(b.x + 8, b.y + 12, b.r, b.r * 0.92, 0, 0, TAU);
+  c.fillStyle = 'rgba(20,10,5,0.3)';
+  c.fill();
+  c.beginPath();
+  c.arc(b.x, b.y, b.r * 0.85, 0, TAU);
+  c.fillStyle = '#2e2622';
+  c.fill();
+  c.lineCap = 'round';
+  for (let n = 0; n < 14; n++) {
+    const a = rnd() * TAU;
+    const L = b.r * (0.6 + rnd() * 0.45);
+    c.beginPath();
+    c.moveTo(b.x, b.y);
+    c.quadraticCurveTo(b.x + Math.cos(a + 0.3) * L * 0.5, b.y + Math.sin(a + 0.3) * L * 0.5, b.x + Math.cos(a) * L, b.y + Math.sin(a) * L);
+    c.strokeStyle = n % 2 ? '#4a3e36' : '#3a302a';
+    c.lineWidth = 5;
+    c.stroke();
+  }
+  for (let n = 0; n < 6; n++) {
+    const a = rnd() * TAU;
+    const d = rnd() * b.r * 0.7;
+    c.beginPath();
+    c.arc(b.x + Math.cos(a) * d, b.y + Math.sin(a) * d, 3.5, 0, TAU);
+    c.fillStyle = Math.sin(t * 3 + n + b.x) > 0 ? '#ff8a2a' : '#c84a1a';
+    c.fill();
+  }
+}
+
+export function drawCover(c: Ctx, w: World, v: Rect, t: number): void {
+  const bushes = w.bushes;
+  const kelp = w.kelp;
   for (const [i, b] of bushes.entries()) {
     if (!touches(b, v, 20)) continue;
     const rnd = seeded(50 + i);
+    const biome = biomeOf(w, b);
+    if (biome === 'tundra') {
+      snowdrift(c, b, rnd);
+      continue;
+    }
+    if (biome === 'volcano') {
+      ashShrub(c, b, rnd, t);
+      continue;
+    }
+    const dark = biome === 'swamp';
     c.beginPath();
     c.ellipse(b.x + 8, b.y + 12, b.r * 1.02, b.r * 0.95, 0, 0, TAU);
     c.fillStyle = 'rgba(20,50,20,0.22)';
     c.fill();
     c.beginPath();
     c.arc(b.x, b.y, b.r * 0.82, 0, TAU);
-    c.fillStyle = '#356f31';
+    c.fillStyle = dark ? '#2a4a26' : '#356f31';
     c.fill();
     // fronds: long leaves from the middle, each with its leaflets
     const n = 9;
     const base = rnd() * TAU;
-    for (const [shade, len, off] of [['#3f8a3a', 1.02, 0], ['#5aa74b', 0.85, 0.5]] as const) {
+    const shades = dark ? [['#365a2c', 1.02, 0], ['#4a7238', 0.85, 0.5]] as const : [['#3f8a3a', 1.02, 0], ['#5aa74b', 0.85, 0.5]] as const;
+    for (const [shade, len, off] of shades) {
       for (let f = 0; f < n; f++) {
         const a = base + ((f + off) * TAU) / n + (rnd() - 0.5) * 0.2;
         const L = b.r * len;
@@ -666,6 +998,59 @@ export function drawFood(c: Ctx, name: string, x: number, y: number, r: number, 
       c.moveTo(0.35, 0.75);
       c.lineTo(0.7, 1.3);
       c.stroke();
+      break;
+    case 'fernhead': // a curled young fern
+      c.beginPath();
+      for (let a = 0; a < TAU * 1.6; a += 0.2) {
+        const r = 0.95 * Math.exp(-0.28 * a);
+        c.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+      }
+      c.lineWidth = 0.32;
+      c.lineCap = 'round';
+      c.strokeStyle = '#6aa83a';
+      c.stroke();
+      c.lineWidth = 0.12;
+      c.strokeStyle = '#a8d870';
+      c.stroke();
+      break;
+    case 'emberberry': // warm, and faintly glowing
+      c.save();
+      c.shadowColor = '#ff6a1a';
+      c.shadowBlur = 8;
+      for (const [bx, by] of [[-0.3, 0.25], [0.35, 0.2], [0, -0.35]] as const) blob(bx, by, 0.55, '#e8501e', '#8a2410');
+      c.restore();
+      for (const [bx, by] of [[-0.3, 0.25], [0.35, 0.2], [0, -0.35]] as const) {
+        c.beginPath();
+        c.arc(bx - 0.15, by - 0.15, 0.15, 0, TAU);
+        c.fillStyle = '#ffd08a';
+        c.fill();
+      }
+      break;
+    case 'frostberry': // pale blue, frosted
+      for (const [bx, by] of [[-0.32, 0.22], [0.35, 0.22], [0, -0.38]] as const) {
+        blob(bx, by, 0.55, '#8ac8f0', '#3a7aa8');
+        c.beginPath();
+        c.arc(bx - 0.18, by - 0.18, 0.18, 0, TAU);
+        c.fillStyle = 'rgba(255,255,255,0.9)';
+        c.fill();
+      }
+      break;
+    case 'pinecone':
+      c.beginPath();
+      c.ellipse(0, 0, 0.7, 1, 0, 0, TAU);
+      c.fillStyle = '#8a5a30';
+      c.fill();
+      c.strokeStyle = '#4a2e14';
+      c.stroke();
+      c.strokeStyle = '#b8844a';
+      c.lineWidth = 0.1;
+      for (let k = -2; k <= 2; k++) {
+        c.beginPath();
+        c.moveTo(-0.6, k * 0.32);
+        c.lineTo(0, k * 0.32 + 0.2);
+        c.lineTo(0.6, k * 0.32);
+        c.stroke();
+      }
       break;
     case 'starfruit': { // rare, and it glows
       c.save();

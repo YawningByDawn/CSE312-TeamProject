@@ -15,7 +15,8 @@ type viewer struct {
 }
 
 // view is the "state" message for one player: their own numbers, and the creatures, food, shots and eating near them.
-// Creatures are [id, x, y, angle, species, hp %, flags, name]; food [id, x, y, kind]; shots [id, x, y, species];
+// Creatures are [id, x, y, angle, species, hp %, flags, name, skill level]; food [id, x, y, kind]; shots [id, x, y,
+// species, skill level];
 // eating [0 for food or 1 for a creature, its id, the eater's id].
 func (a *arena) view(v viewer) []byte {
 	cx, cy, h := v.camX, v.camY, spectatorView
@@ -66,6 +67,8 @@ func (a *arena) view(v viewer) []byte {
 		b = num(b, a.flags(c))
 		b = append(b, ',')
 		b = append(b, c.nameJSON...)
+		b = append(b, ',')
+		b = num(b, c.abilityLv)
 		b = append(b, ']')
 	}
 	b = append(b, `],"f":[`...)
@@ -106,6 +109,8 @@ func (a *arena) view(v viewer) []byte {
 		b = num(b, int(math.Round(s.y)))
 		b = append(b, ',')
 		b = num(b, s.sp)
+		b = append(b, ',')
+		b = num(b, s.lv)
 		b = append(b, ']')
 	}
 	b = append(b, `],"e":[`...)
@@ -131,10 +136,13 @@ func (a *arena) view(v viewer) []byte {
 }
 
 // flags packs a creature's state for the view: 1 hidden, 2 boosting, 4 a bot, 8 spawn-protected, 16 in water,
-// 32 using its ability, 64 charging, 128 hurt just now.
+// 32 using its ability, 64 charging, 128 hurt just now, 256 its tail bitten just now, 512 burning in lava, 1024 dazed,
+// 2048 sliding on ice.
 func (a *arena) flags(c *creature) int {
 	f := 0
-	for i, on := range []bool{c.hidden, c.dash > 0, c.bot != nil, c.guard > 0, c.wet, c.fx > 0, c.charging > 0, a.clock-c.hurtAt < 0.2} {
+	burning := c.kind().Habitat != air && !c.kind().Fireproof && inside(a.lava, c.x, c.y) != nil
+	for i, on := range []bool{c.hidden, c.dash > 0, c.bot != nil, c.guard > 0, c.wet, c.fx > 0, c.charging > 0, a.clock-c.hurtAt < 0.2,
+		c.tailBit > 0, burning, c.dazed > 0, a.onIce(c)} {
 		if on {
 			f |= 1 << i
 		}

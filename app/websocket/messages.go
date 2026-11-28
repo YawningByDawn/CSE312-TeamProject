@@ -49,6 +49,9 @@ type worldMessage struct {
 	Rocks     []circle   `json:"rocks"`
 	Reefs     []circle   `json:"reefs"`
 	Sources   []*source  `json:"sources"`
+	Lava      []circle   `json:"lava"`
+	Ice       []circle   `json:"ice"`
+	Edges     edges      `json:"edges"`     // the biome borders
 	ClimbTier int        `json:"climbTier"` // the biggest tier that gets onto rocks and reefs; fliers do too
 }
 
@@ -83,7 +86,8 @@ type meAlive struct {
 
 type meDead struct {
 	Alive bool   `json:"alive"`
-	By    string `json:"by"` // who ate them; "" when they starved
+	By    string `json:"by"`    // who ate them; "" when they starved or burned
+	Cause string `json:"cause"` // "eaten", "starved" or "lava"
 	BySp  int    `json:"bySp"`
 	Sp    int    `json:"sp"`
 	XP    int    `json:"xp"`
@@ -169,6 +173,7 @@ func encodeWorld(a *arena) []byte {
 		Type: "world", W: worldW, H: worldH, Tick: a.rate, Boost: boostCooldown, Coast: a.coast, CoastStep: coastStep,
 		Needs: tierNeed, MaxLevel: maxLevel, Species: speciesList, Foods: foodKinds, Ponds: a.ponds, Bushes: a.bushes, Kelp: a.kelp,
 		Islands: a.islands, Tar: a.tar, Rocks: a.rocks, Reefs: a.reefs, Sources: a.sources, ClimbTier: climbTier,
+		Lava: a.lava, Ice: a.ice, Edges: a.edges,
 	})
 	return data
 }
@@ -202,7 +207,7 @@ func encodeMe(b []byte, v viewer) []byte {
 		data, _ = json.Marshal(me)
 	case v.died != nil:
 		d := v.died
-		data, _ = json.Marshal(meDead{By: html.EscapeString(d.By), BySp: d.BySp, Sp: d.Sp, XP: int(d.XP), Kills: d.Kills, Secs: int(d.Secs)})
+		data, _ = json.Marshal(meDead{By: html.EscapeString(d.By), Cause: d.Cause, BySp: d.BySp, Sp: d.Sp, XP: int(d.XP), Kills: d.Kills, Secs: int(d.Secs)})
 	default:
 		data = []byte("null")
 	}

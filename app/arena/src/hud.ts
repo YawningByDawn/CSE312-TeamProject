@@ -1,12 +1,15 @@
 import { drawAnimal } from './animals';
 import type { Frame } from './view';
+import { BIOME_NAME } from './geo';
 import type { Circle, World } from './types';
 
 const within = (set: Circle[], x: number, y: number): boolean => set.some((k) => Math.hypot(x - k.x, y - k.y) < k.r);
 
 /** What the ground under a player means for them, if anything special. */
-function terrainHint(world: World, x: number, y: number, tier: number, habitat: string): string {
+function terrainHint(world: World, x: number, y: number, tier: number, habitat: string, fireproof: boolean, home: string): string {
   const climber = tier <= world.climbTier || habitat === 'air';
+  if (within(world.lava, x, y) && habitat !== 'air') return fireproof ? 'Fireproof: the lava cannot hurt you, and few can follow' : 'LAVA! It burns: get out!';
+  if (within(world.ice, x, y) && habitat !== 'air') return home === 'tundra' ? 'Sure-footed on the ice: it is your home' : 'Ice: you slide! Turning and stopping are slow';
   if (within(world.rocks, x, y) && climber) return 'Up on the rocks: nothing bigger than tier ' + (world.climbTier + 1) + ' can follow (but fliers can)';
   if (within(world.reefs, x, y) && climber) return 'In the reef: nothing bigger than tier ' + (world.climbTier + 1) + ' fits (but fliers can)';
   if (within(world.tar, x, y) && habitat !== 'air') return climber ? 'Tar pit: light enough to skitter across. Big ones bog down here' : 'Tar pit: you are bogged down! Get out';
@@ -90,6 +93,13 @@ export class Hud {
     this.banner = { title, sub, t0: performance.now() / 1000 };
   }
 
+  private zoneName: { name: string; hint: string; t0: number } | null = null;
+
+  /** Names the biome the player has just come into, under the top of the screen. */
+  zone(name: string, hint: string): void {
+    this.zoneName = { name, hint, t0: performance.now() / 1000 };
+  }
+
   /** `bottom` is how much of the screen's foot the DOM panels take, so the bars sit above them. */
   draw(c: CanvasRenderingContext2D, w: number, h: number, dpr: number, f: Frame, world: World | null, myName: string | null, playing: boolean, bottom: number): void {
     c.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -122,7 +132,7 @@ export class Hud {
       bar(c, x + half + 8, y - 26, half, 20, me.hp / me.maxHp, me.hp > me.maxHp * 0.35 ? '#6cc24a' : '#e2533f', `Health ${me.hp}`);
       dial(c, x + bw - 22, y - 58, 1 - me.cooldown / world.boost, '#8fd3ff', 'BOOST', small ? '' : 'Space');
       dial(c, x + bw - 72, y - 58, 1 - me.abilityCd / sp.ability.cooldown, '#ffb14a', 'SKILL', small ? '' : 'E');
-      const hint = terrainHint(world, f.camX, f.camY, sp.tier, sp.habitat);
+      const hint = terrainHint(world, f.camX, f.camY, sp.tier, sp.habitat, sp.fireproof, sp.home);
       if (hint) { // top middle, clear of the evolution choice
         c.font = `700 ${small ? 12 : 14}px ${FONT}`;
         const tw = Math.min(w - 24, c.measureText(hint).width + 28);
@@ -156,6 +166,28 @@ export class Hud {
       c.fillStyle = m.color;
       c.fillText(m.text, w / 2, y + 1);
       c.globalAlpha = 1;
+    }
+    if (this.zoneName) {
+      const age = t - this.zoneName.t0;
+      if (age > 3.5) this.zoneName = null;
+      else {
+        c.globalAlpha = Math.min(1, age * 3, (3.5 - age) * 2);
+        c.textAlign = 'center';
+        c.textBaseline = 'middle';
+        const zy = small ? 150 : 74;
+        c.font = `800 ${small ? 20 : 26}px ${FONT}`;
+        c.lineWidth = 5;
+        c.strokeStyle = 'rgba(28,44,26,0.85)';
+        c.strokeText(this.zoneName.name, w / 2, zy);
+        c.fillStyle = '#ffffff';
+        c.fillText(this.zoneName.name, w / 2, zy);
+        c.font = `600 ${small ? 12 : 14}px ${FONT}`;
+        c.lineWidth = 3;
+        c.strokeText(this.zoneName.hint, w / 2, zy + 22);
+        c.fillStyle = '#ffe9a8';
+        c.fillText(this.zoneName.hint, w / 2, zy + 22);
+        c.globalAlpha = 1;
+      }
     }
     if (this.banner) {
       const age = t - this.banner.t0;
@@ -209,7 +241,7 @@ export class Hud {
     c.fillText(sp.name, tx, y + (small ? 24 : 26));
     c.font = `600 ${small ? 11 : 12}px ${FONT}`;
     c.fillStyle = HABITAT_COLOR[sp.habitat] ?? '#fff';
-    c.fillText(`Tier ${sp.tier + 1} · ${HABITAT_LABEL[sp.habitat] ?? ''}`, tx, y + (small ? 39 : 43));
+    c.fillText(`Tier ${sp.tier + 1} · ${HABITAT_LABEL[sp.habitat] ?? ''}${sp.fireproof ? ' · fireproof' : ''}${small ? '' : ` · ${BIOME_NAME[sp.home]}`}`, tx, y + (small ? 39 : 43));
     c.fillStyle = 'rgba(255,255,255,0.9)';
     const atk = Math.round(sp.atk * (1 + 0.2 * bite));
     const hp = Math.round(sp.hp * (1 + 0.15 * health));
@@ -266,6 +298,37 @@ export class Hud {
     c.fill();
     c.save();
     c.clip();
+    // the biomes: swamp to the west, volcano north, tundra south
+    const e = world.edges;
+    for (const [which, fill] of [['swamp', 'rgba(70,96,52,0.85)'], ['volcano', 'rgba(80,62,54,0.9)'], ['tundra', 'rgba(225,236,244,0.85)']] as const) {
+      c.beginPath();
+      if (which === 'swamp') {
+        c.moveTo(x, y);
+        e.swamp.forEach((sx, i) => c.lineTo(x + sx * k, y + i * e.step * k));
+        c.lineTo(x, y + mh);
+      } else {
+        const line = which === 'volcano' ? e.volcano : e.tundra;
+        const far = which === 'volcano' ? y : y + mh;
+        c.moveTo(x, far);
+        line.forEach((sy, i) => c.lineTo(x + i * e.step * k, y + sy * k));
+        c.lineTo(x + mw, far);
+      }
+      c.closePath();
+      c.fillStyle = fill;
+      c.fill();
+    }
+    c.fillStyle = 'rgba(255,120,30,0.95)';
+    for (const p of world.lava) {
+      c.beginPath();
+      c.arc(x + p.x * k, y + p.y * k, Math.max(1.5, p.r * k), 0, TAU);
+      c.fill();
+    }
+    c.fillStyle = 'rgba(170,220,245,0.95)';
+    for (const p of world.ice) {
+      c.beginPath();
+      c.arc(x + p.x * k, y + p.y * k, Math.max(1.5, p.r * k), 0, TAU);
+      c.fill();
+    }
     c.beginPath();
     for (const [i, cx] of world.coast.entries()) c.lineTo(x + cx * k, y + i * world.coastStep * k);
     c.lineTo(x + mw, y + mh + 10);

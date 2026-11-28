@@ -1,7 +1,9 @@
 import { BODY_COLOR, drawAnimal, drawShadow } from './animals';
+import { Fx, STYLE_COLOR } from './fx';
+import { biomeAt } from './geo';
 import type { Net } from './net';
 import { drawCover, drawFood, drawGround, drawPonds, drawTerrain, type Rect } from './scene';
-import { BOOSTING, BOT, CHARGING, GUARDED, HIDDEN, HURT, USING, WET, type BoardRow, type Creature, type MeAlive, type MeDead, type Snap, type Species, type World } from './types';
+import { BOOSTING, BOT, BURNING, CHARGING, DAZED, GUARDED, HIDDEN, HURT, TAIL_BIT, USING, WET, type Biome, type BoardRow, type Creature, type MeAlive, type MeDead, type Snap, type Species, type World } from './types';
 
 // The world as one frame sees it: a little in the past, between the two snapshots either side of that moment, so
 // creatures glide at any tick rate. A snapshot's events play as the frame passes it: food and prey slide into
@@ -13,19 +15,6 @@ const SPECTATOR_VIEW = 1100;
 const PREDATOR = '#ff3b30';
 const PREY = '#3ddc57';
 const MAX_ASPECT = 2.4; // the hub sends a view up to this many times as wide as it is high
-
-/** The colours of each ability style: its main colour and a lighter one. */
-export const STYLE_COLOR: Record<string, [string, string]> = {
-  dust: ['#c9a66b', '#efdcb4'],
-  quake: ['#8a6a3a', '#d8b878'],
-  roar: ['#ffffff', '#fff3a8'],
-  wind: ['#e8f4ff', '#ffffff'],
-  fire: ['#ff7a1a', '#ffe27a'],
-  venom: ['#7fd23a', '#d8ff8a'],
-  ink: ['#3a2250', '#7a5a9a'],
-  water: ['#5fc8f0', '#d8f6ff'],
-  gaze: ['#ffd23a', '#fff8c8'],
-};
 
 export interface Hooks {
   spawned(me: MeAlive): void;
@@ -43,6 +32,7 @@ export interface Frame {
   scale: number;
   mine: { x: number; y: number; r: number } | null; // my creature on screen, CSS px
   threat: number; // 0 to 1: how close something that could eat me is
+  biome: Biome | null; // where the camera is
 }
 
 interface Ghost {
@@ -75,17 +65,6 @@ interface Float {
   color: string;
 }
 
-/** An ability going off: a ring that spreads (a stomp) or closes in (a pull) round a creature. */
-interface Wave {
-  id: number;
-  x: number;
-  y: number;
-  r0: number;
-  r1: number;
-  t0: number;
-  style: string;
-}
-
 const lerp = (a: number, b: number, k: number): number => a + (b - a) * k;
 
 function lerpAngle(a: number, b: number, k: number): number {
@@ -107,7 +86,8 @@ export class View {
   private ghosts: Ghost[] = [];
   private particles: Particle[] = [];
   private floats: Float[] = [];
-  private waves: Wave[] = [];
+  private fx = new Fx();
+  private echoes = new Map<number, { x: number; y: number; a: number }[]>(); // where charging creatures just were
   private last: MeAlive | MeDead | null = null;
   private drift = 0; // the menu's slow pan with no server
 
@@ -120,7 +100,7 @@ export class View {
     if (!world || snaps.length === 0) {
       this.drift += dt * 30;
       this.place(c, w, h, dpr, 1000 + this.drift, 1000 + this.drift * 0.4, 1, world, t);
-      return { me: null, board: [], camX: this.camX, camY: this.camY, scale: 1, mine: null, threat: 0 };
+      return { me: null, board: [], camX: this.camX, camY: this.camY, scale: 1, mine: null, threat: 0, biome: null };
     }
 
     const rt = net.serverNow() - (1.2 / world.tick + 0.03);
@@ -172,7 +152,7 @@ export class View {
     const scale = Math.max(h / (this.viewH * (h > w ? 1.25 : 1)), w / (this.viewH * MAX_ASPECT));
     const v = this.place(c, w, h, dpr, this.camX, this.camY, scale, world, t);
 
-    drawPonds(c, world.ponds, v, t);
+    drawPonds(c, world, v, t);
     drawTerrain(c, world, v, t);
     for (const f of cur.food.values()) {
       const kind = world.foods[f.kind]!;
@@ -194,7 +174,8 @@ export class View {
       if (!visible(d) || d === mine && d.flags & HIDDEN) continue;
       this.creature(c, d, t, d.flags & HIDDEN && d.flags & WET && d.s.habitat === 'amph' ? 0.3 : 1, d.flags & HIDDEN ? null : ring(d), scale);
     }
-    drawCover(c, world.bushes, world.kelp, v, t);
+    for (const id of this.echoes.keys()) if (!byId.get(id) || !(byId.get(id)!.flags & CHARGING)) this.echoes.delete(id);
+    drawCover(c, world, v, t);
     if (mine && mine.flags & HIDDEN) {
       this.creature(c, mine, t, 0.6, null, scale);
       c.beginPath();
@@ -207,9 +188,13 @@ export class View {
     }
     this.shots(c, A, B, k, world, t);
     this.effects(c, world, byId, t, dt);
+    // weak spots: where a creature bigger than me can be bitten without biting back
+    for (const d of drawn) if (visible(d) && !(d.flags & HIDDEN) && ring(d) === PREDATOR) this.weakSpot(c, d, t, scale);
+    const biome = biomeAt(world, this.camX, this.camY);
 
-    // names and hp, in screen space
+    // the weather, then names and hp, in screen space
     c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    this.fx.weather(c, w, h, biome, t, dt);
     let threat = 0;
     c.textAlign = 'center';
     c.textBaseline = 'middle';
@@ -247,6 +232,7 @@ export class View {
       scale,
       mine: mine ? { x: (mine.x - this.camX) * scale + w / 2, y: (mine.y - this.camY) * scale + h / 2, r: mine.s.r * scale } : null,
       threat: Math.max(0, threat),
+      biome,
     };
   }
 
@@ -274,6 +260,19 @@ export class View {
       c.stroke();
       c.globalAlpha = alpha;
     }
+    if (d.flags & CHARGING) { // afterimages: more, the higher the skill
+      const trail = this.echoes.get(d.id) ?? [];
+      trail.push({ x: d.x, y: d.y, a: d.a });
+      while (trail.length > 3 + d.lv * 2) trail.shift();
+      this.echoes.set(d.id, trail);
+      for (const [i, e] of trail.slice(0, -1).entries()) {
+        c.globalAlpha = alpha * 0.12 * (i + 1);
+        drawAnimal(c, d.s.name, e.x, e.y, r, e.a, t + d.id, 1, 1.15);
+      }
+      c.globalAlpha = alpha;
+      this.fx.emit(d.s.ability.style, d.x - Math.cos(d.a) * r, d.y - Math.sin(d.a) * r, 1 + Math.floor(d.lv / 2), 60 + d.lv * 15, 1, d.a + Math.PI);
+    }
+    if (d.flags & BURNING && Math.random() < 0.6) this.fx.emit('fire', d.x + (Math.random() - 0.5) * r, d.y + (Math.random() - 0.5) * r, 1, 30);
     if (d.flags & (BOOSTING | CHARGING)) {
       const [main] = STYLE_COLOR[d.flags & CHARGING ? d.s.ability.style : 'wind'] ?? ['#fff'];
       c.strokeStyle = d.flags & CHARGING ? main : 'rgba(255,255,255,0.6)';
@@ -305,6 +304,28 @@ export class View {
       c.fillStyle = 'rgba(255,40,30,0.38)';
       c.fill();
     }
+    if (d.flags & BURNING) {
+      c.beginPath();
+      c.arc(d.x, d.y, r * 0.95, 0, TAU);
+      c.fillStyle = `rgba(255,110,20,${0.25 + Math.sin(t * 12) * 0.1})`;
+      c.fill();
+    }
+    if (d.flags & DAZED) { // stars circling its head
+      for (let k = 0; k < 3; k++) {
+        const a = t * 5 + (k * TAU) / 3;
+        const sx = d.x + Math.cos(d.a) * r * 0.4 + Math.cos(a) * r * 0.55;
+        const sy = d.y + Math.sin(d.a) * r * 0.4 + Math.sin(a) * r * 0.3;
+        c.beginPath();
+        for (let n = 0; n < 10; n++) {
+          const sa = (n / 10) * TAU - Math.PI / 2;
+          const sr = n % 2 ? 2.5 : 6;
+          c.lineTo(sx + Math.cos(sa) * sr, sy + Math.sin(sa) * sr);
+        }
+        c.closePath();
+        c.fillStyle = '#ffe45a';
+        c.fill();
+      }
+    }
     if (d.flags & GUARDED) {
       c.strokeStyle = `rgba(255,255,255,${0.45 + Math.sin(t * 10) * 0.25})`;
       c.lineWidth = 3;
@@ -315,29 +336,59 @@ export class View {
     c.globalAlpha = 1;
   }
 
-  /** Shots in flight, between A and B: glowing balls in the colours of whoever spat them. */
+  /** A predator's weak spot: a pulsing target at its tail, flashing when it is bitten there. */
+  private weakSpot(c: CanvasRenderingContext2D, d: Drawn, t: number, scale: number): void {
+    const R = d.s.r;
+    const x = d.x - Math.cos(d.a) * R * 0.95;
+    const y = d.y - Math.sin(d.a) * R * 0.95;
+    const r = Math.max(R * 0.5, 11 / scale);
+    const bitten = d.flags & TAIL_BIT;
+    const pulse = (Math.sin(t * 5 + d.id) + 1) / 2;
+    const color = bitten ? '#ff5a3a' : '#ffd23a';
+    const px = 1 / scale; // a screen pixel, in world units
+    c.save();
+    c.beginPath();
+    c.arc(x, y, r * (0.95 + pulse * 0.12), 0, TAU);
+    c.fillStyle = bitten ? 'rgba(255,90,58,0.45)' : `rgba(255,210,58,${0.22 + pulse * 0.18})`;
+    c.fill();
+    c.lineWidth = 3.5 * px;
+    c.strokeStyle = 'rgba(40,30,10,0.55)';
+    c.stroke();
+    c.setLineDash([6 * px, 4 * px]);
+    c.lineDashOffset = -t * 24 * px;
+    c.lineWidth = 3 * px;
+    c.strokeStyle = color;
+    c.stroke();
+    c.setLineDash([]);
+    // two fangs in the middle: bite here
+    for (const s of [-1, 1]) {
+      c.beginPath();
+      c.moveTo(x + s * 5 * px - 4 * px, y - 5 * px);
+      c.lineTo(x + s * 5 * px + 4 * px, y - 5 * px);
+      c.lineTo(x + s * 5 * px, y + 7 * px);
+      c.closePath();
+      c.fillStyle = '#fffaf0';
+      c.fill();
+      c.lineWidth = 1.5 * px;
+      c.strokeStyle = 'rgba(40,30,10,0.8)';
+      c.stroke();
+    }
+    c.restore();
+  }
+
+  /** Shots in flight, between A and B: glowing, trailing balls in the colours of whoever spat them. */
   private shots(c: CanvasRenderingContext2D, A: Snap, B: Snap, k: number, world: World, t: number): void {
+    const ids = new Set<number>();
     for (const sb of B.shots.values()) {
+      ids.add(sb.id);
       const sa = A.shots.get(sb.id);
       const x = sa ? lerp(sa.x, sb.x, k) : sb.x;
       const y = sa ? lerp(sa.y, sb.y, k) : sb.y;
       const s = world.species[sb.sp]!;
-      const [main, light] = STYLE_COLOR[s.ability.style] ?? ['#fff', '#fff'];
-      const r = 7 + 1.3 * s.tier;
-      c.save();
-      c.shadowColor = main;
-      c.shadowBlur = 14;
       const ang = sa ? Math.atan2(sb.y - sa.y, sb.x - sa.x) : 0;
-      c.beginPath();
-      c.ellipse(x, y, r * 1.5, r, ang, 0, TAU);
-      c.fillStyle = main;
-      c.fill();
-      c.beginPath();
-      c.arc(x + Math.cos(ang) * r * 0.3, y + Math.sin(ang) * r * 0.3, r * (0.5 + Math.sin(t * 20) * 0.08), 0, TAU);
-      c.fillStyle = light;
-      c.fill();
-      c.restore();
+      this.fx.shot(c, sb.id, x, y, ang, (7 + 1.3 * s.tier) * (1 + 0.12 * sb.lv), s.ability.style, sb.lv, t);
     }
+    this.fx.keepTrails(ids);
   }
 
   /** A snapshot's events, as the frame reaches it: what was eaten, abilities going off, and what changed for me. */
@@ -361,12 +412,23 @@ export class View {
     }
     for (const cr of s.creatures.values()) {
       const before = prev?.creatures.get(cr.id);
+      if (cr.flags & TAIL_BIT && !(before && before.flags & TAIL_BIT)) {
+        const sp = world.species[cr.sp]!;
+        this.burst(cr.x - Math.cos(cr.a) * sp.r * 0.9, cr.y - Math.sin(cr.a) * sp.r * 0.9, sp.r * 0.3, '#ff5a3a', 12);
+      }
       if (!(cr.flags & USING) || (before && before.flags & USING)) continue;
       const sp = world.species[cr.sp]!;
       const { kind, style } = sp.ability;
-      if (kind === 'stomp') this.waves.push({ id: cr.id, x: cr.x, y: cr.y, r0: sp.r, r1: sp.r * 2.6 + 40, t0: t, style });
-      else if (kind === 'pull') this.waves.push({ id: cr.id, x: cr.x, y: cr.y, r0: sp.r * 4 + 60, r1: sp.r, t0: t, style });
-      else this.burst(cr.x + Math.cos(cr.a) * sp.r, cr.y + Math.sin(cr.a) * sp.r, sp.r * 0.4, (STYLE_COLOR[style] ?? ['#fff'])[0], 8);
+      const grow = 1 + 0.12 * cr.lv; // skills reach further with their level, as on the server
+      const mouthX = cr.x + Math.cos(cr.a) * sp.r;
+      const mouthY = cr.y + Math.sin(cr.a) * sp.r;
+      if (kind === 'stomp') this.fx.stomp(cr.x, cr.y, sp.r, (sp.r * 2.6 + 40) * grow, style, cr.lv, t, cr.id);
+      else if (kind === 'pull') this.fx.pull(cr.x, cr.y, (sp.r * 4 + 60) * grow, style, cr.lv, t, cr.id);
+      else this.fx.burst(mouthX, mouthY, style, cr.lv, cr.a);
+    }
+    for (const sh of prev?.shots.values() ?? []) { // shots that are gone burst where they were
+      if (s.shots.has(sh.id)) continue;
+      this.fx.impact(sh.x, sh.y, world.species[sh.sp]!.ability.style, sh.lv, t);
     }
     if (me?.alive && was?.alive && me.id === was.id) {
       const mine = s.creatures.get(me.id);
@@ -390,26 +452,7 @@ export class View {
   }
 
   private effects(c: CanvasRenderingContext2D, world: World, byId: Map<number, Drawn>, t: number, dt: number): void {
-    this.waves = this.waves.filter((wv) => {
-      const p = (t - wv.t0) / 0.45;
-      if (p >= 1) return false;
-      const at = byId.get(wv.id);
-      const x = at?.x ?? wv.x;
-      const y = at?.y ?? wv.y;
-      const [main, light] = STYLE_COLOR[wv.style] ?? ['#fff', '#fff'];
-      const ease = 1 - (1 - p) * (1 - p);
-      for (const [i, color] of [main, light].entries()) {
-        const r = lerp(wv.r0, wv.r1, Math.max(0, ease - i * 0.15));
-        c.globalAlpha = (1 - p) * (i ? 0.5 : 0.8);
-        c.strokeStyle = color;
-        c.lineWidth = 10 * (1 - p) + 2;
-        c.beginPath();
-        c.arc(x, y, Math.max(1, r), 0, TAU);
-        c.stroke();
-      }
-      c.globalAlpha = 1;
-      return true;
-    });
+    this.fx.draw(c, t, dt, (id) => byId.get(id));
     this.ghosts = this.ghosts.filter((g) => {
       const p = (t - g.t0) / g.dur;
       if (p >= 1) return false;

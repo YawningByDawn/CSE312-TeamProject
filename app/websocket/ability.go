@@ -1,24 +1,33 @@
 package websocket
 
-import "math"
+import (
+	"math"
+	"slices"
+)
 
 // Abilities: each species has one, on its own key, with a cooldown (species.go). A charge is a long dash that hurts the
 // first creature it runs into; a stomp hurts everything near and throws it back; a pull hurts everything near and
 // drags it in; a spit fires a shot that hurts the first creature it reaches. An ability hurts creatures of any size,
 // the ones bigger than its user less the bigger they are (fightBack), and a hurt that empties a creature's hp eats it,
 // wherever it is.
+//
+// Skills grow with their level (the "ability" stat): a stomp or pull reaches further and throws harder, and from
+// level 3 a stomp dazes what it hits; a charge runs longer and goes through more creatures; a spit flies bigger,
+// faster and further, and from level 3 it fires three shots in a fan, five at level 5.
 
 const (
 	chargeTime  = 0.45 // seconds an ability charge lasts
 	shotSpeed   = 720.0
 	abilityShow = 0.35 // seconds the views show an ability being used
+	dazeTime    = 1.0  // seconds a stomp from level 3 slows what it hits
+	dazeSlow    = 0.5  // to this share of its speed
 )
 
 // shot is a spit in flight.
 type shot struct {
 	id                   int
 	by                   *creature
-	sp                   int // the species that spat it, for how it looks
+	sp, lv               int // the species that spat it and its skill level, for how it looks
 	x, y, vx, vy, r, dmg float64
 	life                 float64 // seconds before it falls
 }
@@ -31,12 +40,17 @@ func abilityDamage(c *creature) float64 {
 	return c.kind().ATK * abilityShare[c.kind().Ability.Kind] * (1 + levelBonus*float64(c.abilityLv))
 }
 
+// grow is how much bigger a skill is at its user's level.
+func grow(c *creature, per float64) float64 {
+	return 1 + per*float64(c.abilityLv)
+}
+
 // reach is how far a stomp or a pull reaches from the middle of its user.
 func reach(c *creature) float64 {
 	if c.kind().Ability.Kind == pull {
-		return c.r()*4 + 60
+		return (c.r()*4 + 60) * grow(c, 0.12)
 	}
-	return c.r()*2.6 + 40
+	return (c.r()*2.6 + 40) * grow(c, 0.12)
 }
 
 // hittable says whether `by`'s ability can hurt o.
@@ -54,24 +68,43 @@ func (a *arena) useAbility(c *creature) {
 	dmg := abilityDamage(c)
 	switch ab.Kind {
 	case charge:
-		c.charging, c.chargeHit = chargeTime, false
+		c.charging, c.chargeHits = chargeTime*grow(c, 0.1), c.chargeHits[:0]
 	case stomp, pull:
-		knock := 380.0
+		knock := 380 * grow(c, 0.1)
 		if ab.Kind == pull {
-			knock = -340
+			knock = -340 * grow(c, 0.1)
 		}
 		for _, o := range a.creatures {
 			if hittable(c, o) && math.Hypot(o.x-c.x, o.y-c.y) < reach(c)+o.r() {
 				a.hurt(c, o, dmg*against(c, o), knock)
+				if ab.Kind == stomp && c.abilityLv >= 3 {
+					o.dazed = dazeTime
+				}
 			}
 		}
 	case spit:
-		cos, sin := math.Cos(c.angle), math.Sin(c.angle)
 		t := float64(c.tier())
-		a.shots = append(a.shots, &shot{
-			id: a.id(), by: c, sp: c.sp, dmg: dmg, r: 7 + 1.3*t, life: (600 + 40*t) / shotSpeed,
-			x: c.x + cos*(c.r()+6), y: c.y + sin*(c.r()+6), vx: cos * shotSpeed, vy: sin * shotSpeed,
-		})
+		n := 1
+		if c.abilityLv >= 5 {
+			n = 5
+		} else if c.abilityLv >= 3 {
+			n = 3
+		}
+		speed := shotSpeed * grow(c, 0.05)
+		for i := range n {
+			side := float64(i - n/2)
+			ang := c.angle + side*0.16
+			share := 1.0
+			if side != 0 {
+				share = 0.6 // the shots to the sides hurt less
+			}
+			cos, sin := math.Cos(ang), math.Sin(ang)
+			a.shots = append(a.shots, &shot{
+				id: a.id(), by: c, sp: c.sp, lv: c.abilityLv, dmg: dmg * share, r: (7 + 1.3*t) * grow(c, 0.12),
+				life: (600 + 40*t) * grow(c, 0.1) / speed,
+				x:    c.x + cos*(c.r()+6), y: c.y + sin*(c.r()+6), vx: cos * speed, vy: sin * speed,
+			})
+		}
 	}
 }
 
@@ -81,14 +114,18 @@ func (a *arena) abilities(dt float64) {
 		c.abilityCd = max(0, c.abilityCd-dt)
 		c.fx = max(0, c.fx-dt)
 		c.charging = max(0, c.charging-dt)
-		if c.charging == 0 || c.chargeHit || c.dead != nil {
+		c.dazed = max(0, c.dazed-dt)
+		// a charge goes through creatures, more of them the higher its level
+		if c.charging == 0 || c.dead != nil || len(c.chargeHits) > c.abilityLv/2 {
 			continue
 		}
 		for _, o := range a.creatures {
-			if hittable(c, o) && math.Hypot(o.x-c.x, o.y-c.y) < c.r()+o.r()+4 {
-				c.chargeHit = true
-				a.hurt(c, o, abilityDamage(c)*against(c, o), 480)
-				break
+			if hittable(c, o) && !slices.Contains(c.chargeHits, o.id) && math.Hypot(o.x-c.x, o.y-c.y) < c.r()+o.r()+4 {
+				c.chargeHits = append(c.chargeHits, o.id)
+				a.hurt(c, o, abilityDamage(c)*against(c, o), 480*grow(c, 0.1))
+				if len(c.chargeHits) > c.abilityLv/2 {
+					break
+				}
 			}
 		}
 	}

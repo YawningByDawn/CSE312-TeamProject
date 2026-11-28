@@ -2,6 +2,7 @@ import './style.css';
 import { Hud } from './hud';
 import { Input } from './input';
 import { Net } from './net';
+import { BIOME_HINT, BIOME_NAME } from './geo';
 import { drawTree, Panels } from './panels';
 import type { MeDead } from './types';
 import { View } from './view';
@@ -38,6 +39,10 @@ let playing = false;
 let deathTimer = 0;
 
 const TIPS = [
+  'Bite a bigger creature on its tail (the yellow target) and it cannot bite you back.',
+  'Lava burns anything that is not fireproof, so fireproof creatures can hide in it.',
+  'On Frostmarch ice everyone slides, except the creatures born there.',
+  'Skills grow with their level: wider stomps, longer charges, and three or five shots at once.',
   'Bitten? You are thrown clear and run faster for a moment: get away!',
   'Nothing takes more than half your health in one hit, so keep moving.',
   'You bite back when bitten, and a boost into a bigger creature bites it too.',
@@ -92,8 +97,9 @@ const view = new View({
 
 function showDeath(me: MeDead): void {
   const species = net.world?.species ?? [];
-  $('dead-title').textContent = me.by ? 'You were eaten!' : 'You starved!';
-  $('dead-sub').textContent = me.by ? `by ${me.by}, a ${species[me.bySp]?.name ?? 'creature'}` : 'Big creatures get hungry fast.';
+  $('dead-title').textContent = me.cause === 'lava' ? 'You burned!' : me.by ? 'You were eaten!' : 'You starved!';
+  $('dead-sub').textContent =
+    me.cause === 'lava' ? 'Lava burns all but the fireproof: Salamanders, Dimetrodons and the fire-born.' : me.by ? `by ${me.by}, a ${species[me.bySp]?.name ?? 'creature'}` : 'Big creatures get hungry fast.';
   $('st-sp').textContent = species[me.sp]?.name ?? '?';
   $('st-xp').textContent = `${me.xp}`;
   $('st-kills').textContent = `${me.kills}`;
@@ -205,6 +211,7 @@ window.addEventListener('keydown', (e) => {
 // the loop
 let last = performance.now();
 let sent = { dx: 0, dy: 0, at: 0 };
+let lastBiome: string | null = null;
 
 function frame(now: number): void {
   const dt = Math.min(0.1, (now - last) / 1000);
@@ -219,6 +226,8 @@ function frame(now: number): void {
   const f = view.frame(ctx, w, h, dpr, net, now / 1000, dt);
   hud.draw(ctx, w, h, dpr, f, net.world, net.name, playing, 0);
   const alive = f.me?.alive && playing ? f.me : null;
+  if (alive && f.biome && f.biome !== lastBiome) hud.zone(BIOME_NAME[f.biome], BIOME_HINT[f.biome]);
+  lastBiome = alive ? f.biome : null;
   panels.update(alive, net.world);
 
   if (alive) {

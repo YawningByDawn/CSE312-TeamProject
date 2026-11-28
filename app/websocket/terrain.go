@@ -14,7 +14,8 @@ import (
 // crawl through the sea to get there.
 //
 // Food sources grow their own food around them, up to a few at a time: ginkgo trees drop nuts, termite mounds swarm,
-// nests lay eggs, the bones of a fallen giant still give meat, ponds grow lilies, and vents in the sea feed shrimp.
+// nests lay eggs, the bones of a fallen giant still give meat, ponds grow lilies, fishing holes in the tundra ice
+// give fish, and vents in the sea feed shrimp.
 // Now and then a starfruit ripens somewhere on land: rare, and worth a lot to anyone.
 
 const (
@@ -49,6 +50,7 @@ var sourceKinds = map[string]sourceKind{
 	"nest":   {food: "egg", max: 3, every: 6, spread: 1},
 	"bones":  {food: "meat", max: 4, every: 5, spread: 0.9, on: true}, // meat lies on the carcass
 	"vent":   {food: "shrimp", max: 8, every: 1.5, spread: 1.8},
+	"hole":   {food: "fish", max: 3, every: 4, spread: 1.6},
 	"lilies": {food: "lily", max: 4, every: 4, spread: 0.8, on: true},
 }
 
@@ -104,24 +106,32 @@ func (a *arena) tarPaceOf(c *creature) float64 {
 	return tarPace
 }
 
-// placeSources puts the food sources about the map: trees, mounds, nests and bones on land, vents at sea, and lilies
-// in every pond.
-func (a *arena) placeSources() {
-	onLand := func(x, y, r float64) bool {
-		return x+r+250 < a.coastX(y) && inside(a.ponds, x, y) == nil && inside(a.tar, x, y) == nil
+// placeSources puts the food sources about the map, by biome: ginkgo trees in the meadow and swamp, termite mounds,
+// nests in the meadow and the volcano, a fallen giant's bones mostly where the big ones die, fishing holes in the
+// tundra ice, vents at sea; a ginkgo on every island, and lilies in every pond.
+func (a *arena) placeSources(in map[string]func(x, y, r float64) bool) {
+	clearOf := func(ok func(x, y, r float64) bool) func(x, y, r float64) bool {
+		return func(x, y, r float64) bool {
+			return ok(x, y, r) && inside(a.ponds, x, y) == nil && inside(a.tar, x, y) == nil && inside(a.lava, x, y) == nil && inside(a.ice, x, y) == nil
+		}
 	}
-	atSea := func(x, y, r float64) bool { return x-r-250 > a.coastX(y) && inside(a.islands, x, y) == nil }
-	taken := slices.Concat(a.ponds, a.tar, a.bushes, a.rocks)
+	taken := slices.Concat(a.ponds, a.tar, a.lava, a.bushes, a.rocks)
 	for _, spec := range []struct {
-		kind       string
-		n          int
-		minR, maxR float64
-		ok         func(x, y, r float64) bool
+		kind, biome string
+		n           int
+		minR, maxR  float64
 	}{
-		{"tree", 22, 45, 60, onLand}, {"mound", 14, 22, 30, onLand}, {"nest", 12, 20, 26, onLand},
-		{"bones", 8, 75, 95, onLand}, {"vent", 14, 22, 32, atSea},
+		{"tree", meadow, 18, 45, 60}, {"tree", swamp, 10, 45, 60},
+		{"mound", meadow, 10, 22, 30}, {"mound", swamp, 6, 22, 30}, {"mound", volcano, 5, 22, 30},
+		{"nest", meadow, 8, 20, 26}, {"nest", volcano, 8, 20, 26},
+		{"bones", volcano, 6, 75, 95}, {"bones", tundra, 4, 75, 95}, {"bones", meadow, 3, 75, 95},
+		{"hole", tundra, 10, 20, 28}, {"vent", oceanBiome, 20, 22, 32},
 	} {
-		for _, c := range a.scatter(spec.n, spec.minR, spec.maxR, taken, spec.ok) {
+		ok := clearOf(in[spec.biome])
+		if spec.kind == "hole" { // fishing holes are cut in the ice
+			ok = func(x, y, r float64) bool { return in[tundra](x, y, r) && inside(a.ice, x, y) != nil }
+		}
+		for _, c := range a.scatter(spec.n, spec.minR, spec.maxR, taken, ok) {
 			a.sources = append(a.sources, &source{Kind: spec.kind, X: c.X, Y: c.Y, R: c.R})
 			taken = append(taken, c)
 		}
@@ -175,7 +185,7 @@ func (a *arena) growSources(dt float64) {
 		}
 		for tries := 0; ripe < starfruits && tries < 20; tries++ {
 			x, y := 100+a.rng.Float64()*(worldW-200), 100+a.rng.Float64()*(worldH-200)
-			if a.terrain(x, y) == ground && inside(a.tar, x, y) == nil {
+			if a.terrain(x, y) == ground && inside(a.tar, x, y) == nil && inside(a.lava, x, y) == nil {
 				a.food = append(a.food, &foodItem{id: a.id(), kind: star, x: x, y: y})
 				break
 			}

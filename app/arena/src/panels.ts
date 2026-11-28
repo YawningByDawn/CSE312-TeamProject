@@ -1,4 +1,5 @@
 import { drawAnimal } from './animals';
+import { BIOME_NAME } from './geo';
 import { HABITAT_COLOR, HABITAT_LABEL } from './hud';
 import type { MeAlive, Species, World } from './types';
 
@@ -105,7 +106,7 @@ export class Panels {
         b.append(icon(here, 52), el('b', '', `Stay ${here.name}`), el('small', '', '+1 stat point: bite, skill, health or speed'));
       } else {
         const sp = world.species[to]!;
-        const habitat = el('small', 'habitat', HABITAT_LABEL[sp.habitat] ?? '');
+        const habitat = el('small', 'habitat', `${HABITAT_LABEL[sp.habitat] ?? ''}${sp.fireproof ? ' · fireproof' : ''} · ${BIOME_NAME[sp.home]}`);
         habitat.style.color = HABITAT_COLOR[sp.habitat] ?? '';
         b.append(icon(sp, 52), el('b', '', sp.name), habitat, el('small', 'hpatk', `HP ${sp.hp} · ATK ${sp.atk}`), el('small', '', `${sp.ability.name}: ${KIND_TEXT[sp.ability.kind] ?? ''}`));
       }
@@ -151,8 +152,8 @@ export class Panels {
 
 /** Draws the whole evolution tree onto a canvas, tiers left to right, with `current` ringed. */
 export function drawTree(cv: HTMLCanvasElement, world: World, current: number): void {
-  const colW = 132;
-  const rowH = 112;
+  const colW = 128;
+  const rowH = 88;
   const tiers = Math.max(...world.species.map((s) => s.tier)) + 1;
   const columns: number[][] = Array.from({ length: tiers }, () => []);
   for (const [i, s] of world.species.entries()) columns[s.tier]!.push(i);

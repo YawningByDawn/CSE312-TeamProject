@@ -2,19 +2,21 @@ package websocket
 
 import (
 	"encoding/json"
+	"maps"
 	"math"
 	"math/rand/v2"
 	"regexp"
+	"slices"
 	"testing"
 )
 
-// newTestArena keeps the map's coast (the sea is east of x = 4500 or so) but nothing else: no food, bots, bushes,
-// kelp, ponds, islands, tar, crags or food sources, and nothing grows back.
+// newTestArena keeps the map's coast (the sea is east of x = 7300 or so) and biome borders but nothing else: no food,
+// bots, bushes, kelp, ponds, islands, tar, lava, ice, crags or food sources, and nothing grows back.
 func newTestArena() *arena {
 	a := newArena(rand.New(rand.NewPCG(1, 2)), 20)
 	a.creatures, a.food, a.bushes, a.kelp, a.ponds = nil, nil, nil, nil, nil
-	a.islands, a.tar, a.rocks, a.reefs, a.sources = nil, nil, nil, nil, nil
-	a.landFood, a.seaFood, a.minBots, a.totalCreatures = 0, 0, 0, 0
+	a.islands, a.tar, a.rocks, a.reefs, a.sources, a.lava, a.ice = nil, nil, nil, nil, nil, nil, nil
+	a.foodTarget, a.minBots, a.totalCreatures = map[string]int{}, 0, 0
 	return a
 }
 
@@ -67,6 +69,7 @@ func TestTheTreeGrowsOneTierAtATimeAndBothWaysReachTheTop(t *testing.T) {
 func TestABiggerCreatureBitesASmallerOneThatBitesBackAndRuns(t *testing.T) {
 	a := newTestArena()
 	rex := put(t, a, "ann", "T-Rex", 1000, 1000)
+	rex.angle = 0 // facing the raptor, not showing it its tail
 	raptor := put(t, a, "bea", "Raptor", 1060, 1000)
 	a.step(0.05)
 	if raptor.dead != nil || raptor.hp >= raptor.maxHP() {
@@ -85,7 +88,7 @@ func TestABiggerCreatureBitesASmallerOneThatBitesBackAndRuns(t *testing.T) {
 		t.Fatal("bit again before the bite cooled down")
 	}
 	for i := 0; i < 100 && raptor.dead == nil; i++ { // held against the rex, it is eaten in the end
-		raptor.x, raptor.y, raptor.vx, raptor.vy = rex.x+60, rex.y, 0, 0
+		raptor.x, raptor.y, raptor.vx, raptor.vy, rex.angle = rex.x+60, rex.y, 0, 0, 0
 		a.step(0.05)
 	}
 	if raptor.dead == nil || raptor.dead.By != "ann" || rex.kills != 1 || rex.xp <= 0 {
@@ -109,7 +112,7 @@ func TestASmallerCreatureFightsBackWithABoost(t *testing.T) {
 	compy := put(t, a, "ann", "Compy", 1000, 1000)
 	compy.angle = 0
 	tooth := put(t, a, "bea", "Sabertooth", 1045, 1000)
-	tooth.biteCd = 10 // so only the compy bites
+	tooth.biteCd, tooth.angle = 10, math.Pi // so only the compy bites, and at its face, not its tail
 	a.boost(compy)
 	a.step(0.05)
 	want := biteDamage(compy) * fightBack(tooth.tier()-compy.tier())
@@ -119,7 +122,7 @@ func TestASmallerCreatureFightsBackWithABoost(t *testing.T) {
 	tooth.hp = 1
 	compy.bit, compy.dash = false, boostTime
 	compy.x, compy.y = 1000, 1000
-	tooth.x, tooth.y, tooth.vx = 1045, 1000, 0
+	tooth.x, tooth.y, tooth.vx, tooth.angle = 1045, 1000, 0, math.Pi
 	a.step(0.05)
 	if tooth.dead == nil || tooth.dead.By != "ann" {
 		t.Fatal("a fight-back bite that emptied the sabertooth's hp did not eat it")
@@ -299,8 +302,8 @@ func TestStayingGivesAStatPointAndOffersAgainSooner(t *testing.T) {
 
 func TestTheTopOfTheChainEarnsStatPoints(t *testing.T) {
 	a := newTestArena()
-	c := put(t, a, "ann", "Dragon", 1000, 1000)
-	c.progress = tierNeed[9] + 1
+	c := put(t, a, "ann", "Quetzalcoatl", 1000, 1000)
+	c.progress = tierNeed[11] + 1
 	a.step(0.05)
 	if c.offer || c.points != 1 {
 		t.Fatalf("offer %v, points %d", c.offer, c.points)
@@ -360,7 +363,7 @@ func TestAChargeHurtsTheFirstCreatureItRunsInto(t *testing.T) {
 	for range 10 {
 		a.step(0.05)
 	}
-	if foe.hp >= foe.maxHP() || !tri.chargeHit {
+	if foe.hp >= foe.maxHP() || len(tri.chargeHits) == 0 {
 		t.Fatalf("foe at %v hp after the charge", foe.hp)
 	}
 }
@@ -460,7 +463,7 @@ func TestAFullArenaRuns(t *testing.T) {
 			}
 		}
 	}
-	if len(a.creatures) < a.minBots || len(a.food) < (a.landFood+a.seaFood)/2 {
+	if len(a.creatures) < a.minBots || len(a.food) < 1000 {
 		t.Fatalf("%d creatures and %d food after the run", len(a.creatures), len(a.food))
 	}
 	if seaBots == 0 || float64(wet) < 0.9*float64(seaBots) {
@@ -495,7 +498,7 @@ func TestTheViewIsJSONAndOnlyWhatIsNear(t *testing.T) {
 	if err := json.Unmarshal(data, &got); err != nil {
 		t.Fatalf("%v in %s", err, data)
 	}
-	if got.Type != "state" || !got.Me.Alive || got.Me.ID != c.id || len(got.Me.Offer) != 2 || got.Me.MaxHP != int(c.maxHP()) ||
+	if got.Type != "state" || !got.Me.Alive || got.Me.ID != c.id || len(got.Me.Offer) != len(c.kind().Next) || got.Me.MaxHP != int(c.maxHP()) ||
 		len(got.C) != 2 || len(got.F) != 1 || len(got.P) != 1 || len(got.LB) != 3 {
 		t.Fatalf("view %s", data)
 	}
@@ -523,7 +526,7 @@ func TestTheWorldMessageIsJSON(t *testing.T) {
 	a := newArena(rand.New(rand.NewPCG(5, 6)), 20)
 	var got worldMessage
 	if err := json.Unmarshal(a.world, &got); err != nil || got.Type != "world" || len(got.Species) != len(speciesList) ||
-		len(got.Ponds) == 0 || len(got.Bushes) == 0 || len(got.Kelp) == 0 || len(got.Coast) < int(worldH/coastStep) {
+		len(got.Ponds) == 0 || len(got.Bushes) == 0 || len(got.Kelp) == 0 || len(got.Coast) < int(worldH)/int(coastStep) {
 		t.Fatalf("world %.300s (%v)", a.world, err)
 	}
 }
@@ -626,7 +629,8 @@ func TestSourcesGrowTheirFoodUpToTheirMost(t *testing.T) {
 	f := a.food[0]
 	c := put(t, a, "ann", "Millipede", f.x, f.y)
 	a.step(0.05)
-	if c.xp == 0 || a.sources[0].count != sourceKinds["tree"].max-1 {
+	ate := int(math.Round(c.xp / foodKinds[foodIndex("ginkgo")].XP))
+	if ate == 0 || a.sources[0].count != sourceKinds["tree"].max-ate {
 		t.Fatalf("after one was eaten: xp %v, count %d", c.xp, a.sources[0].count)
 	}
 }
@@ -674,5 +678,158 @@ func TestEveryFoodAndSourceKindIsKnown(t *testing.T) {
 	}
 	if foodKinds[meat].Name != "meat" {
 		t.Error("meat is not at its index")
+	}
+}
+
+func TestASmallerCreatureBitesATailAndCannotBeBittenThere(t *testing.T) {
+	a := newTestArena()
+	tooth := put(t, a, "ann", "Sabertooth", 1000, 4000)
+	tooth.angle = 0 // facing east: its tail is to the west
+	x, y, _ := tailSpot(tooth)
+	raptor := put(t, a, "bea", "Raptor", x-10, y)
+	raptor.angle = 0
+	a.step(0.05)
+	if tooth.hp >= tooth.maxHP() || tooth.tailBit == 0 {
+		t.Fatalf("the tail bite took nothing: %v hp", tooth.hp)
+	}
+	if raptor.hp != raptor.maxHP() {
+		t.Fatalf("the sabertooth bit back from its tail: raptor at %v", raptor.hp)
+	}
+	want := biteDamage(raptor) * tailBonus * fightBack(tooth.tier()-raptor.tier())
+	if got := tooth.maxHP() - tooth.hp; math.Abs(got-want) > 0.01 {
+		t.Fatalf("the tail bite took %v, want %v", got, want)
+	}
+	// in front, the sabertooth bites
+	front := put(t, a, "cy", "Raptor", 1000+tooth.r()+10, 4000)
+	tooth.biteCd = 0
+	a.step(0.05)
+	if front.hp >= front.maxHP() {
+		t.Fatal("the sabertooth did not bite the raptor in front of it")
+	}
+}
+
+func TestLavaBurnsAllButTheFireproofAndFliers(t *testing.T) {
+	a := newTestArena()
+	a.lava = []circle{{X: 3000, Y: 1000, R: 400}}
+	rex := put(t, a, "ann", "T-Rex", 3000, 1000)
+	sal := put(t, a, "bea", "Salamander", 3100, 1100)
+	bird := put(t, a, "cy", "Argentavis", 2900, 900)
+	a.step(0.5)
+	if rex.hp >= rex.maxHP() || sal.hp != sal.maxHP() || bird.hp != bird.maxHP() {
+		t.Fatalf("rex %v, salamander %v, argentavis %v", rex.hp, sal.hp, bird.hp)
+	}
+	rex.hp = 1
+	a.step(0.5)
+	if rex.dead == nil || rex.dead.Cause != "lava" {
+		t.Fatalf("death %+v, want lava", rex.dead)
+	}
+}
+
+func TestIceSlidesAllButTundraCreatures(t *testing.T) {
+	a := newTestArena()
+	a.ice = []circle{{X: 3000, Y: 7000, R: 600}}
+	raptor := put(t, a, "ann", "Raptor", 3000, 7000)
+	rhino := put(t, a, "bea", "Woolly Rhino", 3000, 7300)
+	for _, c := range []*creature{raptor, rhino} {
+		c.vx = 300
+	}
+	a.step(0.05)
+	if raptor.vx < 250 || rhino.vx > 250 {
+		t.Fatalf("after letting go: raptor %v, rhino %v", raptor.vx, rhino.vx)
+	}
+}
+
+func TestTheBiomesLieWhereTheyShould(t *testing.T) {
+	a := newTestArena()
+	for _, c := range []struct {
+		x, y float64
+		want string
+	}{{4000, 400, volcano}, {4000, 7600, tundra}, {600, 4000, swamp}, {4500, 4000, meadow}, {9700, 4000, oceanBiome}} {
+		if got := a.biomeAt(c.x, c.y); got != c.want {
+			t.Errorf("%v, %v is %s, want %s", c.x, c.y, got, c.want)
+		}
+	}
+}
+
+func TestEachBiomeGrowsItsOwnFood(t *testing.T) {
+	a := newTestArena()
+	a.foodTarget = maps.Clone(foodTarget)
+	a.restockFood(math.MaxInt)
+	for _, f := range a.food {
+		if a.biomeAt(f.x, f.y) != f.biome {
+			t.Fatalf("%s food at %v, %v, in %s", f.biome, f.x, f.y, a.biomeAt(f.x, f.y))
+		}
+		if !slices.ContainsFunc(looseFood[f.biome], func(k struct {
+			name  string
+			share float64
+		}) bool {
+			return k.name == foodKinds[f.kind].Name
+		}) {
+			t.Fatalf("%s grew in %s", foodKinds[f.kind].Name, f.biome)
+		}
+	}
+	if len(a.food) < 1500 {
+		t.Fatalf("only %d food", len(a.food))
+	}
+}
+
+func TestBotsAreBornAtHome(t *testing.T) {
+	a := newArena(rand.New(rand.NewPCG(8, 8)), 20)
+	home := 0
+	for _, c := range a.creatures {
+		if a.biomeAt(c.x, c.y) == c.kind().Home {
+			home++
+		}
+	}
+	if home < len(a.creatures)*9/10 {
+		t.Fatalf("%d of %d bots were born at home", home, len(a.creatures))
+	}
+}
+
+func TestSkillsGrowWithTheirLevel(t *testing.T) {
+	a := newTestArena()
+	frog := put(t, a, "ann", "Devil Frog", 1000, 4000)
+	for _, c := range []struct{ lv, shots int }{{0, 1}, {3, 3}, {5, 5}} {
+		a.shots, frog.abilityCd, frog.abilityLv = nil, 0, c.lv
+		a.useAbility(frog)
+		if len(a.shots) != c.shots {
+			t.Fatalf("level %d fired %d shots, want %d", c.lv, len(a.shots), c.shots)
+		}
+	}
+	rex := put(t, a, "bea", "T-Rex", 3000, 4000)
+	near := reach(rex)
+	rex.abilityLv = 3
+	if reach(rex) <= near {
+		t.Fatal("a stomp's reach did not grow")
+	}
+	foe := put(t, a, "cy", "Mosasaur", 3100, 4000)
+	a.useAbility(rex)
+	if foe.dazed == 0 {
+		t.Fatal("a level 3 stomp did not daze")
+	}
+	// a level 2 charge goes through two creatures, by its side as it passes
+	tri := put(t, a, "dee", "Triceratops", 1000, 5000)
+	tri.angle, tri.abilityLv = 0, 2
+	put(t, a, "eve", "Raptor", 1100, 5045)
+	put(t, a, "fay", "Raptor", 1250, 4955)
+	a.useAbility(tri)
+	for range 10 {
+		a.step(0.05)
+	}
+	if len(tri.chargeHits) != 2 {
+		t.Fatalf("the charge hit %d creatures, want 2", len(tri.chargeHits))
+	}
+}
+
+func TestEverySpeciesHasAHomeAndTheTopIsTier12(t *testing.T) {
+	top := 0
+	for _, s := range speciesList {
+		if _, ok := biomeShare[s.Home]; !ok {
+			t.Errorf("%s lives in %q", s.Name, s.Home)
+		}
+		top = max(top, s.Tier)
+	}
+	if top != len(tierNeed)-1 || top != 11 {
+		t.Fatalf("the top tier is %d", top)
 	}
 }

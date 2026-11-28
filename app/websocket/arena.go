@@ -3,6 +3,7 @@ package websocket
 import (
 	"encoding/json"
 	"html"
+	"maps"
 	"math"
 	"math/rand/v2"
 	"slices"
@@ -13,8 +14,9 @@ import (
 // enough of it a creature may evolve into one of the species its own leads to (species.go), or stay as it is for a
 // stat point that raises its bite or its ability.
 //
-// Fights are hp against bites. A creature bites any smaller creature it touches, every preyBiteCd; one of its own
-// tier only with a boost. No one hit takes more than maxHitShare of a creature's health, so nothing is eaten in one
+// Fights are hp against bites. A creature bites any smaller creature it touches, every preyBiteCd, except at its own
+// tail: there, the smaller one bites its weak spot (tailBonus) and is out of reach of its teeth. One of its own tier
+// it bites only with a boost. No one hit takes more than maxHitShare of a creature's health, so nothing is eaten in one
 // bite: a bitten creature is thrown clear, gets a burst of speed to run with, and bites back as it goes, and a boost
 // into a bigger creature bites it too, the harder the closer in size they are. A hurt that empties a creature's hp
 // eats it, whichever of the two is bigger. Health grows back only once a creature has not been hurt for a while.
@@ -26,30 +28,35 @@ type foodKind struct {
 	R      float64 `json:"r"`
 	XP     float64 `json:"xp"`
 	Hunger float64 `json:"hunger"`
-	Sea    bool    `json:"sea"`  // grows in the sea, not on land
+	Sea    bool    `json:"sea"`  // found at sea
 	Full   bool    `json:"full"` // feeds big creatures as much as small ones; other food feeds them less
-	share  float64 // its share of what grows loose where it grows; the rest only comes from sources, or creatures
 }
 
+// foodKinds are all the food there is. What grows loose in each biome is in looseFood (biome.go); the rest comes from
+// sources (terrain.go) or from creatures.
 var foodKinds = []foodKind{
-	{Name: "berry", R: 7, XP: 3, Hunger: 5, share: 0.5},
-	{Name: "mushroom", R: 9, XP: 6, Hunger: 7, share: 0.3},
-	{Name: "egg", R: 10, XP: 12, Hunger: 12, share: 0.2},
-	{Name: "krill", R: 7, XP: 3, Hunger: 5, Sea: true, share: 0.55},
-	{Name: "clam", R: 9, XP: 6, Hunger: 7, Sea: true, share: 0.3},
-	{Name: "fish", R: 11, XP: 12, Hunger: 12, Sea: true, share: 0.15},
+	{Name: "berry", R: 7, XP: 3, Hunger: 5},
+	{Name: "mushroom", R: 9, XP: 6, Hunger: 7},
+	{Name: "egg", R: 10, XP: 12, Hunger: 12},
+	{Name: "krill", R: 7, XP: 3, Hunger: 5, Sea: true},
+	{Name: "clam", R: 9, XP: 6, Hunger: 7, Sea: true},
+	{Name: "fish", R: 11, XP: 12, Hunger: 12, Sea: true},
 	{Name: "meat", R: 10, XP: 15, Hunger: 18, Full: true},
 	{Name: "ginkgo", R: 9, XP: 8, Hunger: 9},
 	{Name: "termites", R: 8, XP: 4, Hunger: 5},
 	{Name: "lily", R: 10, XP: 5, Hunger: 8},
 	{Name: "shrimp", R: 8, XP: 6, Hunger: 6, Sea: true},
 	{Name: "starfruit", R: 13, XP: 60, Hunger: 30, Full: true},
+	{Name: "fernhead", R: 9, XP: 6, Hunger: 7},
+	{Name: "emberberry", R: 8, XP: 7, Hunger: 6},
+	{Name: "frostberry", R: 8, XP: 5, Hunger: 6},
+	{Name: "pinecone", R: 10, XP: 8, Hunger: 8},
 }
 
 const meat = 6 // index of meat in foodKinds
 
 const (
-	worldW, worldH = 7200.0, 6000.0
+	worldW, worldH = 10000.0, 8000.0
 	coastStep      = 150.0 // px between the points of the coastline
 	maxHunger      = 100.0
 	spawnGuard     = 3.0  // seconds a new creature cannot be eaten or hurt
@@ -68,6 +75,8 @@ const (
 	adrenaline     = 1.0  // seconds a bitten creature runs faster
 	adrenalineMul  = 1.3  // and how much faster
 	healDelay      = 3.0  // seconds after a hurt before health grows back
+	tailBonus      = 1.5  // a bite on a bigger creature's tail, times the bite
+	tailBoostBonus = 1.4  // and with a boost, times that again
 	spectatorView  = 1100.0
 )
 
@@ -107,10 +116,13 @@ type creature struct {
 	abilityCd             float64 // seconds until its ability is ready
 	biteCd                float64 // seconds until it bites a smaller creature again
 	flee                  float64 // seconds of speed left from being bitten
+	tailBit               float64 // seconds its tail shows as bitten
 	hurtAt                float64 // arena clock when it was last hurt
 	charging              float64 // seconds left of an ability charge
 	fx                    float64 // seconds its ability shows
-	bit, chargeHit        bool    // this boost already bit someone; this charge already hit someone
+	bit                   bool    // this boost already bit someone
+	chargeHits            []int   // the creatures this charge has hit
+	dazed                 float64 // seconds it is slowed by a stomp
 	offer                 bool    // it may evolve, and has not chosen
 	points                int     // stat points to spend
 	biteLv, abilityLv     int
@@ -128,7 +140,8 @@ func (c *creature) maxHP() float64 { return speciesList[c.sp].HP * (1 + hpBonus*
 
 // death is how a creature ended; a player's view shows it until they spawn again.
 type death struct {
-	By    string // the name of who ate it, "" when it starved
+	By    string // the name of who ate it, "" when it starved or burned
+	Cause string // "eaten", "starved" or "lava"
 	BySp  int    // their species
 	Sp    int    // the species it had reached
 	XP    float64
@@ -141,6 +154,7 @@ type foodItem struct {
 	id, kind int
 	x, y     float64
 	src      *source // the source it grew from; nil for none
+	biome    string  // the biome it grew loose in; "" for none
 }
 
 // eaten is one thing eaten this tick, for the views to animate: food or a creature, and the id of the creature that ate it.
@@ -160,44 +174,23 @@ type arena struct {
 	coast               []float64 // the coastline: the sea starts at coast[i] px from the west, at y = i*coastStep
 	ponds, bushes, kelp []circle
 	islands, tar        []circle
+	lava, ice           []circle
+	edges               edges
 	rocks, reefs        []circle // crags: land and sea
 	sources             []*source
 	starTimer           float64
 	eaten               []eaten
-	landFood, seaFood   int // how much food the land and the sea grow back to
-	minBots             int // bots the arena keeps however many players there are
-	totalCreatures      int // creatures bots fill the arena up to
+	foodTarget          map[string]int // how much loose food each biome grows back to
+	minBots             int            // bots the arena keeps however many players there are
+	totalCreatures      int            // creatures bots fill the arena up to
 	botTimer            float64
 	world               []byte // the map as a "world" message, sent once to each connection
 	board               []byte // the leaderboard as JSON, refreshed each step
 }
 
 func newArena(rng *rand.Rand, rate int) *arena {
-	a := &arena{rng: rng, rate: rate, landFood: 800, seaFood: 350, minBots: 16, totalCreatures: 50}
-	p1, p2 := rng.Float64()*6, rng.Float64()*6
-	for y := 0.0; y <= worldH+coastStep; y += coastStep {
-		a.coast = append(a.coast, 5000+230*math.Sin(y/900+p1)+110*math.Sin(y/340+p2))
-	}
-	onLand := func(x, y, r float64) bool { return x+r+220 < a.coastX(y) }
-	atSea := func(x, y, r float64) bool { return x-r-220 > a.coastX(y) }
-	a.ponds = a.scatter(12, 140, 300, nil, func(x, y, r float64) bool { return x+r+350 < a.coastX(y) })
-	a.tar = a.scatter(8, 110, 190, a.ponds, onLand)
-	a.bushes = a.scatter(100, 55, 95, slices.Concat(a.ponds, a.tar), onLand)
-	a.rocks = a.scatter(30, 60, 110, slices.Concat(a.ponds, a.tar, a.bushes), onLand)
-	a.islands = a.scatter(5, 220, 380, nil, func(x, y, r float64) bool { return x-r-350 > a.coastX(y) })
-	for _, isl := range a.islands { // each island has a fern, a rock and (in placeSources) a ginkgo tree
-		at := a.rng.Float64() * 2 * math.Pi
-		spot := func(k float64) (float64, float64) {
-			return isl.X + math.Cos(at+k*2.1)*isl.R*0.45, isl.Y + math.Sin(at+k*2.1)*isl.R*0.45
-		}
-		x, y := spot(0)
-		a.bushes = append(a.bushes, circle{X: x, Y: y, R: 55 + a.rng.Float64()*15})
-		x, y = spot(1)
-		a.rocks = append(a.rocks, circle{X: x, Y: y, R: 55 + a.rng.Float64()*20})
-	}
-	a.kelp = a.scatter(34, 60, 110, a.islands, atSea)
-	a.reefs = a.scatter(16, 60, 100, slices.Concat(a.islands, a.kelp), atSea)
-	a.placeSources()
+	a := &arena{rng: rng, rate: rate, minBots: 24, totalCreatures: 80, foodTarget: maps.Clone(foodTarget)}
+	a.makeMap()
 	a.world = encodeWorld(a)
 	a.restockFood(math.MaxInt)
 	for range a.totalCreatures {
@@ -306,60 +299,45 @@ func pace(habitat string, t int) float64 {
 	return 1.1 // amphibious, in water
 }
 
-// growFood adds one food of a kind drawn by share, on land or in the sea.
-func (a *arena) growFood(inSea bool) {
+// growFood adds one loose food to a biome, of a kind drawn by its share there.
+func (a *arena) growFood(biome string) {
 	roll := a.rng.Float64()
-	kind := -1
-	for i, k := range foodKinds {
-		if k.Sea != inSea || k.share == 0 {
-			continue
-		}
-		kind = i
+	name := ""
+	for _, k := range looseFood[biome] {
+		name = k.name
 		if roll < k.share {
 			break
 		}
 		roll -= k.share
 	}
-	for range 20 {
-		x, y := 30+a.rng.Float64()*(worldW-60), 30+a.rng.Float64()*(worldH-60)
-		if t := a.terrain(x, y); (t == ocean) == inSea && t != pond {
-			a.food = append(a.food, &foodItem{id: a.id(), kind: kind, x: x, y: y})
-			return
-		}
+	if x, y, ok := a.pointIn(biome, 30); ok {
+		a.food = append(a.food, &foodItem{id: a.id(), kind: foodIndex(name), x: x, y: y, biome: biome})
 	}
 }
 
-// restockFood grows up to n food where the land or the sea has less than it should.
+// restockFood grows up to n loose food in the biomes that have less than they should.
 func (a *arena) restockFood(n int) {
-	landN, seaN := 0, 0
+	have := map[string]int{}
 	for _, f := range a.food {
-		switch k := foodKinds[f.kind]; {
-		case k.share == 0:
-		case k.Sea:
-			seaN++
-		default:
-			landN++
+		if f.biome != "" {
+			have[f.biome]++
 		}
 	}
-	for ; n > 0 && (landN < a.landFood || seaN < a.seaFood); n-- {
-		inSea := seaN < a.seaFood && (landN >= a.landFood || a.rng.Float64() < 0.35)
-		a.growFood(inSea)
-		if inSea {
-			seaN++
-		} else {
-			landN++
+	for b, want := range a.foodTarget {
+		for ; n > 0 && have[b] < want; n-- {
+			a.growFood(b)
+			have[b]++
 		}
 	}
 }
 
-// spawnPoint is a place a species is at home, the one of a few tries furthest from anything that could eat it.
-func (a *arena) spawnPoint(sp int, inSea bool) (float64, float64) {
+// spawnPoint is a place in a biome, the one of a few tries furthest from anything that could eat a creature of sp.
+func (a *arena) spawnPoint(sp int, biome string) (float64, float64) {
 	tier := speciesList[sp].Tier
-	bestX, bestY, best := worldW/3, worldH/2, -1.0
+	bestX, bestY, best := worldW/2, worldH/2, -1.0
 	for range 24 {
-		x, y := 150+a.rng.Float64()*(worldW-300), 150+a.rng.Float64()*(worldH-300)
-		coast := a.coastX(y)
-		if inSea && x < coast+200 || !inSea && (x > coast-200 || a.terrain(x, y) != ground) {
+		x, y, ok := a.pointIn(biome, 150)
+		if !ok {
 			continue
 		}
 		near := 1e9
@@ -375,18 +353,18 @@ func (a *arena) spawnPoint(sp int, inSea bool) (float64, float64) {
 	return bestX, bestY
 }
 
-func (a *arena) add(name string, sp int, xp float64, bot *brain, inSea bool) *creature {
+func (a *arena) add(name string, sp int, xp float64, bot *brain, biome string) *creature {
 	c := &creature{id: a.id(), name: name, bot: bot, sp: sp, xp: xp, hp: speciesList[sp].HP, hunger: maxHunger * 0.8, guard: spawnGuard, born: a.clock, hurtAt: -healDelay}
 	c.nameJSON, _ = json.Marshal(html.EscapeString(name))
-	c.x, c.y = a.spawnPoint(sp, inSea)
+	c.x, c.y = a.spawnPoint(sp, biome)
 	c.angle = a.rng.Float64() * 2 * math.Pi
 	a.creatures = append(a.creatures, c)
 	return c
 }
 
-// spawn starts a player's new creature as the starter species, on land.
+// spawn starts a player's new creature as the starter species, in the meadow.
 func (a *arena) spawn(name string) *creature {
-	return a.add(name, starter, 0, nil, false)
+	return a.add(name, starter, 0, nil, meadow)
 }
 
 // remove takes a creature out at the next step, as when its player has gone for good.
@@ -481,6 +459,7 @@ func (a *arena) move(c *creature, dt float64) {
 	c.dash = max(0, c.dash-dt)
 	c.biteCd = max(0, c.biteCd-dt)
 	c.flee = max(0, c.flee-dt)
+	c.tailBit = max(0, c.tailBit-dt)
 	dx, dy := c.dx, c.dy
 	m := math.Hypot(dx, dy)
 	if m > 1 {
@@ -495,6 +474,9 @@ func (a *arena) move(c *creature, dt float64) {
 	if c.flee > 0 {
 		speed *= adrenalineMul
 	}
+	if c.dazed > 0 {
+		speed *= dazeSlow
+	}
 	if t == ground && sp.Habitat == land && !sp.Hides && inBush(a.bushes, c.x, c.y) {
 		speed *= 0.75 // the big ones push through
 	}
@@ -506,6 +488,10 @@ func (a *arena) move(c *creature, dt float64) {
 		tx, ty = math.Cos(c.angle)*speed*boostSpeed, math.Sin(c.angle)*speed*boostSpeed
 	}
 	k := min(1, dt*8)
+	if a.onIce(c) { // it slides: slow to turn or stop, and a little faster
+		k = min(1, dt*1.4)
+		tx, ty = tx*1.15, ty*1.15
+	}
 	c.vx += (tx - c.vx) * k
 	c.vy += (ty - c.vy) * k
 	c.x = max(sp.R, min(worldW-sp.R, c.x+c.vx*dt))
@@ -569,6 +555,18 @@ func against(by, o *creature) float64 {
 	return 1
 }
 
+// tailSpot is the weak spot at a creature's tail: its middle and radius.
+func tailSpot(c *creature) (x, y, r float64) {
+	R := c.r()
+	return c.x - math.Cos(c.angle)*R*0.9, c.y - math.Sin(c.angle)*R*0.9, R * 0.5
+}
+
+// atTail says whether small touches big's weak spot.
+func atTail(big, small *creature) bool {
+	x, y, r := tailSpot(big)
+	return math.Hypot(small.x-x, small.y-y) < small.r()+r
+}
+
 // preyBite is a bigger creature's bite on a smaller one it touches: harder the bigger the gap, and the smaller one
 // bites back and runs.
 func (a *arena) preyBite(big, small *creature) {
@@ -601,6 +599,21 @@ func (a *arena) contact() {
 				continue
 			}
 			switch {
+			case big.tier() > small.tier() && atTail(big, small):
+				// at a bigger creature's tail, the smaller one bites its weak spot, and it cannot bite back from there
+				if big.guard == 0 && (small.biteCd == 0 || small.dash > 0 && !small.bit) {
+					dmg := biteDamage(small) * tailBonus * fightBack(big.tier()-small.tier())
+					if small.dash > 0 && !small.bit {
+						small.bit = true
+						dmg *= tailBoostBonus
+					}
+					small.biteCd = preyBiteCd
+					a.hurt(small, big, dmg, 260) // and knocks it on, away from its biter
+					big.tailBit = abilityShow
+				}
+				if big.dead == nil && small.dead == nil {
+					push(big, small, d, rb+rs)
+				}
 			case big.tier() > small.tier():
 				// a boost into a bigger creature bites it, before it can bite back
 				if small.dash > 0 && !small.bit && big.guard == 0 {
@@ -659,7 +672,7 @@ func (a *arena) hurt(by, victim *creature, dmg, knock float64) {
 }
 
 func (a *arena) eat(eater, prey *creature) {
-	prey.dead = &death{By: eater.name, BySp: eater.sp, Sp: prey.sp, XP: prey.xp, Kills: prey.kills, Secs: a.clock - prey.born}
+	prey.dead = &death{By: eater.name, Cause: "eaten", BySp: eater.sp, Sp: prey.sp, XP: prey.xp, Kills: prey.kills, Secs: a.clock - prey.born}
 	a.gain(eater, 10+prey.xp*0.4)
 	eater.hunger = min(maxHunger, eater.hunger+25+5*float64(prey.tier()))
 	eater.hp = min(eater.maxHP(), eater.hp+0.15*eater.maxHP())
@@ -682,6 +695,7 @@ func (a *arena) metabolise(dt float64) {
 			continue
 		}
 		top := c.maxHP()
+		burned := a.lavaBurns(c, dt)
 		c.hunger -= (0.4 + 0.15*float64(c.tier())) * dt
 		switch {
 		case c.hunger <= 0:
@@ -691,7 +705,11 @@ func (a *arena) metabolise(dt float64) {
 			c.hp = min(top, c.hp+0.04*top*dt)
 		}
 		if c.hp <= 0 || c.bot != nil && a.clock-c.born > c.bot.lifespan {
-			c.dead = &death{Sp: c.sp, XP: c.xp, Kills: c.kills, Secs: a.clock - c.born}
+			cause := "starved"
+			if burned {
+				cause = "lava"
+			}
+			c.dead = &death{Cause: cause, Sp: c.sp, XP: c.xp, Kills: c.kills, Secs: a.clock - c.born}
 			a.dropMeat(c)
 			continue
 		}
@@ -727,29 +745,40 @@ func (a *arena) restockBots(dt float64) {
 	}
 }
 
-// spawnBot adds a bot: most are small, a third live in the sea, and none starts above botTopTier.
+// spawnBot adds a bot to a biome, drawn by its share of the world: one of the species at home there, most of them
+// small, and none above botTopTier.
 func (a *arena) spawnBot() {
+	roll := a.rng.Float64()
+	biome := meadow
+	for b, share := range biomeShare {
+		if roll < share {
+			biome = b
+			break
+		}
+		roll -= share
+	}
 	r := a.rng.Float64()
-	tier := int(r * r * r * float64(botTopTier+1))
-	inSea := a.rng.Float64() < 0.3
+	want := int(r * r * r * float64(botTopTier+1))
 	var pool []int
-	for ; len(pool) == 0 && tier <= botTopTier; tier++ {
-		for i, s := range speciesList {
-			if s.Tier == tier && (s.Habitat == amph || (s.Habitat == sea) == inSea) {
-				pool = append(pool, i)
+	// the species of this biome at the tier drawn, or the nearest tier that has one
+	for d := 0; len(pool) == 0 && d <= botTopTier; d++ {
+		for _, t := range []int{want - d, want + d} {
+			for i, s := range speciesList {
+				if s.Tier == t && t <= botTopTier && s.Home == biome && (s.Habitat == sea) == (biome == oceanBiome) {
+					pool = append(pool, i)
+				}
 			}
 		}
 	}
 	sp := starter
 	if len(pool) > 0 {
 		sp = pool[a.rng.IntN(len(pool))]
-	}
-	if speciesList[sp].Habitat == land || speciesList[sp].Habitat == air {
-		inSea = false
+	} else {
+		biome = meadow
 	}
 	t := speciesList[sp].Tier
 	b := &brain{heading: a.rng.Float64() * 2 * math.Pi, wary: 0.6 + a.rng.Float64()*0.5, bold: 0.2 + a.rng.Float64()*0.5, lifespan: 90 + a.rng.Float64()*180}
-	c := a.add(a.botName(), sp, cumulativeXP(t)+a.rng.Float64()*tierNeed[t]*0.5, b, inSea)
+	c := a.add(a.botName(), sp, cumulativeXP(t)+a.rng.Float64()*tierNeed[t]*0.5, b, biome)
 	c.progress = c.xp - cumulativeXP(t)
 }
 
