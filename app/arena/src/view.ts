@@ -1,5 +1,6 @@
 import { BODY_COLOR, drawAnimal, drawShadow } from './animals';
 import { Fx, STYLE_COLOR } from './fx';
+import { type Rig, stepRig } from './shapes';
 import { biomeAt } from './geo';
 import type { Net } from './net';
 import { drawCover, drawFood, drawGround, drawPonds, drawTerrain, type Rect } from './scene';
@@ -88,12 +89,15 @@ export class View {
   private floats: Float[] = [];
   private fx = new Fx();
   private echoes = new Map<number, { x: number; y: number; a: number }[]>(); // where charging creatures just were
+  private rigs = new Map<number, Rig>(); // each creature's spine and planted feet
+  private frameDt = 0;
   private last: MeAlive | MeDead | null = null;
   private drift = 0; // the menu's slow pan with no server
 
   constructor(private hooks: Hooks) {}
 
   frame(c: CanvasRenderingContext2D, w: number, h: number, dpr: number, net: Net, now: number, dt: number): Frame {
+    this.frameDt = dt;
     const world = net.world;
     const snaps = net.snaps;
     const t = now;
@@ -176,6 +180,7 @@ export class View {
     }
     for (const id of this.echoes.keys()) if (!byId.get(id) || !(byId.get(id)!.flags & CHARGING)) this.echoes.delete(id);
     drawCover(c, world, v, t);
+    for (const id of this.rigs.keys()) if (!byId.has(id)) this.rigs.delete(id);
     if (mine && mine.flags & HIDDEN) {
       this.creature(c, mine, t, 0.6, null, scale);
       c.beginPath();
@@ -297,7 +302,7 @@ export class View {
       c.arc(d.x, d.y, r * (1.15 + Math.sin(t * 4 + d.id) * 0.08), 0, TAU);
       c.stroke();
     }
-    drawAnimal(c, d.s.name, d.x, d.y, r, d.a, t + d.id, d.mv, d.flags & (BOOSTING | CHARGING) ? 1.1 : 1);
+    drawAnimal(c, d.s.name, d.x, d.y, r, d.a, t + d.id, d.mv, d.flags & (BOOSTING | CHARGING) ? 1.1 : 1, this.rig(d));
     if (d.flags & HURT) {
       c.beginPath();
       c.arc(d.x, d.y, r * 0.95, 0, TAU);
@@ -334,6 +339,13 @@ export class View {
       c.stroke();
     }
     c.globalAlpha = 1;
+  }
+
+  /** A creature's rig, moved on to where it is now. */
+  private rig(d: Drawn): Rig {
+    const rig = stepRig(this.rigs.get(d.id), d.x, d.y, d.a, d.s.r, this.frameDt);
+    this.rigs.set(d.id, rig);
+    return rig;
   }
 
   /** A predator's weak spot: a pulsing target at its tail, flashing when it is bitten there. */

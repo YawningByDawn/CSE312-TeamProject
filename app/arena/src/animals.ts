@@ -3,35 +3,43 @@
 // by species name, so the server's species list can change order freely.
 
 import { BEAST_COLOR, BEASTS } from './beasts';
-import { Ctx, Draw, ell, eyes, feet, flippers, glowEyes, paint, poly, serpent, shag, stride, tail, tailFin, TAU, wings } from './shapes';
+import { across, bodyLine, clearPose, Ctx, Draw, ell, eyes, feet, flippers, glowEyes, paint, poly, type Rig, serpent, setPose, shag, spine, stride, tail, tailFin, TAU, wings } from './shapes';
 
 // ---- tier 0 to 2
 
 const millipede: Draw = (c, t, mv) => {
   const n = 7;
-  const wave = (i: number): number => Math.sin(t * 6 - i * 0.8) * 0.12 * (0.3 + mv);
+  // each segment lies along the body's line: with a rig the body winds after the head
+  const seg = (i: number): { x: number; y: number; a: number } => {
+    const p = spine(-(0.85 - i * 0.3), Math.sin(t * 6 - i * 0.8) * 0.06 * (0.3 + mv));
+    return { x: p.x, y: p.y, a: p.a + Math.PI };
+  };
+  const segs = Array.from({ length: n }, (_, i) => seg(i));
   c.lineCap = 'round';
   c.strokeStyle = '#4a2a1c';
   c.lineWidth = 0.06;
-  for (let i = 0; i < n; i++) {
-    const x = 0.85 - i * 0.3;
+  for (const [i, g] of segs.entries()) {
+    const cos = Math.cos(g.a);
+    const sin = Math.sin(g.a);
     for (const s of [-1, 1]) {
       const w = Math.sin(t * 18 + i * 1.3 + (s > 0 ? Math.PI : 0)) * 0.1 * mv;
+      const bx = g.x - sin * s * 0.25;
+      const by = g.y + cos * s * 0.25;
       c.beginPath();
-      c.moveTo(x, wave(i) + s * 0.25);
-      c.lineTo(x + w - 0.05, wave(i) + s * 0.62);
+      c.moveTo(bx, by);
+      c.lineTo(bx + cos * (w - 0.05) - sin * s * 0.37, by + sin * (w - 0.05) + cos * s * 0.37);
       c.stroke();
     }
   }
   c.lineWidth = 0.06;
   for (let i = n - 1; i >= 0; i--) {
-    const x = 0.85 - i * 0.3;
-    ell(c, x, wave(i), 0.25, 0.38);
+    const g = segs[i]!;
+    ell(c, g.x, g.y, 0.25, 0.38, g.a);
     paint(c, i % 2 ? '#8b4a2f' : '#9c5636', '#5a2e1c');
-    ell(c, x + 0.02, wave(i), 0.07, 0.3);
+    ell(c, g.x + Math.cos(g.a) * 0.02, g.y + Math.sin(g.a) * 0.02, 0.07, 0.3, g.a);
     paint(c, '#b97a52');
   }
-  const hy = wave(-1);
+  const hy = Math.sin(t * 6 + 0.8) * 0.06 * (0.3 + mv);
   c.strokeStyle = '#3a1e12';
   c.beginPath();
   c.moveTo(1.15, hy - 0.1);
@@ -362,27 +370,50 @@ const triceratops: Draw = (c, t, mv) => {
   feet(c, t, mv, 0.5, 0.72, 0.2, 0.15, '#6f7a4c', '#4f5634', 7);
   ell(c, -0.15, 0, 0.9, 0.76);
   paint(c, '#8d9a62', '#4f5634');
+  c.strokeStyle = 'rgba(79,86,52,0.45)';
+  c.lineWidth = 0.04;
+  for (const y of [-0.45, -0.15, 0.15, 0.45]) { // the hide's folds
+    c.beginPath();
+    c.moveTo(-0.85, y);
+    c.quadraticCurveTo(-0.3, y * 1.15, 0.2, y);
+    c.stroke();
+  }
+  c.lineWidth = 0.06;
+  // the frill, rimmed with epoccipitals: the bony points along its edge
   c.beginPath();
-  c.arc(0.55, 0, 0.68, Math.PI / 2, Math.PI * 1.5);
+  for (let k = 0; k <= 22; k++) {
+    const a = Math.PI / 2 + (k / 22) * Math.PI;
+    const r = k % 2 ? 0.66 : 0.76;
+    c.lineTo(0.55 + Math.cos(a) * r, Math.sin(a) * r);
+  }
   c.closePath();
   paint(c, '#c9773f', '#7a4220');
-  for (let a = Math.PI / 2 + 0.2; a < Math.PI * 1.5; a += 0.35) {
-    ell(c, 0.55 + Math.cos(a) * 0.62, Math.sin(a) * 0.62, 0.07, 0.07);
+  c.beginPath();
+  c.arc(0.55, 0, 0.48, Math.PI / 2, Math.PI * 1.5);
+  c.closePath();
+  paint(c, '#d98e50');
+  for (let a = Math.PI / 2 + 0.3; a < Math.PI * 1.5; a += 0.4) {
+    ell(c, 0.55 + Math.cos(a) * 0.3, Math.sin(a) * 0.3, 0.07, 0.07);
     paint(c, '#f0d9a0');
-    ell(c, 0.55 + Math.cos(a) * 0.38, Math.sin(a) * 0.38, 0.06, 0.06);
-    paint(c, '#e09a5a');
   }
-  ell(c, 0.82, 0, 0.36, 0.3);
+  ell(c, 0.84, 0, 0.36, 0.3);
   paint(c, '#8d9a62', '#4f5634');
-  for (const s of [-1, 1]) {
-    poly(c, [[0.8, s * 0.12], [1.42, s * 0.3], [0.86, s * 0.24]]);
+  for (const s of [-1, 1]) { // the brow horns, long and curving forward
+    c.beginPath();
+    c.moveTo(0.78, s * 0.1);
+    c.quadraticCurveTo(1.15, s * 0.32, 1.5, s * 0.26);
+    c.quadraticCurveTo(1.12, s * 0.2, 0.88, s * 0.24);
+    c.closePath();
     paint(c, '#f1e6c8', '#a89a78');
   }
-  poly(c, [[1.08, -0.06], [1.32, 0], [1.08, 0.06]]);
+  poly(c, [[1.08, -0.06], [1.3, 0], [1.08, 0.06]]);
   paint(c, '#f1e6c8', '#a89a78');
-  ell(c, 1.16, 0, 0.08, 0.1);
-  paint(c, '#4a4a3a');
-  eyes(c, 0.9, 0.2, 0.05);
+  c.beginPath(); // the beak
+  c.moveTo(1.12, -0.1);
+  c.quadraticCurveTo(1.3, 0, 1.12, 0.1);
+  c.closePath();
+  paint(c, '#3a3a2a');
+  eyes(c, 0.92, 0.2, 0.05);
 };
 
 // ---- tier 5
@@ -569,7 +600,7 @@ const titanoboa: Draw = (c, t, mv) => {
   c.setLineDash([0.18, 0.22]);
   c.strokeStyle = '#7d8f45';
   c.beginPath();
-  for (let x = -1.5; x <= 0.8; x += 0.1) c.lineTo(x, Math.sin(t * 5 - x * 2.2) * 0.32 * (0.45 + mv * 0.55) * (0.3 + 0.7 * ((x + 1.7) / 2.55)));
+  for (const [x, y] of head.pts.slice(1, -1)) c.lineTo(x, y);
   c.stroke();
   c.restore();
   c.save();
@@ -603,7 +634,7 @@ const seaSerpent: Draw = (c, t, mv) => {
   c.lineWidth = 0.14;
   c.strokeStyle = '#e0a94a';
   c.beginPath();
-  for (let x = -1.7; x <= 0.7; x += 0.1) c.lineTo(x, Math.sin(t * 5 - x * 2.2) * 0.38 * (0.45 + mv * 0.55) * (0.3 + 0.7 * ((x + 1.9) / 2.8)));
+  for (const [x, y] of head.pts.slice(1, -1)) c.lineTo(x, y);
   c.stroke();
   c.restore();
   c.save();
@@ -682,10 +713,11 @@ const kraken: Draw = (c, t, mv) => {
     let px = -0.3;
     let py = y0;
     c.moveTo(px, py);
-    for (let k = 1; k <= 8; k++) {
+    for (let k = 1; k <= 8; k++) { // trailing behind it, along where it swam
       const s = k / 8;
-      px = -0.3 - s * 1.5;
-      py = y0 + spread * s + Math.sin(t * 4 + i * 0.9 - s * 4) * 0.18 * s * (0.5 + mv);
+      const p = spine(0.3 + s * 1.5, y0 + spread * s + Math.sin(t * 4 + i * 0.9 - s * 4) * 0.18 * s * (0.5 + mv));
+      px = p.x;
+      py = p.y;
       c.lineTo(px, py);
     }
     c.lineWidth = 0.2;
@@ -791,18 +823,18 @@ const behemoth: Draw = (c, t, mv) => {
 
 const leviathan: Draw = (c, t, mv) => {
   const head = serpent(c, t, mv, -2, 0.85, 0.78, '#1f3f73', '#0f2142', 0.34);
-  for (let x = -1.7; x <= 0.6; x += 0.22) {
-    const y = Math.sin(t * 5 - x * 2.2) * 0.34 * (0.45 + mv * 0.55) * (0.3 + 0.7 * ((x + 2) / 2.85));
-    poly(c, [[x - 0.08, y], [x + 0.02, y - 0.13], [x + 0.1, y], [x + 0.02, y + 0.13]]);
+  const line = bodyLine(head.pts);
+  for (const p of line.slice(2, -2)) { // dorsal spikes, each lying along the body
+    poly(c, [across(p, 0, -0.08), across(p, -0.13, 0.02), across(p, 0, 0.1), across(p, 0.13, 0.02)]);
     paint(c, '#7fb4e0');
   }
   c.save();
   c.shadowColor = '#9fe8ff';
   c.shadowBlur = 6;
-  for (let x = -1.5; x <= 0.5; x += 0.35) {
-    const y = Math.sin(t * 5 - x * 2.2) * 0.34 * (0.45 + mv * 0.55) * (0.3 + 0.7 * ((x + 2) / 2.85));
+  for (const p of line.filter((_, i) => i % 3 === 1).slice(0, -1)) {
     for (const s of [-1, 1]) {
-      ell(c, x, y + s * 0.22, 0.035, 0.035);
+      const [x, y] = across(p, s * 0.22);
+      ell(c, x, y, 0.035, 0.035);
       paint(c, '#9fe8ff');
     }
   }
@@ -899,14 +931,21 @@ export const BODY_COLOR: Record<string, string> = {
 };
 
 /** Draws the species named `name` at x, y with radius r, facing angle a. */
-export function drawAnimal(c: Ctx, name: string, x: number, y: number, r: number, a: number, t: number, mv: number, stretch = 1): void {
+/** Draws the species named `name` at x, y with radius r, facing angle a. With a rig (kept by the view), its tail and
+ * body follow where it has been and its feet stay planted; it breathes, blinks, and is lit from the top left. */
+export function drawAnimal(c: Ctx, name: string, x: number, y: number, r: number, a: number, t: number, mv: number, stretch = 1, rig: Rig | null = null): void {
   c.save();
   c.translate(x, y);
   c.rotate(a);
-  c.scale(r * stretch, r / Math.sqrt(stretch));
+  const breath = rig ? Math.sin(t * 2.4) * 0.02 * (1 - mv * 0.6) : 0;
+  c.scale(r * stretch * (1 + breath * 0.4), (r / Math.sqrt(stretch)) * (1 + breath));
   c.lineJoin = 'round';
   c.lineCap = 'butt';
+  const m = c.getTransform();
+  if (rig) Object.assign(rig, { x, y, a, r });
+  setPose(a, Math.hypot(m.a, m.b), rig, t);
   (draws[name] ?? millipede)(c, t, mv);
+  clearPose();
   c.restore();
 }
 

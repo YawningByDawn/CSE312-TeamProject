@@ -1,41 +1,51 @@
-import { type Draw, ell, eyes, feet, flippers, glowEyes, paint, poly, serpent, shag, stride, TAU, tail, tailFin, wings, type Ctx } from './shapes';
+import { across, bodyLine, type Draw, ell, eyes, feet, flippers, glowEyes, paint, poly, serpent, shag, spine, stride, TAU, tail, tailFin, wings, type Ctx } from './shapes';
 
 // The creatures that came with the biomes and the top tiers: the air line from the Meganeura to Quetzalcoatl, the
 // fire-walkers of the Ashen Peaks, the beasts of Frostmarch and Mirewood, more of the sea, and the last myths. Each
 // at a radius of 1, facing +x.
 
-/** A giant on two legs, seen from above: a broad back, a head in front, and long arms swinging forward to fists. */
+/** A giant on two legs, seen from above: a broad back, a head in front, and arms in three parts, shoulder to fist,
+ * swinging as it walks. */
 function giant(c: Ctx, t: number, mv: number, skin: string, dark: string, fur: string | null): void {
-  const swing = Math.sin(t * 5) * 0.22 * (0.3 + mv);
+  const swing = Math.sin(t * 5) * 0.2 * (0.3 + mv);
   for (const s of [-1, 1]) {
     const step = Math.sin(t * 5 + (s > 0 ? Math.PI : 0)) * 0.22 * mv;
-    ell(c, -0.45 + step, s * 0.32, 0.26, 0.15);
+    ell(c, -0.45 + step, s * 0.3, 0.26, 0.15);
     paint(c, dark, dark);
   }
-  if (fur) {
-    shag(c, -0.15, 0, 0.55, 0.92, 18, 0.12);
-    paint(c, fur, dark);
-  } else {
-    ell(c, -0.15, 0, 0.55, 0.92);
-    paint(c, skin, dark);
-  }
-  c.lineCap = 'round';
   for (const s of [-1, 1]) {
     const reach = s > 0 ? swing : -swing;
-    for (const [color, w] of [[dark, 0.36], [fur ?? skin, 0.26]] as const) {
-      c.strokeStyle = color;
-      c.lineWidth = w;
-      c.beginPath();
-      c.moveTo(-0.15, s * 0.78);
-      c.quadraticCurveTo(0.25, s * 1.02, 0.62 + reach, s * 0.82);
-      c.stroke();
-    }
-    c.lineWidth = 0.05;
-    ell(c, 0.7 + reach, s * 0.8, 0.2, 0.18);
+    ell(c, -0.05 + reach * 0.4, s * 0.86, 0.3, 0.17, s * -0.35);
+    paint(c, fur ?? skin, dark);
+    ell(c, 0.32 + reach, s * 0.92, 0.28, 0.15, s * 0.15);
+    paint(c, fur ?? skin, dark);
+    ell(c, 0.62 + reach, s * 0.86, 0.17, 0.16);
     paint(c, skin, dark);
+    c.strokeStyle = dark; // knuckles
+    c.lineWidth = 0.035;
+    c.beginPath();
+    for (const k of [-1, 0, 1]) {
+      c.moveTo(0.7 + reach, s * 0.86 + k * 0.06);
+      c.lineTo(0.78 + reach, s * 0.86 + k * 0.06);
+    }
+    c.stroke();
   }
   c.lineWidth = 0.05;
-  ell(c, 0.25, 0, 0.36, 0.34);
+  if (fur) {
+    shag(c, -0.15, 0, 0.55, 0.88, 18, 0.12);
+    paint(c, fur, dark);
+  } else {
+    ell(c, -0.15, 0, 0.55, 0.88);
+    paint(c, skin, dark);
+  }
+  c.strokeStyle = dark; // the spine down its back
+  c.globalAlpha = 0.35;
+  c.beginPath();
+  c.moveTo(-0.6, 0);
+  c.lineTo(0.15, 0);
+  c.stroke();
+  c.globalAlpha = 1;
+  ell(c, 0.25, 0, 0.34, 0.32);
   paint(c, skin, dark);
 }
 
@@ -73,8 +83,9 @@ const meganeura: Draw = (c, t) => {
     }
   }
   c.lineWidth = 0.06;
-  for (let i = 0; i < 8; i++) {
-    ell(c, -0.3 - i * 0.16, 0, 0.1, 0.08 - i * 0.004);
+  for (let i = 0; i < 8; i++) { // the long abdomen trails along its flight
+    const p = spine(0.3 + i * 0.16);
+    ell(c, p.x, p.y, 0.1, 0.08 - i * 0.004, p.a);
     paint(c, i % 2 ? '#2f6f7a' : '#3a8a94', '#1d4048');
   }
   ell(c, 0.3, 0, 0.3, 0.22);
@@ -239,57 +250,84 @@ const thunderbird: Draw = (c, t) => {
 };
 
 const phoenix: Draw = (c, t) => {
-  c.save();
-  c.shadowColor = '#ff8a2a';
-  c.shadowBlur = 14;
-  for (let k = -2; k <= 2; k++) { // tail plumes
-    const sway = Math.sin(t * 4 + k) * 0.15;
-    ell(c, -1.1, k * 0.16 + sway, 0.6, 0.1, k * 0.2 + sway);
-    paint(c, k % 2 ? '#ffb02a' : '#ff6a1a');
-  }
-  wings(c, t * 0.8, 0.05, 2.1, 'rgba(255,120,30,0.9)', '#c83a10', true);
-  flames(c, t, -0.1, 0.55, 0.45, 12);
-  c.restore();
   c.lineWidth = 0.05;
-  ell(c, -0.1, 0, 0.55, 0.42);
-  paint(c, '#ff8a2a', '#c83a10');
-  ell(c, -0.1, 0, 0.32, 0.24);
-  paint(c, '#ffe27a');
-  ell(c, 0.55, 0, 0.24, 0.2);
-  paint(c, '#ffa02a', '#c83a10');
-  for (const s of [-1, 1]) {
-    poly(c, [[0.5, s * 0.08], [0.2, s * 0.3], [0.42, s * 0.12]]);
-    paint(c, '#ffe27a');
+  for (let k = -2; k <= 2; k++) { // tail plumes, each ending in an eyespot
+    const sway = Math.sin(t * 3 + k) * 0.12;
+    const ang = Math.PI + k * 0.22 + sway;
+    const len = 1.35 - Math.abs(k) * 0.12;
+    const ex = -0.45 + Math.cos(ang) * len;
+    const ey = Math.sin(ang) * len;
+    c.beginPath();
+    c.moveTo(-0.45, 0);
+    c.quadraticCurveTo(-0.45 + Math.cos(ang) * len * 0.5, Math.sin(ang) * len * 0.5 + sway * 0.3, ex, ey);
+    c.strokeStyle = k % 2 ? '#ff9a2a' : '#ff6a1a';
+    c.lineWidth = 0.09;
+    c.stroke();
+    c.lineWidth = 0.04;
+    ell(c, ex, ey, 0.13, 0.09, ang);
+    paint(c, '#ffd23a', '#c83a10');
+    ell(c, ex, ey, 0.05, 0.05);
+    paint(c, '#7a2a8a');
   }
-  poly(c, [[0.72, -0.07], [1, 0], [0.72, 0.07]]);
+  wings(c, t * 0.8, 0.05, 1.85, '#ff8a2a', '#b8340e', true);
+  for (const s of [-1, 1]) { // flame tips along each wing
+    for (let k = 0; k < 5; k++) {
+      const f = Math.sin(t * 9 + k * 1.7 + s) * 0.06;
+      const x = -0.05 - k * 0.14;
+      const y = s * (1.6 - k * 0.22) * (0.88 + Math.sin(t * 5.6) * 0.12);
+      c.beginPath();
+      c.moveTo(x + 0.06, y - s * 0.02);
+      c.quadraticCurveTo(x - 0.05, y + s * (0.18 + f), x - 0.12, y + s * (0.26 + f));
+      c.quadraticCurveTo(x - 0.02, y + s * 0.08, x - 0.07, y - s * 0.02);
+      c.closePath();
+      c.fillStyle = k % 2 ? '#ffe27a' : '#ffb02a';
+      c.fill();
+    }
+  }
+  c.save();
+  c.shadowColor = '#ff9a2a';
+  c.shadowBlur = 6;
+  ell(c, -0.1, 0, 0.5, 0.38);
+  paint(c, '#ff8a2a', '#b8340e');
+  c.restore();
+  ell(c, -0.1, 0, 0.28, 0.2);
+  paint(c, '#ffe27a');
+  ell(c, 0.5, 0, 0.23, 0.19);
+  paint(c, '#ffa02a', '#b8340e');
+  for (let k = -2; k <= 2; k++) { // a crest of flames
+    const f = Math.sin(t * 10 + k) * 0.05;
+    poly(c, [[0.42, k * 0.05], [0.12 + f, k * 0.12], [0.36, k * 0.05 + 0.04]]);
+    paint(c, k % 2 ? '#ffe27a' : '#ff6a1a');
+  }
+  poly(c, [[0.68, -0.07], [0.95, 0], [0.68, 0.07]]);
   paint(c, '#ffe27a', '#c87a10');
-  glowEyes(c, 0.6, 0.1, 0.045, '#fff6c0');
+  glowEyes(c, 0.56, 0.09, 0.04, '#fff6c0');
 };
 
 const quetzalcoatl: Draw = (c, t, mv) => {
-  c.save();
-  c.shadowColor = '#7fffd0';
-  c.shadowBlur = 10;
-  wings(c, t * 0.6, 0.35, 1.8, 'rgba(60,200,150,0.9)', '#106a50', true);
-  c.restore();
+  for (const [span, fill, stroke] of [[1.55, '#2ab88a', '#0e6a4e'], [1.15, '#ffd23a', '#a87a18'], [0.8, '#e84a6a', '#8a1a34']] as const) {
+    wings(c, t * 0.6, 0.35, span, fill, stroke, true); // rainbow layers: green, gold, red
+  }
   const head = serpent(c, t, mv, -2, 0.95, 0.5, '#3cc890', '#106a50', 0.38);
-  c.save();
-  c.setLineDash([0.1, 0.1]);
-  c.lineWidth = 0.18;
-  for (const [color, off] of [['#ffd23a', 0], ['#e84a6a', 0.1]] as const) {
-    c.strokeStyle = color;
-    c.lineDashOffset = off;
+  const line = bodyLine(head.pts);
+  for (const p of line.slice(1, -2)) { // scales: a gold chevron on each segment
     c.beginPath();
-    for (let x = -1.8; x <= 0.8; x += 0.1) c.lineTo(x, Math.sin(t * 5 - x * 2.2) * 0.38 * (0.45 + mv * 0.55) * (0.3 + 0.7 * ((x + 2) / 2.95)));
+    c.moveTo(...across(p, -0.12, -0.05));
+    c.lineTo(...across(p, 0, 0.05));
+    c.lineTo(...across(p, 0.12, -0.05));
+    c.strokeStyle = '#ffd23a';
+    c.lineWidth = 0.04;
     c.stroke();
   }
-  c.restore();
   c.save();
   c.translate(head.x, head.y);
   c.rotate(head.a);
   c.lineWidth = 0.05;
-  shag(c, 0, 0, 0.3, 0.42, 7, 0.35, Math.PI * 0.55, Math.PI * 1.45);
-  paint(c, '#ffd23a', '#a87a18');
+  for (const [k, color] of ['#e84a6a', '#ffd23a', '#2ab88a', '#5ab8ff', '#ffd23a', '#e84a6a'].entries()) { // a feathered ruff
+    const a = Math.PI * 0.6 + (k / 5) * Math.PI * 0.8;
+    ell(c, Math.cos(a) * 0.32, Math.sin(a) * 0.36, 0.16, 0.07, a);
+    paint(c, color, '#0e6a4e');
+  }
   ell(c, 0.15, 0, 0.32, 0.24);
   paint(c, '#3cc890', '#106a50');
   poly(c, [[0.4, -0.06], [0.62, 0], [0.4, 0.06]]);
@@ -353,25 +391,35 @@ const dimetrodon: Draw = (c, t, mv) => {
 
 const diplocaulus: Draw = (c, t, mv) => {
   c.lineWidth = 0.06;
-  const tip = tail(c, t, mv, -0.5, 0.9, 0.3, '#7a8a4a', '#4a5428', 0.45);
-  ell(c, tip.x, tip.y, 0.18, 0.08, tip.a);
+  const tip = tail(c, t, mv, -0.45, 1, 0.32, '#6f8044', '#4a5428', 0.45);
+  ell(c, tip.x, tip.y, 0.2, 0.08, tip.a);
   paint(c, '#7a8a4a', '#4a5428');
-  feet(c, t, mv, 0.25, 0.42, 0.12, 0.08, '#6a7a3a', '#4a5428', 10);
-  ell(c, -0.05, 0, 0.6, 0.38);
+  feet(c, t, mv, 0.2, 0.36, 0.11, 0.08, '#6a7a3a', '#4a5428', 10);
+  ell(c, -0.1, 0, 0.55, 0.32);
   paint(c, '#7a8a4a', '#4a5428');
-  // the boomerang head
-  c.beginPath();
-  c.moveTo(0.85, 0);
-  c.quadraticCurveTo(0.7, -0.5, 0.1, -1.05);
-  c.quadraticCurveTo(0.5, -0.4, 0.45, 0);
-  c.quadraticCurveTo(0.5, 0.4, 0.1, 1.05);
-  c.quadraticCurveTo(0.7, 0.5, 0.85, 0);
-  paint(c, '#8a9a58', '#4a5428');
-  for (const [x, y] of [[0.4, -0.5], [0.4, 0.5], [0.25, -0.8], [0.25, 0.8]] as const) {
-    ell(c, x, y, 0.05, 0.05);
+  for (const [x, y] of [[-0.35, -0.12], [-0.1, 0.14], [-0.45, 0.1], [0.05, -0.1]] as const) {
+    ell(c, x, y, 0.05, 0.04);
     paint(c, '#5a6a30');
   }
-  eyes(c, 0.68, 0.12, 0.045, '#e8d040');
+  // the boomerang head: wide and flat, its horns sweeping back past its shoulders
+  c.beginPath();
+  c.moveTo(0.95, 0);
+  c.bezierCurveTo(0.92, -0.35, 0.55, -0.7, -0.05, -1.05);
+  c.bezierCurveTo(0.2, -0.75, 0.35, -0.45, 0.3, -0.2);
+  c.quadraticCurveTo(0.35, 0, 0.3, 0.2);
+  c.bezierCurveTo(0.35, 0.45, 0.2, 0.75, -0.05, 1.05);
+  c.bezierCurveTo(0.55, 0.7, 0.92, 0.35, 0.95, 0);
+  paint(c, '#8a9a58', '#4a5428');
+  c.strokeStyle = 'rgba(74,84,40,0.5)';
+  c.lineWidth = 0.035;
+  for (const s of [-1, 1]) { // ridges along each horn
+    c.beginPath();
+    c.moveTo(0.7, s * 0.15);
+    c.quadraticCurveTo(0.45, s * 0.55, 0.05, s * 0.95);
+    c.stroke();
+  }
+  c.lineWidth = 0.06;
+  eyes(c, 0.72, 0.12, 0.05, '#e8d040');
 };
 
 const sarcosuchus: Draw = (c, t, mv) => {
@@ -660,14 +708,13 @@ const jormungandr: Draw = (c, t, mv) => {
   c.save();
   c.shadowColor = '#6aff9a';
   c.shadowBlur = 8;
-  for (let x = -1.9; x <= 0.6; x += 0.3) {
-    const y = Math.sin(t * 5 - x * 2.2) * 0.36 * (0.45 + mv * 0.55) * (0.3 + 0.7 * ((x + 2.2) / 3.1));
+  for (const p of bodyLine(head.pts).filter((_, i) => i % 2 === 1).slice(0, -1)) {
     c.strokeStyle = '#8affb0';
     c.lineWidth = 0.05;
-    c.beginPath(); // runes
-    c.moveTo(x - 0.06, y - 0.12);
-    c.lineTo(x + 0.06, y);
-    c.lineTo(x - 0.06, y + 0.12);
+    c.beginPath(); // runes, pointing the way it goes
+    c.moveTo(...across(p, -0.12, -0.06));
+    c.lineTo(...across(p, 0, 0.06));
+    c.lineTo(...across(p, 0.12, -0.06));
     c.stroke();
   }
   c.restore();

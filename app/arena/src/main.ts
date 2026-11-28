@@ -4,6 +4,7 @@ import { Input } from './input';
 import { Net } from './net';
 import { BIOME_HINT, BIOME_NAME } from './geo';
 import { drawTree, Panels } from './panels';
+import { quality } from './shapes';
 import type { MeDead } from './types';
 import { View } from './view';
 
@@ -211,11 +212,14 @@ window.addEventListener('keydown', (e) => {
 // the loop
 let last = performance.now();
 let sent = { dx: 0, dy: 0, at: 0 };
+let slowFrames = 0; // frames in a row over budget: enough of them and creatures are drawn flat
 let lastBiome: string | null = null;
 
 function frame(now: number): void {
   const dt = Math.min(0.1, (now - last) / 1000);
   last = now;
+  slowFrames = dt > 0.033 ? slowFrames + 1 : 0;
+  if (slowFrames > 180) quality.shade = false; // three seconds under 30 fps
   const dpr = Math.min(2, window.devicePixelRatio || 1);
   const w = window.innerWidth;
   const h = window.innerHeight;
